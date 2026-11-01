@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Needed by the Dockerfile (copies .next/standalone into a small runtime image).
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

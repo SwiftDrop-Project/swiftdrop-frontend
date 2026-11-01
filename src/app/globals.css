@@ -1,26 +1,155 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * SwiftDrop design tokens (DESIGN.md v1.0).
+ * This file is the ONLY place colours, type sizes, radius and shadows are defined.
+ * Components use the generated utilities (bg-orange-700, text-grey-600, text-h1, rounded-md ...),
+ * never hex values. Tailwind's default colour, type, radius and shadow scales are removed,
+ * so a class that isn't in DESIGN.md simply doesn't exist.
+ */
+@theme {
+  /* ---------- Colour: accent (orange) ---------- */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+
+  --color-orange-50: #fff4ec;  /* active nav fill */
+  --color-orange-100: #ffe3cf; /* input focus ring */
+  --color-orange-500: #ff6a00; /* brand: logo and auth panel ONLY, never text/buttons */
+  --color-orange-600: #e55400; /* focus border, checked, selected, active nav icon */
+  --color-orange-700: #cc4a00; /* primary button, text links */
+  --color-orange-800: #a33a00; /* primary hover, active nav label */
+
+  /* ---------- Colour: neutrals ---------- */
+  --color-grey-50: #f7f8f9;  /* hover, subtle fills, disabled input, segmented track */
+  --color-grey-100: #eff1f3; /* row dividers, disabled button */
+  --color-grey-200: #e3e6ea; /* default borders */
+  --color-grey-300: #cdd2d8; /* control borders */
+  --color-grey-400: #a3aab3; /* disabled text */
+  --color-grey-500: #6b737d; /* placeholder, nav group labels */
+  --color-grey-600: #59616b; /* secondary text */
+  --color-grey-700: #3f4650; /* icons, quiet labels, nav label */
+  --color-grey-800: #272c33; /* strong text on fills */
+  --color-grey-900: #15181d; /* primary text */
+
+  /* ---------- Colour: functional (validation and delivery outcomes only) ---------- */
+  --color-error: #b42318;
+  --color-error-tint: #fef3f2;
+  --color-success: #157347;
+  --color-success-tint: #eef8f2;
+
+  /* ---------- Typography (IBM Plex Sans 400/500/600) ---------- */
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --text-*: initial;
+  --text-display: 2rem;          /* 32 / 40 / 600 */
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 600;
+  --text-h1: 1.5rem;             /* 24 / 32 / 600 */
+  --text-h1--line-height: 2rem;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.25rem;            /* 20 / 28 / 600 */
+  --text-h2--line-height: 1.75rem;
+  --text-h2--font-weight: 600;
+  --text-h3: 1rem;               /* 16 / 24 / 600 */
+  --text-h3--line-height: 1.5rem;
+  --text-h3--font-weight: 600;
+  --text-body: 1rem;             /* 16 / 24 / 400 */
+  --text-body--line-height: 1.5rem;
+  --text-body--font-weight: 400;
+  --text-body-sm: 0.875rem;      /* 14 / 20 / 400 */
+  --text-body-sm--line-height: 1.25rem;
+  --text-body-sm--font-weight: 400;
+  --text-label: 0.875rem;        /* 14 / 20 / 500. Tabular = text-label + tabular-nums */
+  --text-label--line-height: 1.25rem;
+  --text-label--font-weight: 500;
+  --text-caption: 0.75rem;       /* 12 / 16 / 500 */
+  --text-caption--line-height: 1rem;
+  --text-caption--font-weight: 500;
+
+  /*
+   * ---------- Spacing ----------
+   * Tailwind's 4px step is kept. DESIGN.md steps map to it like this:
+   * space-0.5 4px = 1 · space-1 8px = 2 · space-2 16px = 4 · space-3 24px = 6 · space-4 32px = 8
+   * space-5 40px = 10 · space-6 48px = 12 · space-8 64px = 16 · space-10 80px = 20
+   * Auth forms use 20px (gap-5) between fields and 24px (gap-6) between field groups.
+   */
+  --spacing-sidebar: 248px; /* w-sidebar */
+  --spacing-topbar: 64px;   /* h-topbar */
+
+  --container-content: 1200px; /* max-w-content: app content */
+  --container-form: 440px;     /* max-w-form: auth form column (login and register) */
+  --container-form-app: 640px; /* max-w-form-app: in-app forms */
+
+  /* ---------- Radius ---------- */
+  --radius-*: initial;
+  --radius-sm: 4px;  /* badges, checkbox */
+  --radius-md: 6px;  /* buttons, inputs */
+  --radius-lg: 8px;  /* panels, cards, menus */
+  --radius-full: 9999px;
+
+  /* ---------- Elevation: menus, popovers and dialogs only ---------- */
+  --shadow-*: initial;
+  --shadow-overlay: 0 4px 16px rgb(21 24 29 / 0.08);
 }
 
+/* short:pt-8 etc. apply when the window is less than 800px tall. */
+@custom-variant short (@media (max-height: 799.98px));
+
+/* Semantic names used by shadcn/ui components, mapped onto the tokens above. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-white);
+  --color-foreground: var(--color-grey-900);
+  --color-card: var(--color-white);
+  --color-card-foreground: var(--color-grey-900);
+  --color-popover: var(--color-white);
+  --color-popover-foreground: var(--color-grey-900);
+  --color-primary: var(--color-orange-700);
+  --color-primary-foreground: var(--color-white);
+  --color-secondary: var(--color-white);
+  --color-secondary-foreground: var(--color-grey-900);
+  --color-muted: var(--color-grey-50);
+  --color-muted-foreground: var(--color-grey-600);
+  --color-accent: var(--color-grey-50);
+  --color-accent-foreground: var(--color-grey-900);
+  --color-destructive: var(--color-error);
+  --color-border: var(--color-grey-200);
+  --color-input: var(--color-grey-300);
+  --color-ring: var(--color-orange-600);
+  --color-overlay: rgb(21 24 29 / 0.4); /* dialog and drawer backdrop */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-grey-200);
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-white);
+    color: var(--color-grey-900);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Visible focus for links, buttons and anything else reached by keyboard. */
+  :focus-visible {
+    outline: 2px solid var(--color-orange-600);
+    outline-offset: 2px;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
