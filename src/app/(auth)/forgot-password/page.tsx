@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
       title="Reset your password"
       description="Resetting your password online is coming soon. Until then, contact our support team and we'll help you get back into your account."
     >
-      <Button asChild size="lg" className="mt-10 w-full">
+      <Button asChild size="lg" className="mt-8 w-full">
         <Link href="/login">Back to log in</Link>
       </Button>
     </AuthComingSoon>

@@ -11,7 +11,7 @@ export default function TermsPage() {
       title="Terms of Service"
       description="Our full Terms of Service will be published here, including what you can send and how cash on delivery works."
     >
-      <Button asChild size="lg" className="mt-10 w-full">
+      <Button asChild size="lg" className="mt-8 w-full">
         <Link href="/login">Back to log in</Link>
       </Button>
     </AuthComingSoon>

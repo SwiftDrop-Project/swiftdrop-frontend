@@ -11,7 +11,7 @@ export default function PrivacyPage() {
       title="Privacy Policy"
       description="Our full Privacy Policy will be published here. It explains what we store about you and your parcels, and why."
     >
-      <Button asChild size="lg" className="mt-10 w-full">
+      <Button asChild size="lg" className="mt-8 w-full">
         <Link href="/login">Back to log in</Link>
       </Button>
     </AuthComingSoon>

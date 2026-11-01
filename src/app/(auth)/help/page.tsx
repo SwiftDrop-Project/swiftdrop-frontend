@@ -11,7 +11,7 @@ export default function HelpPage() {
       title="Help centre"
       description="Guides on booking pickups, delivery rates by district and cash on delivery are coming soon."
     >
-      <Button asChild size="lg" className="mt-10 w-full">
+      <Button asChild size="lg" className="mt-8 w-full">
         <Link href="/login">Back to log in</Link>
       </Button>
     </AuthComingSoon>

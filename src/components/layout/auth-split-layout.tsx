@@ -8,23 +8,42 @@ const FOOTER_LINKS = [
   { href: "/terms", label: "Terms" },
 ];
 
+const SCROLL_CONTAINER_ID = "auth-scroll";
+
+/** On large screens the left column scrolls, not the window, so scroll both back to the top. */
+export function scrollAuthPageToTop() {
+  document.getElementById(SCROLL_CONTAINER_ID)?.scrollTo({ top: 0 });
+  window.scrollTo({ top: 0 });
+}
+
 /**
- * Auth pages (DESIGN.md §4): form on the white left half, solid orange-500 panel with the
- * white logo on the right. The panel is hidden below the lg breakpoint.
+ * Auth pages (DESIGN.md §4): form on the white left column, solid orange-500 panel with the
+ * white logo on the right.
+ *
+ * - lg and up: the page is exactly one window tall. Only the left column scrolls; the panel
+ *   (45% wide) stays put.
+ * - Below lg: one column, no panel, normal page scrolling.
+ * - The form block is centred between the logo and the footer when there is spare height,
+ *   and starts 48px below the logo when there isn't. The footer always sits at the bottom.
  */
 export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-white lg:grid lg:grid-cols-[53fr_47fr]">
-      <div className="flex min-h-dvh flex-col px-4 py-8 sm:px-10 lg:px-20 lg:py-10">
-        <Link href="/login" className="w-fit rounded-sm">
+    <div className="bg-white lg:flex lg:h-dvh">
+      {/* relative: keeps absolutely positioned helpers (e.g. Radix's hidden checkbox input)
+          inside this column, so they can't make the whole window scroll. */}
+      <div
+        id={SCROLL_CONTAINER_ID}
+        className="relative flex min-h-dvh flex-col px-4 py-10 short:py-8 lg:min-w-0 lg:flex-1 lg:overflow-y-auto lg:px-16 xl:px-20"
+      >
+        <Link href="/login" className="w-fit shrink-0 rounded-sm">
           <Logo priority className="h-8" />
         </Link>
 
-        <main id="main" className="w-full flex-1 pt-12 pb-16 lg:pt-20">
-          {children}
+        <main id="main" className="flex flex-1 flex-col py-12">
+          <div className="my-auto w-full max-w-form">{children}</div>
         </main>
 
-        <footer className="flex flex-wrap items-center gap-x-6 gap-y-2 text-body-sm text-grey-600">
+        <footer className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 text-body-sm text-grey-600">
           <span>© 2026 SwiftDrop</span>
           {FOOTER_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className="rounded-sm hover:text-grey-900 hover:underline">
@@ -36,7 +55,7 @@ export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
 
       <div
         aria-hidden="true"
-        className="hidden bg-orange-500 px-16 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:items-center lg:justify-center"
+        className="hidden bg-orange-500 px-16 lg:flex lg:w-[45%] lg:shrink-0 lg:items-center lg:justify-center"
       >
         <Logo variant="white" className="h-auto w-full max-w-sm" />
       </div>
@@ -55,7 +74,7 @@ export function AuthComingSoon({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex max-w-form flex-col">
+    <div className="flex flex-col">
       <h1 className="text-display text-grey-900">{title}</h1>
       <p className="mt-2 text-body text-grey-600">{description}</p>
       {children}

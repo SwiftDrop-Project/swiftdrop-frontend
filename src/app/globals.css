@@ -75,14 +75,14 @@
    * Tailwind's 4px step is kept. DESIGN.md steps map to it like this:
    * space-0.5 4px = 1 · space-1 8px = 2 · space-2 16px = 4 · space-3 24px = 6 · space-4 32px = 8
    * space-5 40px = 10 · space-6 48px = 12 · space-8 64px = 16 · space-10 80px = 20
+   * Auth forms use 20px (gap-5) between fields and 24px (gap-6) between field groups.
    */
   --spacing-sidebar: 248px; /* w-sidebar */
   --spacing-topbar: 64px;   /* h-topbar */
 
-  --container-content: 1200px;  /* max-w-content: app content */
-  --container-form: 400px;      /* max-w-form: auth form column */
-  --container-form-wide: 480px; /* max-w-form-wide: register form (two fields side by side, as in 02 Register.png) */
-  --container-form-app: 640px;  /* max-w-form-app: in-app forms */
+  --container-content: 1200px; /* max-w-content: app content */
+  --container-form: 440px;     /* max-w-form: auth form column (login and register) */
+  --container-form-app: 640px; /* max-w-form-app: in-app forms */
 
   /* ---------- Radius ---------- */
   --radius-*: initial;
@@ -95,6 +95,9 @@
   --shadow-*: initial;
   --shadow-overlay: 0 4px 16px rgb(21 24 29 / 0.08);
 }
+
+/* short:pt-8 etc. apply when the window is less than 800px tall. */
+@custom-variant short (@media (max-height: 799.98px));
 
 /* Semantic names used by shadcn/ui components, mapped onto the tokens above. */
 @theme inline {

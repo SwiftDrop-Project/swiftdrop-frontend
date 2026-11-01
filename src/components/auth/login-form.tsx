@@ -80,46 +80,48 @@ export function LoginForm() {
   });
 
   return (
-    <div className="flex max-w-form flex-col">
+    <div className="flex flex-col">
       <h1 className="text-display text-grey-900">Log in</h1>
       <p className="mt-2 text-body text-grey-600">
         Use the mobile number or email linked to your SwiftDrop account.
       </p>
 
-      <form onSubmit={onSubmit} noValidate className="mt-10 flex flex-col gap-6">
+      <form onSubmit={onSubmit} noValidate className="mt-8 flex flex-col gap-6">
         {notice ? (
           <Notice tone={notice.tone} title={notice.title}>
             {notice.body}
           </Notice>
         ) : null}
 
-        <FormField id="identifier" label="Mobile number or email" error={errors.identifier?.message}>
-          {(a11y) => (
-            <Input
-              {...a11y}
-              {...register("identifier")}
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="077 123 4567 or name@example.com"
-            />
-          )}
-        </FormField>
+        <div className="flex flex-col gap-5">
+          <FormField id="identifier" label="Mobile number or email" error={errors.identifier?.message}>
+            {(a11y) => (
+              <Input
+                {...a11y}
+                {...register("identifier")}
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="077 123 4567 or name@example.com"
+              />
+            )}
+          </FormField>
 
-        <FormField
-          id="password"
-          label="Password"
-          error={errors.password?.message}
-          labelAside={
-            <TextLink href="/forgot-password" className="text-label">
-              Forgot password?
-            </TextLink>
-          }
-        >
-          {(a11y) => (
-            <PasswordInput {...a11y} {...register("password")} autoComplete="current-password" />
-          )}
-        </FormField>
+          <FormField
+            id="password"
+            label="Password"
+            error={errors.password?.message}
+            labelAside={
+              <TextLink href="/forgot-password" className="text-label">
+                Forgot password?
+              </TextLink>
+            }
+          >
+            {(a11y) => (
+              <PasswordInput {...a11y} {...register("password")} autoComplete="current-password" />
+            )}
+          </FormField>
+        </div>
 
         <Controller
           name="rememberMe"

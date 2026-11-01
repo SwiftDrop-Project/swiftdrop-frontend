@@ -9,6 +9,7 @@ import {
   type MerchantApplicationReceived,
 } from "@/components/auth/merchant-register-form";
 import { SegmentedControl } from "@/components/forms/segmented-control";
+import { scrollAuthPageToTop } from "@/components/layout/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { TextLink } from "@/components/ui/text-link";
 
@@ -28,13 +29,13 @@ export function RegisterView() {
   }
 
   return (
-    <div className="flex max-w-form-wide flex-col">
+    <div className="flex flex-col">
       <h1 className="text-display text-grey-900">Create your account</h1>
       <p className="mt-2 text-body text-grey-600">
         Book pickups and track deliveries to any district in Sri Lanka.
       </p>
 
-      <div className="mt-10 flex flex-col gap-2">
+      <div className="mt-8 flex flex-col gap-1">
         <SegmentedControl
           name="accountType"
           legend="Account type"
@@ -51,20 +52,20 @@ export function RegisterView() {
         </p>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6">
         {accountType === "CUSTOMER" ? (
           <CustomerRegisterForm />
         ) : (
           <MerchantRegisterForm
             onSuccess={(application) => {
               setReceived(application);
-              window.scrollTo({ top: 0 });
+              scrollAuthPageToTop();
             }}
           />
         )}
       </div>
 
-      <p className="mt-8 text-body text-grey-600">
+      <p className="mt-6 text-body text-grey-600">
         Already have an account? <TextLink href="/login">Log in</TextLink>
       </p>
     </div>
@@ -80,7 +81,7 @@ function ApplicationReceived({ application }: { application: MerchantApplication
   }, []);
 
   return (
-    <div className="flex max-w-form flex-col">
+    <div className="flex flex-col">
       <div className="flex size-12 items-center justify-center rounded-lg border border-grey-200 bg-grey-50 text-grey-700">
         <MailCheck className="size-6" aria-hidden="true" />
       </div>
@@ -95,7 +96,7 @@ function ApplicationReceived({ application }: { application: MerchantApplication
         We&apos;ll email <span className="font-semibold text-grey-900">{application.email}</span> when
         your account is approved. You can log in after that.
       </p>
-      <Button asChild size="lg" className="mt-10 w-full">
+      <Button asChild size="lg" className="mt-8 w-full">
         <Link href="/login">Back to log in</Link>
       </Button>
     </div>

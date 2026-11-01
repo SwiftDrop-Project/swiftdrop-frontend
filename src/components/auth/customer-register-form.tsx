@@ -51,36 +51,38 @@ export function CustomerRegisterForm() {
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
       {notice}
 
-      <FormField id="fullName" label="Full name" error={errors.fullName?.message}>
-        {(a11y) => <Input {...a11y} {...register("fullName")} autoComplete="name" />}
-      </FormField>
+      <div className="flex flex-col gap-5">
+        <FormField id="fullName" label="Full name" error={errors.fullName?.message}>
+          {(a11y) => <Input {...a11y} {...register("fullName")} autoComplete="name" />}
+        </FormField>
 
-      <FormField id="phone" label="Mobile number" error={errors.phone?.message}>
-        {(a11y) => <PhoneInput {...a11y} {...register("phone")} placeholder="77 123 4567" />}
-      </FormField>
+        <FormField id="phone" label="Mobile number" error={errors.phone?.message}>
+          {(a11y) => <PhoneInput {...a11y} {...register("phone")} placeholder="77 123 4567" />}
+        </FormField>
 
-      <FormField id="email" label="Email" error={errors.email?.message}>
-        {(a11y) => (
-          <Input
-            {...a11y}
-            {...register("email")}
-            type="email"
-            autoComplete="email"
-            autoCapitalize="none"
-            spellCheck={false}
-            placeholder="name@example.com"
-          />
-        )}
-      </FormField>
+        <FormField id="email" label="Email" error={errors.email?.message}>
+          {(a11y) => (
+            <Input
+              {...a11y}
+              {...register("email")}
+              type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="name@example.com"
+            />
+          )}
+        </FormField>
 
-      <FormField
-        id="password"
-        label="Password"
-        helper="At least 8 characters, including a number."
-        error={errors.password?.message}
-      >
-        {(a11y) => <PasswordInput {...a11y} {...register("password")} autoComplete="new-password" />}
-      </FormField>
+        <FormField
+          id="password"
+          label="Password"
+          helper="At least 8 characters, including a number."
+          error={errors.password?.message}
+        >
+          {(a11y) => <PasswordInput {...a11y} {...register("password")} autoComplete="new-password" />}
+        </FormField>
+      </div>
 
       <TermsCheckbox control={control} name="acceptTerms" />
 
