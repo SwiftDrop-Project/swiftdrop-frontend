@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { GoogleSignIn } from "@/components/auth/google-sign-in";
+import { PhoneField } from "@/components/auth/signup-fields";
 import { TermsCheckbox } from "@/components/auth/terms-checkbox";
 import { FormField } from "@/components/forms/form-field";
 import { PasswordInput } from "@/components/forms/password-input";
-import { PhoneInput } from "@/components/forms/phone-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authApi } from "@/lib/api";
@@ -56,9 +56,7 @@ export function CustomerRegisterForm() {
           {(a11y) => <Input {...a11y} {...register("fullName")} autoComplete="name" />}
         </FormField>
 
-        <FormField id="phone" label="Mobile number" error={errors.phone?.message}>
-          {(a11y) => <PhoneInput {...a11y} {...register("phone")} placeholder="77 123 4567" />}
-        </FormField>
+        <PhoneField registration={register("phone")} error={errors.phone?.message} />
 
         <FormField id="email" label="Email" error={errors.email?.message}>
           {(a11y) => (
@@ -90,7 +88,7 @@ export function CustomerRegisterForm() {
         Create account
       </Button>
 
-      <GoogleSignIn />
+      <GoogleSignIn accountType="customer" />
     </form>
   );
 }

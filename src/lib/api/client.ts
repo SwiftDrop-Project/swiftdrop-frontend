@@ -29,12 +29,21 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
-function apiUrl(path: string, query?: RequestOptions["query"]): string {
+function apiBase(): string {
   const base = process.env.NEXT_PUBLIC_API_URL;
   if (!base) {
     throw new Error("NEXT_PUBLIC_API_URL is not set. Copy .env.example to .env.local.");
   }
-  const url = new URL(base.replace(/\/+$/, "") + path);
+  return base.replace(/\/+$/, "");
+}
+
+/** The backend's origin, e.g. http://localhost:8080 for NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1. */
+export function backendOrigin(): string {
+  return new URL(apiBase()).origin;
+}
+
+function apiUrl(path: string, query?: RequestOptions["query"]): string {
+  const url = new URL(apiBase() + path);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined) url.searchParams.set(key, value);
   }

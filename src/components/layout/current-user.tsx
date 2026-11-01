@@ -29,6 +29,7 @@ function currentPath() {
  * Loads the logged-in user from GET /auth/me for one role area.
  * - 401: clears the cookie first (so the proxy doesn't bounce us back), then goes to /login?next=…
  * - wrong role: goes to that user's own home.
+ * - PROFILE_INCOMPLETE (Google sign-up not finished): goes to /register/complete.
  */
 export function CurrentUserProvider({ area, children }: { area: Role; children: React.ReactNode }) {
   const router = useRouter();
@@ -43,6 +44,11 @@ export function CurrentUserProvider({ area, children }: { area: Role; children: 
     authApi
       .me(controller.signal)
       .then((user) => {
+        // Signed up with Google but not finished: the API refuses everything else (403 PROFILE_INCOMPLETE).
+        if (user.status === "PROFILE_INCOMPLETE") {
+          router.replace("/register/complete");
+          return;
+        }
         if (user.role !== area) {
           router.replace(ROLE_HOME[user.role]);
           return;

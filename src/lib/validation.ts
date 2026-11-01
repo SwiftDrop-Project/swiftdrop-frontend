@@ -90,7 +90,18 @@ export const merchantRegisterSchema = z.object({
   acceptTerms,
 });
 
+/*
+ * Finishing a Google sign-up (POST /auth/complete-profile): the register forms without email and
+ * password. Built from the register schemas so the rules can't drift apart.
+ */
+export const customerCompleteProfileSchema = customerRegisterSchema.pick({ phone: true, acceptTerms: true });
+
+export const merchantCompleteProfileSchema = merchantRegisterSchema.omit({ email: true, password: true });
+
 export type LoginValues = z.input<typeof loginSchema>;
+export type CustomerCompleteProfileValues = z.input<typeof customerCompleteProfileSchema>;
+export type MerchantCompleteProfileInput = z.input<typeof merchantCompleteProfileSchema>;
+export type MerchantCompleteProfileValues = z.output<typeof merchantCompleteProfileSchema>;
 export type CustomerRegisterValues = z.input<typeof customerRegisterSchema>;
 export type MerchantRegisterInput = z.input<typeof merchantRegisterSchema>;
 export type MerchantRegisterValues = z.output<typeof merchantRegisterSchema>;

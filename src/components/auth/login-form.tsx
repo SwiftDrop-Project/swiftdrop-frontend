@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { TextLink } from "@/components/ui/text-link";
 import { authApi, isApiError } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
+import { GOOGLE_SIGN_IN_ERRORS, isGoogleSignInError } from "@/lib/google-sign-in";
+import type { GoogleSignInError } from "@/types";
 import { getSafeNext } from "@/lib/roles";
 import { loginSchema, type LoginValues } from "@/lib/validation";
 
@@ -24,16 +26,28 @@ interface FormNotice {
   body: string;
 }
 
+/** The URL only changes by navigation, which remounts the form, so there is nothing to subscribe to. */
+function subscribeToNothing() {
+  return () => {};
+}
+
+/** A known ?error= code from a Google sign-in redirect; unknown values are ignored. */
+function readUrlError(): GoogleSignInError | null {
+  const error = new URLSearchParams(window.location.search).get("error");
+  return isGoogleSignInError(error) ? error : null;
+}
+
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
 
+/** Same notices whether the account problem comes from this form or from a Google sign-in redirect. */
 function noticeFor(code: string, message: string): FormNotice {
   switch (code) {
     case "ACCOUNT_PENDING_APPROVAL":
-      return { tone: "info", title: "Your account is waiting for approval", body: message };
+      return { ...GOOGLE_SIGN_IN_ERRORS.account_pending_approval, body: message };
     case "ACCOUNT_REJECTED":
-      return { tone: "error", title: "Your merchant application wasn't approved", body: message };
+      return { ...GOOGLE_SIGN_IN_ERRORS.account_rejected, body: message };
     case "ACCOUNT_DISABLED":
-      return { tone: "error", title: "This account is disabled", body: message };
+      return { ...GOOGLE_SIGN_IN_ERRORS.account_disabled, body: message };
     default:
       // INVALID_CREDENTIALS, NETWORK_ERROR and anything unexpected
       return { tone: "error", title: "We couldn't log you in", body: message };
@@ -56,8 +70,26 @@ export function LoginForm() {
     defaultValues: { identifier: "", password: "", rememberMe: true },
   });
 
+  // "Continue with Google" failures come back as /login?error=…. The code is read from the URL on the
+  // client (so the form can still be prerendered), kept in state, and then removed from the URL so a
+  // reload or a shared link doesn't show it again.
+  const urlError = React.useSyncExternalStore(subscribeToNothing, readUrlError, () => null);
+  const [googleError, setGoogleError] = React.useState<GoogleSignInError | null>(null);
+  if (urlError !== null && urlError !== googleError) {
+    setGoogleError(urlError);
+  }
+  React.useEffect(() => {
+    if (urlError === null) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("error");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [urlError]);
+
+  const shownNotice = notice ?? (googleError ? GOOGLE_SIGN_IN_ERRORS[googleError] : null);
+
   const onSubmit = handleSubmit(async (values) => {
     setNotice(null);
+    setGoogleError(null);
     try {
       const user = await authApi.login(values);
       setRedirecting(true);
@@ -87,9 +119,9 @@ export function LoginForm() {
       </p>
 
       <form onSubmit={onSubmit} noValidate className="mt-8 flex flex-col gap-6">
-        {notice ? (
-          <Notice tone={notice.tone} title={notice.title}>
-            {notice.body}
+        {shownNotice ? (
+          <Notice tone={shownNotice.tone} title={shownNotice.title}>
+            {shownNotice.body}
           </Notice>
         ) : null}
 
@@ -147,7 +179,7 @@ export function LoginForm() {
           Log in
         </Button>
 
-        <GoogleSignIn />
+        <GoogleSignIn accountType="customer" />
 
         <p className="text-body text-grey-600">
           New to SwiftDrop? <TextLink href="/register">Create an account</TextLink>

@@ -9,12 +9,13 @@ import { applyServerFieldErrors } from "@/lib/form-errors";
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
 
 /**
- * Turns a failed POST /auth/register into field errors (VALIDATION_FAILED, duplicate email or
- * phone) and, for anything else, a notice above the form.
+ * Turns a failed POST /auth/register or /auth/complete-profile into field errors (VALIDATION_FAILED,
+ * duplicate email or phone) and, for anything else, a notice above the form.
  */
 export function useRegisterErrorHandler<T extends FieldValues>(
   setError: UseFormSetError<T>,
   fields: readonly Path<T>[],
+  title = "We couldn't create your account",
 ) {
   const [messages, setMessages] = React.useState<string[] | null>(null);
 
@@ -37,7 +38,7 @@ export function useRegisterErrorHandler<T extends FieldValues>(
   const clearNotice = React.useCallback(() => setMessages(null), []);
 
   const notice = messages ? (
-    <Notice tone="error" title="We couldn't create your account">
+    <Notice tone="error" title={title}>
       {messages.length > 1 ? (
         <ul className="list-disc pl-4">
           {messages.map((message) => (

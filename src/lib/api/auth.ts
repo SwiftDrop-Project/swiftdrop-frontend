@@ -1,5 +1,5 @@
-import type { LoginRequest, RegisterRequest, User } from "@/types";
-import { apiFetch } from "./client";
+import type { CompleteProfileRequest, LoginRequest, RegisterRequest, User } from "@/types";
+import { apiFetch, backendOrigin } from "./client";
 
 export const authApi = {
   /** Customer: logged in straight away (cookie set). Merchant: PENDING_APPROVAL, no cookie. */
@@ -18,5 +18,21 @@ export const authApi = {
 
   me(signal?: AbortSignal) {
     return apiFetch<User>("/auth/me", { signal });
+  },
+
+  /**
+   * Finishes a Google sign-up (status PROFILE_INCOMPLETE).
+   * Customer: ACTIVE, fresh cookie. Merchant: PENDING_APPROVAL, cookie cleared.
+   */
+  completeProfile(body: CompleteProfileRequest) {
+    return apiFetch<User>("/auth/complete-profile", { method: "POST", body });
+  },
+
+  /**
+   * Where "Continue with Google" sends the browser (a full-page navigation, not fetch).
+   * It is on the backend origin, outside /api/v1.
+   */
+  googleSignInUrl() {
+    return `${backendOrigin()}/oauth2/authorization/google`;
   },
 };
