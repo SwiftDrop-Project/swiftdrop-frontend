@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LoaderCircle, LogOut, type LucideIcon } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
-import { useCurrentUserState } from "@/components/layout/current-user";
+import { Logo } from "@/components/ui/logo";
+import { useCurrentUserState } from "@/features/identity";
 import { activeHref, helpItem, NAVIGATION } from "@/lib/navigation";
 import { ROLE_HOME } from "@/lib/roles";
 import { cn } from "@/lib/utils";

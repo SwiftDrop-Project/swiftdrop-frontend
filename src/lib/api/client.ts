@@ -25,7 +25,8 @@ const GENERIC_MESSAGE = "Something went wrong on our side. Try again in a moment
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
-  query?: Record<string, string | undefined>;
+  /** Added to the URL; undefined values are left out. */
+  query?: Record<string, string | number | boolean | undefined>;
   signal?: AbortSignal;
 }
 
@@ -45,7 +46,7 @@ export function backendOrigin(): string {
 function apiUrl(path: string, query?: RequestOptions["query"]): string {
   const url = new URL(apiBase() + path);
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined) url.searchParams.set(key, value);
+    if (value !== undefined) url.searchParams.set(key, String(value));
   }
   return url.toString();
 }
@@ -60,7 +61,8 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 }
 
 /**
- * The only function in the app that calls `fetch`.
+ * The only function in the app that calls `fetch`. Features wrap it in their own api.ts, e.g.
+ * `export const deliveryApi = { get: (id: string) => apiFetch<Delivery>(`/deliveries/${id}`) }`.
  * Always sends the SD_TOKEN cookie (credentials: "include") and speaks JSON.
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {

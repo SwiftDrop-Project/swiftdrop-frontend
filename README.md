@@ -26,37 +26,48 @@ installed version in `node_modules/next/dist/docs/`.
 
 ## Folder structure
 
+The code is split by the same modules as the backend (`com.swiftdrop.<module>`), so each developer
+works mostly inside one feature folder.
+
 ```text
 src/
-├── app/                      Routes (one folder per URL)
-│   ├── (auth)/               Pages with the split auth layout (form left, orange panel right)
-│   │   ├── login/            /login
-│   │   ├── register/         /register, and register/complete/ for finishing a Google sign-up
-│   │   ├── auth/callback/    /auth/callback, where the backend sends users after Google sign-in
-│   │   └── forgot-password/, help/, privacy/, terms/
+├── app/                      Routes only: thin pages that compose feature components
+│   ├── (auth)/               Split auth layout: /login, /register, /register/complete, /auth/callback,
+│   │                         /forgot-password, /help, /privacy, /terms
+│   ├── (public)/             No login needed: /track, /track/[trackingNumber], /rates
 │   ├── customer/             Customer area (/customer/...)
 │   ├── merchant/             Merchant area (/merchant/...)
 │   ├── courier/              Courier area (/courier/...)
 │   ├── dispatcher/           Admin area (/dispatcher/...)
-│   ├── track/                Public parcel tracking (coming soon)
+│   ├── dev/ui/               /dev/ui: every UI component in every state (development only)
 │   ├── globals.css           Design tokens (colours, type, radius) - the only place they are defined
-│   └── layout.tsx            Root layout and font
+│   └── layout.tsx            Root layout, font and toasts
+├── features/                 One folder per backend module, each with a README.md
+│   ├── identity/             Login, register, Google sign-in, current user
+│   ├── merchants/            Merchant approval
+│   └── delivery/, dispatch/, tracking/, pricing/, notifications/, reporting/, webhooks/
+│       (each: components/ hooks/ api.ts types.ts schemas.ts index.ts)
 ├── components/
-│   ├── ui/                   Base components: Button, Input, Checkbox, Table, ...
-│   ├── forms/                FormField, PhoneInput, PasswordInput, NativeSelect, SegmentedControl
-│   ├── layout/               App shell (sidebar, top bar), auth layout, current user
-│   ├── feedback/             Notice, EmptyState, ComingSoon
-│   ├── auth/                 Login, register, Google sign-in, complete-profile
-│   └── admin/, customer/, brand/
-├── hooks/                    Reusable hooks, e.g. useDistricts
+│   ├── ui/                   The UI kit: Button, Input, Select, Table, StatusBadge, Dialog, Toast, ...
+│   └── layout/               App shell (sidebar, top bar), auth layout, PageHeader,
+│                             page templates: ListPage, DetailPage, FormPage
+├── hooks/                    Shared hooks, e.g. useDistricts
 ├── lib/
-│   ├── api/                  The only code that calls the backend (apiFetch, authApi, adminApi, metaApi)
-│   ├── validation.ts         zod schemas and messages, same as API.md
+│   ├── api/                  apiFetch (the only code that calls fetch) and shared endpoints (districts)
+│   ├── format.ts             Rs. amounts, dates in Sri Lankan time, +94 phones, tracking numbers
+│   ├── validation.ts         Shared zod rules and messages, same as API.md
 │   ├── navigation.ts         Sidebar menu for each role
-│   ├── roles.ts              Role → home page, safe redirects after login
-│   └── google-sign-in.ts     Google button flag, saved account type, ?error messages
-├── types/                    TypeScript types matching the backend DTOs in API.md
+│   └── roles.ts              Role → home page, safe redirects after login
+├── types/                    Shared types: API error, Role, District, ParcelStatus, PageResponse
 └── proxy.ts                  Route protection (redirects only)
+```
+
+Rules, also checked by `npm run lint`:
+
+- Import another feature only through its `index.ts` (`@/features/merchants`), never a file inside it.
+- Build screens only from `src/components/ui` and the page templates. Missing a component? Add it to
+  `components/ui` in its own pull request and show it on `/dev/ui`.
+- No hex colours, arbitrary Tailwind colours or arbitrary text sizes: use the tokens.
 ```
 
 ## Design system
@@ -162,7 +173,7 @@ area (`getSafeNext` in `src/lib/roles.ts`).
 
 **Google sign-in.**
 
-1. **Continue with Google** (`src/components/auth/google-sign-in.tsx`) appears below the main button
+1. **Continue with Google** (`src/features/identity/components/google-sign-in.tsx`) appears below the main button
    on `/login` and on both `/register` tabs when `NEXT_PUBLIC_GOOGLE_LOGIN_ENABLED` is `true`.
 2. On click it saves the chosen account type (`customer` or `merchant`; login saves `customer`) in
    `sessionStorage`, shows a spinner, and does a full-page navigation to
@@ -192,64 +203,74 @@ area (`getSafeNext` in `src/lib/roles.ts`).
 
 ## Adding a new page
 
-This example builds the customer **Addresses** page, which currently shows "coming soon".
+This example builds the customer **My deliveries** list, which currently shows "coming soon". It
+belongs to the `delivery` feature, because the backend's `delivery` module owns the API.
 
-**1. Create or replace the page file.** The folder is the URL. Pages inside `src/app/customer/` are
-already protected and wrapped in the app shell by `src/app/customer/layout.tsx`.
+**1. Types and API in the feature.** In `src/features/delivery/types.ts`, add the response types exactly
+as API.md describes them. In `src/features/delivery/api.ts`, wrap `apiFetch` from `@/lib/api`:
 
-`src/app/customer/addresses/page.tsx`:
+```ts
+import { apiFetch } from "@/lib/api";
+import type { PageResponse } from "@/types";
+import type { DeliverySummary } from "./types";
+
+export const deliveryApi = {
+  list(page: number, signal?: AbortSignal) {
+    return apiFetch<PageResponse<DeliverySummary>>("/deliveries", { query: { page, size: 20 }, signal });
+  },
+};
+```
+
+Never call `fetch` anywhere else. Call the API from client components (`"use client"`), because the
+browser holds the login cookie.
+
+**2. The screen as a feature component.** `src/features/delivery/components/deliveries-table.tsx` builds the
+list only from `@/components/ui`: `Card`, `Table` with `TableLoading` and `TableEmpty`, `StatusBadge`,
+`Pagination`, and `formatRs` / `formatDate` / `formatTrackingNumber` from `@/lib/format`. Export it from
+`src/features/delivery/index.ts`.
+
+**3. A thin page.** The folder is the URL. Pages inside `src/app/customer/` are already protected and
+wrapped in the app shell. `src/app/customer/deliveries/page.tsx`:
 
 ```tsx
 import type { Metadata } from "next";
-import { MapPin } from "lucide-react";
-import { EmptyState } from "@/components/feedback/empty-state";
-import { Card, PageHeader } from "@/components/layout/page-header";
+import { ListPage } from "@/components/layout/list-page";
+import { DeliveriesTable } from "@/features/delivery";
 
-export const metadata: Metadata = { title: "Addresses" };
+export const metadata: Metadata = { title: "My deliveries" };
 
-export default function AddressesPage() {
+export default function MyDeliveriesPage() {
   return (
-    <>
-      <PageHeader
-        title="Addresses"
-        description="Save pickup and delivery addresses so you don't have to type them each time."
-      />
-      <Card className="p-6 sm:p-8">
-        <EmptyState
-          icon={MapPin}
-          title="No saved addresses"
-          description="Addresses you save will be listed here."
-        />
-      </Card>
-    </>
+    <ListPage title="My deliveries" description="Every parcel you send, newest first.">
+      <DeliveriesTable />
+    </ListPage>
   );
 }
 ```
 
-**2. Add it to the menu** in `src/lib/navigation.ts` (title, href, a lucide icon and a one-line
+Use `DetailPage` for one item and `FormPage` (with `FormSection` and `FormActions`) for create and edit pages.
+
+**4. The menu.** New pages go in `src/lib/navigation.ts` (title, href, a lucide icon and a one-line
 description). Every menu item must have a `page.tsx`, so no link is broken.
 
-**3. Call the API from `src/lib/api`.** Add a file such as `src/lib/api/addresses.ts` that uses
-`apiFetch`, export it from `src/lib/api/index.ts`, and add the response types to `src/types` exactly as
-API.md describes them. Never call `fetch` anywhere else. Call the API from client components
-(`"use client"`), because the browser holds the login cookie.
+**5. Forms.** Put the zod schema in the feature's `schemas.ts`, built from the shared rules in
+`src/lib/validation.ts` and with the messages from API.md. Use `FormField` with `Input`, `PhoneInput`,
+`Select` or `Textarea`. Show server `fieldErrors` with `applyServerFieldErrors` from
+`src/lib/form-errors.ts`, and other errors in an `InlineNotice`. Use `toast()` for short confirmations.
 
-**4. Build forms the same way as login and register.** Put the zod schema in `src/lib/validation.ts`
-with the messages from API.md. Use `FormField` with `Input`, `PhoneInput` or `NativeSelect`. Show server
-`fieldErrors` with `applyServerFieldErrors` from `src/lib/form-errors.ts`, and other errors in a
-`Notice`.
+**6. Check it against `/dev/ui`.** Same components and states, tokens only, one primary button, and the
+page works at 375px wide. If you need a component that isn't there, add it to `components/ui` in its own
+pull request and show it on `/dev/ui`.
 
-**5. Follow the design rules.** Use tokens only, one primary button, `EmptyState` for empty lists,
-`Notice` for messages. Check the page at 375px wide.
-
-**6. Run the checks:** `npm run lint` and `npm run build`.
+**7. Run the checks:** `npm run lint` and `npm run build`, then fill in the pull request template with
+desktop and 375px screenshots.
 
 ## Scripts
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Starts the development server at http://localhost:3000, with live reload |
-| `npm run lint` | Checks the code with ESLint |
+| `npm run lint` | Checks the code with ESLint, including SwiftDrop's colour and feature-import rules |
 | `npm run build` | Builds the production version and checks types. Run it before every PR. |
 | `npm run start` | Runs the production build from `npm run build` |
 

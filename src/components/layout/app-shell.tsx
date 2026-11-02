@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Notice } from "@/components/feedback/notice";
-import { CurrentUserProvider, useCurrentUserState } from "@/components/layout/current-user";
 import { SidebarContent } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { Button } from "@/components/ui/button";
+import { InlineNotice } from "@/components/ui/inline-notice";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { CurrentUserProvider, useCurrentUserState } from "@/features/identity";
 import type { Role } from "@/types";
 
 /**
@@ -60,18 +60,18 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       {logoutError ? (
-        <Notice tone="error" title="We couldn't log you out" className="mb-6">
+        <InlineNotice tone="error" title="We couldn't log you out" className="mb-6">
           {logoutError}
-        </Notice>
+        </InlineNotice>
       ) : null}
 
       {state.status !== "error" ? children : null}
 
       {state.status === "error" ? (
         <div className="flex max-w-form-app flex-col items-start gap-4">
-          <Notice tone="error" title="We couldn't load your account">
+          <InlineNotice tone="error" title="We couldn't load your account">
             {state.message}
-          </Notice>
+          </InlineNotice>
           <Button variant="secondary" onClick={retry}>
             Try again
           </Button>

@@ -15,6 +15,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: "bg-orange-700 text-white hover:bg-orange-800",
+        danger: "bg-error text-white hover:bg-error/90",
         secondary: "border-grey-300 bg-white text-grey-900 hover:bg-grey-50",
         tertiary: "bg-transparent text-grey-700 hover:bg-grey-50 hover:text-grey-900",
         link: "h-auto px-0 text-orange-700 underline-offset-4 hover:text-orange-800 hover:underline disabled:bg-transparent",
@@ -22,7 +23,7 @@ const buttonVariants = cva(
       size: {
         default: "h-10 px-4 text-label font-semibold",
         lg: "h-12 px-6 text-h3",
-        sm: "h-8 px-3 text-label",
+        /** Used by IconButton. */
         icon: "size-10",
       },
     },

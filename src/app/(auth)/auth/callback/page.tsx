@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GoogleCallback } from "@/components/auth/google-callback";
+import { GoogleCallback } from "@/features/identity";
 
 export const metadata: Metadata = { title: "Signing you in" };
 
