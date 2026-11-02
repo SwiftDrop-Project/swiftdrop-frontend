@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CompleteProfileView } from "@/components/auth/complete-profile-view";
+import { CompleteProfileView } from "@/features/identity";
 
 export const metadata: Metadata = { title: "Finish setting up your account" };
 

@@ -1,5 +1,14 @@
 import * as React from "react";
+import type { LucideIcon } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+/*
+ * Data table. Put it inside a Card. Below md, show the rows as a list of cards instead when the
+ * table has more than three columns (see MerchantApprovals).
+ * Body states: rows, <TableLoading> while fetching, <TableEmpty> when there is nothing to show.
+ */
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -62,4 +71,72 @@ function TableCaption({ className, ...props }: React.ComponentProps<"caption">) 
   );
 }
 
-export { Table, TableHeader, TableBody, TableHead, TableRow, TableCell, TableCaption };
+/** Skeleton rows shown while the data loads. */
+function TableLoading({
+  columns,
+  rows = 3,
+  label = "Loading",
+}: {
+  columns: number;
+  rows?: number;
+  /** Read by screen readers, e.g. "Loading deliveries". */
+  label?: string;
+}) {
+  return (
+    <>
+      <TableRow className="sr-only">
+        <TableCell colSpan={columns} role="status">
+          {label}
+        </TableCell>
+      </TableRow>
+      {Array.from({ length: rows }, (_, row) => (
+        <TableRow key={row} aria-hidden="true">
+          {Array.from({ length: columns }, (_, column) => (
+            <TableCell key={column} className="py-4">
+              <Skeleton className={cn("h-4", column === 0 ? "w-32" : "w-20")} />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+/** One full-width row with an empty state, for when the list has nothing to show. */
+function TableEmpty({
+  columns,
+  icon,
+  title,
+  description,
+  action,
+}: {
+  columns: number;
+  icon: LucideIcon;
+  title: string;
+  description: React.ReactNode;
+  /** One primary Button, if there is something useful to do. */
+  action?: React.ReactNode;
+}) {
+  return (
+    <TableRow>
+      <TableCell colSpan={columns} className="p-6 sm:p-10">
+        {/* Stays in view on phones, where a wide table scrolls sideways. */}
+        <div className="sticky left-0 max-w-72 sm:max-w-none">
+          <EmptyState icon={icon} title={title} description={description} actions={action} headingLevel="h3" />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
+  TableLoading,
+  TableEmpty,
+};

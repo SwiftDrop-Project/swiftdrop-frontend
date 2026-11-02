@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, ChevronDown, CircleQuestionMark, LogOut, Menu, Search, SlidersHorizontal } from "lucide-react";
 import * as React from "react";
-import { Logo } from "@/components/brand/logo";
-import { useCurrentUserState } from "@/components/layout/current-user";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,22 +12,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/ui/logo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCurrentUserState } from "@/features/identity";
 import { initials } from "@/lib/format";
 import { helpItem, SEARCH, settingsHref } from "@/lib/navigation";
 import { ROLE_HOME, ROLE_LABEL } from "@/lib/roles";
 import type { Role } from "@/types";
 
-const iconButtonClass =
-  "inline-flex size-10 shrink-0 items-center justify-center rounded-md text-grey-700 transition-colors hover:bg-grey-50 hover:text-grey-900";
-
 export function TopBar({ role, onOpenMenu }: { role: Role; onOpenMenu: () => void }) {
   return (
     <header className="sticky top-0 z-20 flex h-topbar items-center gap-2 border-b border-grey-200 bg-white px-4 lg:px-8">
-      <button type="button" onClick={onOpenMenu} aria-label="Open menu" className={`${iconButtonClass} -ml-2 lg:hidden`}>
+      <IconButton variant="tertiary" label="Open menu" onClick={onOpenMenu} className="-ml-2 lg:hidden">
         <Menu className="size-5" aria-hidden="true" />
-      </button>
+      </IconButton>
       <Link href={ROLE_HOME[role]} className="rounded-sm lg:hidden">
         <Logo className="h-6" />
       </Link>
@@ -37,9 +35,11 @@ export function TopBar({ role, onOpenMenu }: { role: Role; onOpenMenu: () => voi
       <SearchBox role={role} />
 
       <div className="ml-auto flex items-center gap-1">
-        <Link href={helpItem(role).href} aria-label="Help and support" className={iconButtonClass}>
-          <CircleQuestionMark className="size-5" aria-hidden="true" />
-        </Link>
+        <IconButton asChild variant="tertiary" label="Help and support">
+          <Link href={helpItem(role).href}>
+            <CircleQuestionMark className="size-5" aria-hidden="true" />
+          </Link>
+        </IconButton>
         <Notifications />
         <span className="mx-2 hidden h-8 w-px bg-grey-200 sm:block" aria-hidden="true" />
         <UserMenu role={role} />
@@ -67,7 +67,7 @@ function SearchBox({ role }: { role: Role }) {
         className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-grey-600"
         aria-hidden="true"
       />
-      <Input id="global-search" name="q" type="search" placeholder={placeholder} className="h-10 pl-12 text-body-sm" />
+      <Input id="global-search" name="q" type="search" size="md" placeholder={placeholder} className="pl-12 text-body-sm" />
     </form>
   );
 }
@@ -75,8 +75,10 @@ function SearchBox({ role }: { role: Role }) {
 function Notifications() {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger aria-label="Notifications" className={iconButtonClass}>
-        <Bell className="size-5" aria-hidden="true" />
+      <DropdownMenuTrigger asChild>
+        <IconButton variant="tertiary" label="Notifications">
+          <Bell className="size-5" aria-hidden="true" />
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80 p-4">
         <p className="text-h3 text-grey-900">Notifications</p>

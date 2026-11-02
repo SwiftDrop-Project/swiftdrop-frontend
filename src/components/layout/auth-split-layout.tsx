@@ -1,6 +1,6 @@
 import Link from "next/link";
 import * as React from "react";
-import { Logo } from "@/components/brand/logo";
+import { Logo } from "@/components/ui/logo";
 
 const FOOTER_LINKS = [
   { href: "/help", label: "Help centre" },

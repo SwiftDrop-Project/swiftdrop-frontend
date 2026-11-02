@@ -1,10 +1,9 @@
 import { z } from "zod";
-import type { ParcelsPerMonth } from "@/types";
 
 /*
- * Same rules and messages as the backend (API.md "Validation rules",
- * RegisterRequest.java, LoginRequest.java, PhoneNumberNormalizer.java).
- * Change them together.
+ * Validation rules shared by every feature, with the same rules and messages as the backend
+ * (API.md "Validation rules", PhoneNumberNormalizer.java). Change them together.
+ * A feature's own form schemas live in src/features/<module>/schemas.ts and are built from these.
  */
 
 export const MESSAGES = {
@@ -33,75 +32,8 @@ export function isSriLankanMobile(value: string): boolean {
   return PHONE_PATTERN.test(value.replace(/\s+/g, ""));
 }
 
-export const PARCELS_PER_MONTH_OPTIONS: { value: ParcelsPerMonth; label: string }[] = [
-  { value: "UNDER_50", label: "Under 50" },
-  { value: "FROM_50_TO_200", label: "50 to 200" },
-  { value: "FROM_200_TO_1000", label: "200 to 1,000" },
-  { value: "OVER_1000", label: "Over 1,000" },
-];
-
-export function parcelsPerMonthLabel(value: ParcelsPerMonth): string {
-  return PARCELS_PER_MONTH_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
-
-const PARCELS_PER_MONTH_VALUES = PARCELS_PER_MONTH_OPTIONS.map((option) => option.value) as [
-  ParcelsPerMonth,
-  ...ParcelsPerMonth[],
-];
-
-const personName = (message: string) => z.string().trim().min(2, message).max(100, message);
-const phone = z.string().trim().refine(isSriLankanMobile, MESSAGES.phone);
-const email = z.string().trim().max(254, MESSAGES.email).regex(EMAIL_PATTERN, MESSAGES.email);
-const password = z.string().regex(PASSWORD_PATTERN, MESSAGES.password);
-const acceptTerms = z.boolean().refine((value) => value, MESSAGES.acceptTerms);
-
-export const loginSchema = z.object({
-  identifier: z.string().trim().min(1, MESSAGES.identifier),
-  password: z.string().min(1, MESSAGES.loginPassword),
-  rememberMe: z.boolean(),
-});
-
-export const customerRegisterSchema = z.object({
-  fullName: personName(MESSAGES.fullName),
-  phone,
-  email,
-  password,
-  acceptTerms,
-});
-
-export const merchantRegisterSchema = z.object({
-  businessName: z.string().trim().min(2, MESSAGES.businessName).max(120, MESSAGES.businessName),
-  businessRegNo: z
-    .string()
-    .trim()
-    .max(30, MESSAGES.businessRegNo)
-    .transform((value) => (value === "" ? undefined : value)),
-  // A plain string while editing (the select starts empty), the enum once valid.
-  parcelsPerMonth: z
-    .string()
-    .pipe(z.enum(PARCELS_PER_MONTH_VALUES, { error: MESSAGES.parcelsPerMonth })),
-  contactPerson: personName(MESSAGES.fullName),
-  phone,
-  email,
-  // `error` also covers undefined, which is what a disabled select (districts still loading) gives.
-  pickupDistrict: z.string({ error: MESSAGES.pickupDistrict }).min(1, MESSAGES.pickupDistrict),
-  city: z.string().trim().min(2, MESSAGES.city).max(80, MESSAGES.city),
-  password,
-  acceptTerms,
-});
-
-/*
- * Finishing a Google sign-up (POST /auth/complete-profile): the register forms without email and
- * password. Built from the register schemas so the rules can't drift apart.
- */
-export const customerCompleteProfileSchema = customerRegisterSchema.pick({ phone: true, acceptTerms: true });
-
-export const merchantCompleteProfileSchema = merchantRegisterSchema.omit({ email: true, password: true });
-
-export type LoginValues = z.input<typeof loginSchema>;
-export type CustomerCompleteProfileValues = z.input<typeof customerCompleteProfileSchema>;
-export type MerchantCompleteProfileInput = z.input<typeof merchantCompleteProfileSchema>;
-export type MerchantCompleteProfileValues = z.output<typeof merchantCompleteProfileSchema>;
-export type CustomerRegisterValues = z.input<typeof customerRegisterSchema>;
-export type MerchantRegisterInput = z.input<typeof merchantRegisterSchema>;
-export type MerchantRegisterValues = z.output<typeof merchantRegisterSchema>;
+export const personName = (message: string) => z.string().trim().min(2, message).max(100, message);
+export const phone = z.string().trim().refine(isSriLankanMobile, MESSAGES.phone);
+export const email = z.string().trim().max(254, MESSAGES.email).regex(EMAIL_PATTERN, MESSAGES.email);
+export const password = z.string().regex(PASSWORD_PATTERN, MESSAGES.password);
+export const acceptTerms = z.boolean().refine((value) => value, MESSAGES.acceptTerms);

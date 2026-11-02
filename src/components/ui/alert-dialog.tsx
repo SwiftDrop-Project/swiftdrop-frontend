@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui";
+import { dialogContentClass, dialogOverlayClass } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+
+/*
+ * Confirmation before an action that can't be undone ("Reject Lanka Crafts?").
+ * The confirm button is a `danger` Button for destructive actions.
+ */
 
 function AlertDialog(props: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
@@ -18,17 +24,10 @@ function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
     <AlertDialogPrimitive.Portal>
-      <AlertDialogPrimitive.Overlay
-        data-slot="alert-dialog-overlay"
-        className="fixed inset-0 z-50 bg-overlay duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
-      />
+      <AlertDialogPrimitive.Overlay data-slot="alert-dialog-overlay" className={dialogOverlayClass} />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
-        className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-6 rounded-lg border border-grey-200 bg-white p-6 text-grey-900 shadow-overlay outline-none duration-150",
-          "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className,
-        )}
+        className={cn(dialogContentClass, "max-w-md", className)}
         {...props}
       />
     </AlertDialogPrimitive.Portal>

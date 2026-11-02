@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/feedback/coming-soon";
+import { ComingSoon } from "@/components/layout/coming-soon";
 
 export const metadata: Metadata = { title: "Reports" };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { useCurrentUser } from "@/components/layout/current-user";
+import { useCurrentUser } from "@/features/identity";
 import { firstName } from "@/lib/format";
 
 /** "Welcome to SwiftDrop, Ayesha" with the real name from GET /auth/me. */
