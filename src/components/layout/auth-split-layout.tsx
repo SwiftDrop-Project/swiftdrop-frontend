@@ -24,7 +24,8 @@ export function scrollAuthPageToTop() {
  *   (45% wide) stays put.
  * - Below lg: one column, no panel, normal page scrolling.
  * - The form block is centred between the logo and the footer when there is spare height,
- *   and starts 48px below the logo when there isn't. The footer always sits at the bottom.
+ *   and starts 48px below the logo when there isn't (16px on lg, so the login page with its
+ *   "Track a parcel" hint fits a 1440x900 window). The footer always sits at the bottom.
  */
 export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,13 +34,13 @@ export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
           inside this column, so they can't make the whole window scroll. */}
       <div
         id={SCROLL_CONTAINER_ID}
-        className="relative flex min-h-dvh flex-col px-4 py-10 short:py-8 lg:min-w-0 lg:flex-1 lg:overflow-y-auto lg:px-16 xl:px-20"
+        className="relative flex min-h-dvh flex-col px-4 py-10 short:py-8 lg:min-w-0 lg:py-8 lg:short:py-6 lg:flex-1 lg:overflow-y-auto lg:px-16 xl:px-20"
       >
         <Link href="/login" className="w-fit shrink-0 rounded-sm">
           <Logo priority className="h-8" />
         </Link>
 
-        <main id="main" className="flex flex-1 flex-col py-12">
+        <main id="main" className="flex flex-1 flex-col py-12 lg:py-4">
           <div className="my-auto w-full max-w-form">{children}</div>
         </main>
 

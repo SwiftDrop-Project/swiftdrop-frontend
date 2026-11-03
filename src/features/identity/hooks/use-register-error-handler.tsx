@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
 import { InlineNotice } from "@/components/ui/inline-notice";
-import { isApiError } from "@/lib/api";
+import { isApiError, retryMessage } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
 
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
@@ -23,6 +23,10 @@ export function useRegisterErrorHandler<T extends FieldValues>(
     (error: unknown) => {
       if (!isApiError(error)) {
         setMessages([UNKNOWN_ERROR]);
+        return;
+      }
+      if (error.code === "TOO_MANY_REQUESTS") {
+        setMessages([`Too many attempts from this device. ${retryMessage(error)}`]);
         return;
       }
       const { handled, unmatched } = applyServerFieldErrors(error, setError, fields);

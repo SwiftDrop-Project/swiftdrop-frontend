@@ -8,6 +8,10 @@ export { LoginForm } from "./components/login-form";
 export { RegisterView } from "./components/register-view";
 export { CompleteProfileView } from "./components/complete-profile-view";
 export { GoogleCallback } from "./components/google-callback";
+export { VerifyEmailView } from "./components/verify-email-view";
+export { ForgotPasswordForm } from "./components/forgot-password-form";
+export { ResetPasswordForm } from "./components/reset-password-form";
+export { AccountSettings } from "./components/account-settings";
 
 // The logged-in user, for the app shell and any page inside it
 export { CurrentUserProvider, useCurrentUser, useCurrentUserState } from "./components/current-user";

@@ -5,6 +5,8 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: ApiErrorCode;
   readonly fieldErrors: Record<string, string>;
+  /** For 429 TOO_MANY_REQUESTS: how long to wait (the Retry-After header), if the API said. */
+  readonly retryAfterSeconds?: number;
 
   constructor(body: ApiErrorBody) {
     super(body.message);
@@ -12,11 +14,25 @@ export class ApiError extends Error {
     this.status = body.status;
     this.code = body.code;
     this.fieldErrors = body.fieldErrors ?? {};
+    this.retryAfterSeconds = body.retryAfterSeconds;
   }
 }
 
 export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
+}
+
+/** "Try again in 45 seconds." for a 429, from its Retry-After; "Try again in a minute." when it has none. */
+export function retryMessage(error: ApiError): string {
+  const seconds = error.retryAfterSeconds;
+  if (seconds === undefined) return "Try again in a minute.";
+  return `Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
+}
+
+/** Retry-After in whole seconds (the API sends seconds, never a date). */
+function readRetryAfter(response: Response): number | undefined {
+  const value = Number.parseInt(response.headers.get("Retry-After") ?? "", 10);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 const NETWORK_MESSAGE = "We couldn't reach SwiftDrop. Check your connection and try again.";
@@ -95,7 +111,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (!response.ok) {
     throw new ApiError(
       isErrorBody(data)
-        ? { ...data, status: response.status }
+        ? { ...data, status: response.status, retryAfterSeconds: readRetryAfter(response) }
         : { status: response.status, code: "INTERNAL_ERROR", message: GENERIC_MESSAGE },
     );
   }

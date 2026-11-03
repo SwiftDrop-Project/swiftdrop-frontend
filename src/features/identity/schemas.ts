@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PARCELS_PER_MONTH_VALUES } from "@/lib/reference";
-import { acceptTerms, email, MESSAGES, password, personName, phone } from "@/lib/validation";
+import { acceptTerms, code, email, MESSAGES, password, personName, phone } from "@/lib/validation";
 
 /*
  * Same rules and messages as the backend (API.md "Validation rules",
@@ -50,6 +50,41 @@ export const customerCompleteProfileSchema = customerRegisterSchema.pick({ phone
 
 export const merchantCompleteProfileSchema = merchantRegisterSchema.omit({ email: true, password: true });
 
+/* Email verification and passwords (API.md "Email verification", "Passwords"). */
+
+/** /verify-email without an email in the link: ask for the address the code goes to. */
+export const emailOnlySchema = z.object({ email });
+
+/** The API takes any identifier, but this screen asks for the email the code is sent to. */
+export const forgotPasswordSchema = z.object({ email });
+
+/** The email comes from the link (?email=), so the form only has the code and the new password. */
+export const resetPasswordSchema = z
+  .object({
+    code,
+    newPassword: password,
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.confirmPassword === values.newPassword, {
+    message: MESSAGES.confirmPassword,
+    path: ["confirmPassword"],
+  });
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, MESSAGES.currentPassword),
+    newPassword: password,
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.confirmPassword === values.newPassword, {
+    message: MESSAGES.confirmPassword,
+    path: ["confirmPassword"],
+  });
+
+export type EmailOnlyValues = z.input<typeof emailOnlySchema>;
+export type ForgotPasswordValues = z.input<typeof forgotPasswordSchema>;
+export type ResetPasswordValues = z.input<typeof resetPasswordSchema>;
+export type ChangePasswordValues = z.input<typeof changePasswordSchema>;
 export type LoginValues = z.input<typeof loginSchema>;
 export type CustomerCompleteProfileValues = z.input<typeof customerCompleteProfileSchema>;
 export type MerchantCompleteProfileInput = z.input<typeof merchantCompleteProfileSchema>;

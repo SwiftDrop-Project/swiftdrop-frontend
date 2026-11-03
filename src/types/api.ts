@@ -8,6 +8,11 @@ export type ApiErrorCode =
   | "ACCOUNT_REJECTED"
   | "ACCOUNT_DISABLED"
   | "PROFILE_INCOMPLETE"
+  | "EMAIL_NOT_VERIFIED"
+  | "INVALID_CODE"
+  | "CODE_EXPIRED"
+  | "TOO_MANY_ATTEMPTS"
+  | "TOO_MANY_REQUESTS"
   | "NOT_FOUND"
   | "METHOD_NOT_ALLOWED"
   | "EMAIL_ALREADY_REGISTERED"
@@ -23,4 +28,6 @@ export interface ApiErrorBody {
   code: ApiErrorCode;
   message: string;
   fieldErrors?: Record<string, string>;
+  /** Frontend-only: seconds from the Retry-After header of a 429 TOO_MANY_REQUESTS, when the API sent one. */
+  retryAfterSeconds?: number;
 }

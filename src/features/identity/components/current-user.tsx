@@ -6,6 +6,7 @@ import { isApiError } from "@/lib/api";
 import { ROLE_HOME } from "@/lib/roles";
 import type { Role } from "@/types";
 import { authApi } from "../api";
+import { useLeavingPage } from "../hooks/use-leaving-page";
 import type { User } from "../types";
 
 type UserState =
@@ -38,6 +39,7 @@ export function CurrentUserProvider({ area, children }: { area: Role; children: 
   const [state, setState] = React.useState<UserState>({ status: "loading" });
   const [attempt, setAttempt] = React.useState(0);
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const [leaving, startLeaving] = useLeavingPage();
   const [logoutError, setLogoutError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -83,18 +85,20 @@ export function CurrentUserProvider({ area, children }: { area: Role; children: 
     setLogoutError(null);
     try {
       await authApi.logout();
+      startLeaving();
       router.replace("/login");
     } catch (error) {
       setLogoutError(
         isApiError(error) ? error.message : "We couldn't log you out. Try again in a moment.",
       );
+    } finally {
       setLoggingOut(false);
     }
-  }, [router]);
+  }, [router, startLeaving]);
 
   const value = React.useMemo(
-    () => ({ state, retry, logout, loggingOut, logoutError }),
-    [state, retry, logout, loggingOut, logoutError],
+    () => ({ state, retry, logout, loggingOut: loggingOut || leaving, logoutError }),
+    [state, retry, logout, loggingOut, leaving, logoutError],
   );
 
   return <CurrentUserContext value={value}>{children}</CurrentUserContext>;

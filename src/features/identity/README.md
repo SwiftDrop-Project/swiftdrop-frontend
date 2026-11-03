@@ -11,9 +11,16 @@ User accounts and authentication: register, log in, log out, the current user (`
 ## Built so far
 
 - `/login`, `/register` (Customer and Merchant tabs), `/register/complete`, `/auth/callback`
+- `/verify-email`: the 6-digit code after sign-up (auto-submits, resend with a 60 s countdown). Customers are
+  logged in; merchants see "Application received". Without `?email=` it asks for the address first.
+- `/forgot-password` (email only) → `/reset-password?email=…` (no email → back to `/forgot-password`): reset with an emailed code; success goes to `/login?notice=password_updated`
+- `AccountSettings` (Change password) on `/customer|merchant|courier|dispatcher/settings`
 - `CurrentUserProvider`, `useCurrentUser()`: the logged-in user for the app shell and pages
-- `api.ts`: `authApi` (register, login, logout, me, completeProfile, googleSignInUrl)
-- `schemas.ts`: login, register and complete-profile forms (same rules as API.md)
+- `api.ts`: `authApi` (register, verifyEmail, resendVerification, login, logout, me, forgotPassword,
+  resetPassword, changePassword, completeProfile, googleSignInUrl)
+- `schemas.ts`: login, register, complete-profile, verify, forgot/reset/change password (same rules as API.md)
+- `lib/email.ts`: typo suggestions ("Did you mean name@gmail.com?") and `a•••@gmail.com` masking
+- `lib/cooldown.ts`: countdowns kept in sessionStorage (resend cooldown, 429 Retry-After)
 
 ## Layout
 

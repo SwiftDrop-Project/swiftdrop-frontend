@@ -4,6 +4,7 @@ import Image from "next/image";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { authApi } from "../api";
+import { useLeavingPage } from "../hooks/use-leaving-page";
 import {
   GOOGLE_LOGIN_ENABLED,
   saveGoogleAccountType,
@@ -25,24 +26,15 @@ export function GoogleSignIn({
   accountType: GoogleAccountType;
   helper?: string;
 }) {
-  const [leaving, setLeaving] = React.useState(false);
-
-  // Coming back with the browser's Back button can restore this page exactly as it was left
-  // (back/forward cache), spinner included. Make the button usable again.
-  React.useEffect(() => {
-    const onPageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) setLeaving(false);
-    };
-    window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
-  }, []);
+  // Back from Google can restore this page as it was left (back/forward cache); the hook clears the spinner.
+  const [leaving, startLeaving] = useLeavingPage();
 
   if (!GOOGLE_LOGIN_ENABLED) return null;
 
   const helperId = helper ? "google-sign-in-helper" : undefined;
 
   function continueWithGoogle() {
-    setLeaving(true);
+    startLeaving();
     saveGoogleAccountType(accountType);
     window.location.assign(authApi.googleSignInUrl());
   }
