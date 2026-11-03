@@ -1,23 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { scrollAuthPageToTop } from "@/components/layout/auth-split-layout";
 import { TextLink } from "@/components/ui/text-link";
 import { AccountTypeSwitch, type AccountType } from "./account-type-switch";
-import {
-  ApplicationReceived,
-  type MerchantApplicationReceived,
-} from "./application-received";
 import { CustomerRegisterForm } from "./customer-register-form";
 import { MerchantRegisterForm } from "./merchant-register-form";
 
+/** /register. Both account types continue on /verify-email after sign-up. */
 export function RegisterView() {
   const [accountType, setAccountType] = React.useState<AccountType>("CUSTOMER");
-  const [received, setReceived] = React.useState<MerchantApplicationReceived | null>(null);
-
-  if (received) {
-    return <ApplicationReceived application={received} />;
-  }
 
   return (
     <div className="flex flex-col">
@@ -30,18 +21,7 @@ export function RegisterView() {
         <AccountTypeSwitch value={accountType} onChange={setAccountType} />
       </div>
 
-      <div className="mt-6">
-        {accountType === "CUSTOMER" ? (
-          <CustomerRegisterForm />
-        ) : (
-          <MerchantRegisterForm
-            onSuccess={(application) => {
-              setReceived(application);
-              scrollAuthPageToTop();
-            }}
-          />
-        )}
-      </div>
+      <div className="mt-6">{accountType === "CUSTOMER" ? <CustomerRegisterForm /> : <MerchantRegisterForm />}</div>
 
       <p className="mt-6 text-body text-grey-600">
         Already have an account? <TextLink href="/login">Log in</TextLink>

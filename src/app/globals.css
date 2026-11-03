@@ -152,4 +152,14 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  /*
+   * Edge (and old IE) draw their own reveal and clear buttons inside password fields, which would sit next
+   * to PasswordInput's eye button. Hide them so each password field has exactly one eye.
+   * Chrome, Firefox and Safari don't add a reveal button.
+   */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+  }
 }

@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { FormPage } from "@/components/layout/form-page";
+import { AccountSettings } from "@/features/identity";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default function Page() {
-  return <ComingSoon href="/merchant/settings" />;
+  return (
+    <FormPage title="Settings" description="Your account and sign-in details.">
+      <AccountSettings />
+    </FormPage>
+  );
 }

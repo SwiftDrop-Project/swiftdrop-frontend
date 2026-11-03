@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError } from "@/lib/api";
 import { ROLE_HOME } from "@/lib/roles";
 import { authApi } from "../api";
+import { useLeavingPage } from "../hooks/use-leaving-page";
 import { useRegisterErrorHandler } from "../hooks/use-register-error-handler";
 import { clearGoogleAccountType, readGoogleAccountType } from "../lib/google-sign-in";
 import {
@@ -160,19 +161,22 @@ function CompleteProfileForms({
 /** Logs out, so someone who picked the wrong Google account can start again. */
 function UseAnotherAccount() {
   const router = useRouter();
-  const [leaving, setLeaving] = React.useState(false);
+  const [loggingOut, setLoggingOut] = React.useState(false);
+  const [leaving, startLeaving] = useLeavingPage();
   const [failed, setFailed] = React.useState(false);
 
   async function logOut() {
-    setLeaving(true);
+    setLoggingOut(true);
     setFailed(false);
     try {
       await authApi.logout();
       clearGoogleAccountType();
+      startLeaving();
       router.replace("/login");
     } catch {
       setFailed(true);
-      setLeaving(false);
+    } finally {
+      setLoggingOut(false);
     }
   }
 
@@ -180,7 +184,7 @@ function UseAnotherAccount() {
     <div className="mt-6 flex flex-col gap-2">
       <p className="text-body text-grey-600">
         Wrong Google account?{" "}
-        <Button type="button" variant="link" className="text-body font-semibold" disabled={leaving} onClick={logOut}>
+        <Button type="button" variant="link" className="text-body font-semibold" disabled={loggingOut || leaving} onClick={logOut}>
           Use another account
         </Button>
       </p>
@@ -227,7 +231,7 @@ const CUSTOMER_FIELDS = ["phone", "acceptTerms"] as const;
 
 function CustomerCompleteForm() {
   const router = useRouter();
-  const [redirecting, setRedirecting] = React.useState(false);
+  const [redirecting, startRedirecting] = useLeavingPage();
 
   const {
     register,
@@ -248,7 +252,7 @@ function CustomerCompleteForm() {
       // The API replaces the cookie with one for an ACTIVE account.
       await authApi.completeProfile({ accountType: "CUSTOMER", ...values });
       clearGoogleAccountType();
-      setRedirecting(true);
+      startRedirecting();
       router.replace(ROLE_HOME.CUSTOMER);
     } catch (error) {
       handleError(error);

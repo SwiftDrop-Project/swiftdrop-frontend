@@ -200,6 +200,17 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         },
       ],
     },
+    {
+      label: "Account",
+      items: [
+        {
+          title: "Settings",
+          href: "/dispatcher/settings",
+          icon: SlidersHorizontal,
+          description: "Change your password.",
+        },
+      ],
+    },
   ],
 };
 

@@ -19,6 +19,9 @@ export const MESSAGES = {
   pickupDistrict: "Select a district.",
   city: "Enter your city or town.",
   acceptTerms: "Accept the terms to continue.",
+  code: "Enter the 6-digit code.",
+  currentPassword: "Enter your current password.",
+  confirmPassword: "The passwords don't match.",
 } as const;
 
 /** 0771234567, 771234567 or +94771234567, spaces allowed. */
@@ -37,3 +40,5 @@ export const phone = z.string().trim().refine(isSriLankanMobile, MESSAGES.phone)
 export const email = z.string().trim().max(254, MESSAGES.email).regex(EMAIL_PATTERN, MESSAGES.email);
 export const password = z.string().regex(PASSWORD_PATTERN, MESSAGES.password);
 export const acceptTerms = z.boolean().refine((value) => value, MESSAGES.acceptTerms);
+/** A one-time code from an email: exactly 6 digits. */
+export const code = z.string().regex(/^\d{6}$/, MESSAGES.code);
