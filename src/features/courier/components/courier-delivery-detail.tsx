@@ -1,13 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { PackageSearch } from "lucide-react";
 import * as React from "react";
 import { DetailPage } from "@/components/layout/detail-page";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PARCEL_STATUS_LABEL, StatusBadge } from "@/components/ui/status-badge";
 import { Timeline, type TimelineItem } from "@/components/ui/timeline";
@@ -18,6 +14,7 @@ import { courierRoutes, failureReasonLabel, formatWeight, isFinished } from "../
 import type { CourierDeliveryDetail as Detail } from "../types";
 import { ContactDetails } from "./contact-details";
 import { LoadError } from "./load-error";
+import { ParcelNotFound } from "./parcel-not-found";
 import { StatusActions } from "./status-actions";
 
 const BACK = { backHref: courierRoutes.today, backLabel: "Back to today's deliveries" } as const;
@@ -187,27 +184,6 @@ function timelineItems(parcel: Detail): TimelineItem[] {
       tone: entry.status === "DELIVERED" ? "success" : entry.status === "FAILED" ? "error" : "default",
     };
   });
-}
-
-function ParcelNotFound() {
-  return (
-    <>
-      <PageHeader title="Parcel" {...BACK} />
-      <Card className="p-6 sm:p-10">
-        <EmptyState
-          icon={PackageSearch}
-          size="lg"
-          title="We couldn't find this parcel"
-          description="It isn't assigned to you any more, or the link is wrong."
-          actions={
-            <Button asChild>
-              <Link href={courierRoutes.today}>Back to today&apos;s deliveries</Link>
-            </Button>
-          }
-        />
-      </Card>
-    </>
-  );
 }
 
 function LoadingDetail() {
