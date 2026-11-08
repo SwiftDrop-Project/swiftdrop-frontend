@@ -18,8 +18,10 @@ export type ApiErrorCode =
   | "EMAIL_ALREADY_REGISTERED"
   | "PHONE_ALREADY_REGISTERED"
   | "PROFILE_ALREADY_COMPLETE"
+  | "INVALID_STATUS_TRANSITION"
   | "UNSUPPORTED_MEDIA_TYPE"
   | "INTERNAL_ERROR"
+  | "SERVICE_UNAVAILABLE"
   | "NETWORK_ERROR";
 
 /** Body of every non-2xx response. `fieldErrors` only comes with VALIDATION_FAILED. */
