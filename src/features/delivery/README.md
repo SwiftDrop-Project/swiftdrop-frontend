@@ -11,7 +11,10 @@ Parcels and deliveries: creating them, listing them, status changes, proof of de
 ## Built so far
 
 - `CreateDelivery` (`/customer/deliveries/new`): details form → review → tracking number with a copy button and the fee. Calls `POST /deliveries`; the pickup name and phone start as the customer's own.
-- Overview cards: `CustomerParcelsCard`, `CustomerSetupCard`, `CustomerHelpCard` (`/customer`) and `MerchantOrdersCard` (`/merchant`). They show empty states until the delivery API exists.
+- `MyDeliveries` (`/customer/deliveries`): the customer's deliveries, newest first, 20 a page, with a status filter (`GET /deliveries`). Cards on phones, a table from md up.
+- `DeliveryDetail` (`/customer/deliveries/[id]`): one delivery with its history as a timeline (`GET /deliveries/{id}`); someone else's delivery or a wrong link shows "not found".
+- Overview cards: `CustomerParcelsCard` (the five newest deliveries, or the empty state for a new customer), `CustomerSetupCard`, `CustomerHelpCard` (`/customer`) and `MerchantOrdersCard` (`/merchant`, still an empty state).
+- `hooks/use-deliveries.ts`: `useDeliveries` and `useDelivery` load the API data (loading, error, retry; stale requests are cancelled).
 
 ## Layout
 
@@ -22,6 +25,8 @@ delivery/
 ├── api.ts        Endpoints, built on apiFetch from @/lib/api
 ├── types.ts      Types matching the backend DTOs
 ├── schemas.ts    zod schemas for this feature's forms
+├── labels.ts     Words shown for API codes (failure reasons)
+├── routes.ts     Hrefs of this feature's pages
 └── index.ts      Public exports: the only file other code may import
 ```
 

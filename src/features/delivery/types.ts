@@ -4,6 +4,15 @@ import type { DistrictCode, ParcelStatus } from "@/types";
 
 export type { ParcelStatus } from "@/types";
 
+/** Why a delivery attempt failed (backend delivery.FailureReason). */
+export type FailureReason =
+  | "RECIPIENT_UNAVAILABLE"
+  | "WRONG_ADDRESS"
+  | "RECIPIENT_REFUSED"
+  | "ADDRESS_UNREACHABLE"
+  | "PARCEL_DAMAGED"
+  | "OTHER";
+
 /** A pickup or recipient. Phones go out as typed and come back as +947XXXXXXXX. */
 export interface DeliveryContact {
   name: string;
@@ -23,7 +32,13 @@ export interface CreateDeliveryRequest {
   instructions?: string;
 }
 
-/** A delivery as its customer sees it (POST /deliveries 201). */
+/** Who received a delivered parcel, and whether the courier added a photo. */
+export interface DeliveryProof {
+  recipientName: string | null;
+  hasPhoto: boolean;
+}
+
+/** A delivery as its customer sees it (POST /deliveries 201, and every item of My deliveries). */
 export interface Delivery {
   id: string;
   trackingNumber: string;
@@ -37,4 +52,36 @@ export interface Delivery {
   feeAmount: number;
   currency: string;
   createdAt: string;
+  updatedAt: string;
+  /** Only while AT_BRANCH: the branch (a district) the parcel is at. */
+  currentBranch: DistrictCode | null;
+  /** Only while FAILED. */
+  failureReason: FailureReason | null;
+  /** Only once DELIVERED. */
+  proof: DeliveryProof | null;
+}
+
+/** One status change of a delivery. */
+export interface DeliveryHistoryEntry {
+  status: ParcelStatus;
+  /** Only on AT_BRANCH entries. */
+  branch: DistrictCode | null;
+  note: string | null;
+  /** Only on FAILED entries. */
+  failureReason: FailureReason | null;
+  occurredAt: string;
+}
+
+/** GET /deliveries/{id}: the delivery and its history, newest first. */
+export interface DeliveryDetail {
+  delivery: Delivery;
+  history: DeliveryHistoryEntry[];
+}
+
+/** The query of GET /deliveries. `page` is 0-based; `size` is 1-100. */
+export interface DeliveryListQuery {
+  page: number;
+  size: number;
+  /** Leave out for every status. */
+  status?: ParcelStatus;
 }

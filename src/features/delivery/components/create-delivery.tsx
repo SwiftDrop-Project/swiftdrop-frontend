@@ -8,7 +8,7 @@ import { flushSync } from "react-dom";
 import { useForm, type FieldErrors, type Path, type UseFormRegister } from "react-hook-form";
 import { FormActions, FormSection } from "@/components/layout/form-page";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
@@ -23,10 +23,11 @@ import { useDistricts } from "@/hooks/use-districts";
 import { isApiError } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
 import { formatPhone, formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { deliveryApi } from "../api";
+import { deliveryHref } from "../routes";
 import { createDeliverySchema, type CreateDeliveryInput, type CreateDeliveryValues } from "../schemas";
 import type { Delivery } from "../types";
+import { SummaryCard } from "./summary-card";
 
 const STEPS = [{ label: "Details" }, { label: "Review" }];
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
@@ -336,31 +337,6 @@ function ReviewDetails({
   );
 }
 
-interface SummaryRow {
-  label: string;
-  value: string;
-  tabular?: boolean;
-}
-
-function SummaryCard({ title, rows }: { title: string; rows: SummaryRow[] }) {
-  const titleId = React.useId();
-  return (
-    <Card aria-labelledby={titleId}>
-      <CardHeader title={title} titleId={titleId} />
-      <CardContent>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          {rows.map((row) => (
-            <div key={row.label} className="flex min-w-0 flex-col gap-1">
-              <dt className="text-label text-grey-600">{row.label}</dt>
-              <dd className={cn("text-body break-words text-grey-900", row.tabular && "tabular-nums")}>{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
-
 /** The last step: the tracking number to keep, with a copy button, and the fee the server set. */
 function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; onCreateAnother: () => void }) {
   const copyTrackingNumber = async () => {
@@ -402,11 +378,11 @@ function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; on
       </Card>
 
       <FormActions>
-        <Button type="button" onClick={onCreateAnother}>
-          Create another delivery
+        <Button asChild>
+          <Link href={deliveryHref(delivery.id)}>View delivery</Link>
         </Button>
-        <Button asChild variant="secondary">
-          <Link href="/customer">Back to overview</Link>
+        <Button type="button" variant="secondary" onClick={onCreateAnother}>
+          Create another delivery
         </Button>
       </FormActions>
     </div>
