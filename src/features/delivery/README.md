@@ -10,6 +10,7 @@ Parcels and deliveries: creating them, listing them, status changes, proof of de
 
 ## Built so far
 
+- `CreateDelivery` (`/customer/deliveries/new`): details form → review → tracking number with a copy button and the fee. Calls `POST /deliveries`; the pickup name and phone start as the customer's own.
 - Overview cards: `CustomerParcelsCard`, `CustomerSetupCard`, `CustomerHelpCard` (`/customer`) and `MerchantOrdersCard` (`/merchant`). They show empty states until the delivery API exists.
 
 ## Layout
