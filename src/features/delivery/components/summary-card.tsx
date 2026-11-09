@@ -20,7 +20,9 @@ export function SummaryCard({ title, rows }: { title: string; rows: SummaryRow[]
           {rows.map((row) => (
             <div key={row.label} className="flex min-w-0 flex-col gap-1">
               <dt className="text-label text-grey-600">{row.label}</dt>
-              <dd className={cn("text-body break-words text-grey-900", row.tabular && "tabular-nums")}>{row.value}</dd>
+              <dd className={cn("text-body wrap-break-word text-grey-900", row.tabular && "tabular-nums")}>
+                {row.value}
+              </dd>
             </div>
           ))}
         </dl>
