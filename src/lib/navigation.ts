@@ -226,229 +226,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
   ],
   ADMIN: [
     {
-      label: "Customer",
-      collapsible: true,
-      defaultOpen: false,
-      items: [
-        {
-          title: "Overview",
-          href: "/admin/customer",
-          icon: House,
-          description: "Customer portal overview and delivery summary.",
-        },
-        {
-          title: "Create Delivery",
-          href: "/admin/customer/create-delivery",
-          icon: SquarePlus,
-          description: "Book a customer parcel pickup and delivery.",
-        },
-        {
-          title: "My Deliveries",
-          href: "/admin/customer/deliveries",
-          icon: Package,
-          description: "View active customer deliveries and parcel statuses.",
-        },
-        {
-          title: "Track Parcel",
-          href: "/admin/customer/track",
-          icon: Search,
-          description: "Look up any parcel with its tracking number.",
-        },
-        {
-          title: "My Addresses",
-          href: "/admin/customer/addresses",
-          icon: MapPin,
-          description: "Manage saved customer pickup and delivery addresses.",
-        },
-        {
-          title: "Delivery History",
-          href: "/admin/customer/history",
-          icon: ListClock,
-          description: "Browse completed and past customer deliveries.",
-        },
-        {
-          title: "Payments & Receipts",
-          href: "/admin/customer/payments",
-          icon: CreditCard,
-          description: "Inspect delivery charges, payments and downloadable receipts.",
-        },
-        {
-          title: "Profile",
-          href: "/admin/customer/profile",
-          icon: UserCog,
-          description: "Customer profile and contact preferences.",
-        },
-      ],
-    },
-    {
-      label: "Merchant",
-      collapsible: true,
-      defaultOpen: false,
-      items: [
-        {
-          title: "Overview",
-          href: "/admin/merchant",
-          icon: Store,
-          description: "Merchant portal summary, order volume and settlement status.",
-        },
-        {
-          title: "Create Order",
-          href: "/admin/merchant/create-order",
-          icon: SquarePlus,
-          description: "Create a merchant parcel order for pickup.",
-        },
-        {
-          title: "My Orders",
-          href: "/admin/merchant/orders",
-          icon: ClipboardList,
-          description: "View merchant orders, statuses and cash-on-delivery amounts.",
-        },
-        {
-          title: "Track Shipments",
-          href: "/admin/merchant/track",
-          icon: Navigation,
-          description: "Track merchant shipments across branches.",
-        },
-        {
-          title: "Customers",
-          href: "/admin/merchant/customers",
-          icon: Users,
-          description: "Recipient directory for merchant orders.",
-        },
-        {
-          title: "API Keys",
-          href: "/admin/merchant/api-keys",
-          icon: KeyRound,
-          description: "Manage merchant store integration API keys.",
-        },
-        {
-          title: "Webhooks",
-          href: "/admin/merchant/webhooks",
-          icon: Webhook,
-          description: "Configure webhook endpoints for parcel status events.",
-        },
-        {
-          title: "Webhook Logs",
-          href: "/admin/merchant/webhook-logs",
-          icon: FileText,
-          description: "Inspect webhook delivery attempts, response codes and retries.",
-        },
-        {
-          title: "Business Profile",
-          href: "/admin/merchant/profile",
-          icon: Building2,
-          description: "Merchant business details, pickup district and settlement info.",
-        },
-      ],
-    },
-    {
-      label: "Dispatcher",
-      collapsible: true,
-      defaultOpen: false,
-      items: [
-        {
-          title: "Overview",
-          href: "/admin/dispatcher",
-          icon: Headset,
-          description: "Branch dispatch queue and daily courier capacity.",
-        },
-        {
-          title: "Unassigned Parcels",
-          href: "/admin/dispatcher/unassigned",
-          icon: PackageOpen,
-          description: "Parcels waiting to be assigned to an eligible courier.",
-        },
-        {
-          title: "All Parcels",
-          href: "/admin/dispatcher/parcels",
-          icon: Package,
-          description: "Every parcel currently moving through dispatch.",
-        },
-        {
-          title: "Couriers",
-          href: "/admin/dispatcher/couriers",
-          icon: Bike,
-          description: "Active couriers available for parcel assignment.",
-        },
-        {
-          title: "Assign Courier",
-          href: "/admin/dispatcher/assign",
-          icon: UserCheck,
-          description: "Assign waiting parcels to active couriers by branch.",
-        },
-        {
-          title: "Live Tracking",
-          href: "/admin/dispatcher/tracking",
-          icon: Radar,
-          description: "Real-time courier route and parcel progress tracking.",
-        },
-        {
-          title: "Delivery Issues",
-          href: "/admin/dispatcher/issues",
-          icon: CircleAlert,
-          description: "Resolve failed delivery attempts and address exceptions.",
-        },
-      ],
-    },
-    {
-      label: "Courier",
-      collapsible: true,
-      defaultOpen: false,
-      items: [
-        {
-          title: "Overview",
-          href: "/admin/courier",
-          icon: Truck,
-          description: "Courier shift overview and assigned route summary.",
-        },
-        {
-          title: "Today's Deliveries",
-          href: "/admin/courier/today",
-          icon: PackageCheck,
-          description: "Parcels scheduled for pickup and delivery today.",
-        },
-        {
-          title: "My Assignments",
-          href: "/admin/courier/assignments",
-          icon: ClipboardList,
-          description: "Current parcel manifest assigned to the courier.",
-        },
-        {
-          title: "Delivery Details",
-          href: "/admin/courier/delivery-details",
-          icon: FileText,
-          description: "Recipient contact, COD amount and address instructions.",
-        },
-        {
-          title: "Update Status",
-          href: "/admin/courier/update-status",
-          icon: CircleCheck,
-          description: "Record pickup, transit and proof-of-delivery updates.",
-        },
-        {
-          title: "Delivery History",
-          href: "/admin/courier/history",
-          icon: ListClock,
-          description: "Completed pickups and deliveries by date.",
-        },
-        {
-          title: "Failed Deliveries",
-          href: "/admin/courier/failed",
-          icon: PackageX,
-          description: "Parcels that could not be delivered and require follow-up.",
-        },
-        {
-          title: "Profile",
-          href: "/admin/courier/profile",
-          icon: UserCog,
-          description: "Courier vehicle, branch and contact details.",
-        },
-      ],
-    },
-    {
       label: "Admin",
-      collapsible: true,
-      defaultOpen: true,
       items: [
         {
           title: "Overview",
@@ -515,6 +293,205 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
   ],
 };
 
+/**
+ * Preserved titles, icons, and descriptions for retained `/admin/{customer,merchant,dispatcher,courier}/**`
+ * placeholder pages (`ComingSoon`) without exposing those role-preview links in `NAVIGATION.ADMIN`.
+ */
+const RETAINED_ADMIN_PLACEHOLDER_ITEMS: NavItem[] = [
+  {
+    title: "Overview",
+    href: "/admin/customer",
+    icon: House,
+    description: "Customer portal overview and delivery summary.",
+  },
+  {
+    title: "Create Delivery",
+    href: "/admin/customer/create-delivery",
+    icon: SquarePlus,
+    description: "Book a customer parcel pickup and delivery.",
+  },
+  {
+    title: "My Deliveries",
+    href: "/admin/customer/deliveries",
+    icon: Package,
+    description: "View active customer deliveries and parcel statuses.",
+  },
+  {
+    title: "Track Parcel",
+    href: "/admin/customer/track",
+    icon: Search,
+    description: "Look up any parcel with its tracking number.",
+  },
+  {
+    title: "My Addresses",
+    href: "/admin/customer/addresses",
+    icon: MapPin,
+    description: "Manage saved customer pickup and delivery addresses.",
+  },
+  {
+    title: "Delivery History",
+    href: "/admin/customer/history",
+    icon: ListClock,
+    description: "Browse completed and past customer deliveries.",
+  },
+  {
+    title: "Payments & Receipts",
+    href: "/admin/customer/payments",
+    icon: CreditCard,
+    description: "Inspect delivery charges, payments and downloadable receipts.",
+  },
+  {
+    title: "Profile",
+    href: "/admin/customer/profile",
+    icon: UserCog,
+    description: "Customer profile and contact preferences.",
+  },
+  {
+    title: "Overview",
+    href: "/admin/merchant",
+    icon: Store,
+    description: "Merchant portal summary, order volume and settlement status.",
+  },
+  {
+    title: "Create Order",
+    href: "/admin/merchant/create-order",
+    icon: SquarePlus,
+    description: "Create a merchant parcel order for pickup.",
+  },
+  {
+    title: "My Orders",
+    href: "/admin/merchant/orders",
+    icon: ClipboardList,
+    description: "View merchant orders, statuses and cash-on-delivery amounts.",
+  },
+  {
+    title: "Track Shipments",
+    href: "/admin/merchant/track",
+    icon: Navigation,
+    description: "Track merchant shipments across branches.",
+  },
+  {
+    title: "Customers",
+    href: "/admin/merchant/customers",
+    icon: Users,
+    description: "Recipient directory for merchant orders.",
+  },
+  {
+    title: "API Keys",
+    href: "/admin/merchant/api-keys",
+    icon: KeyRound,
+    description: "Manage merchant store integration API keys.",
+  },
+  {
+    title: "Webhooks",
+    href: "/admin/merchant/webhooks",
+    icon: Webhook,
+    description: "Configure webhook endpoints for parcel status events.",
+  },
+  {
+    title: "Webhook Logs",
+    href: "/admin/merchant/webhook-logs",
+    icon: FileText,
+    description: "Inspect webhook delivery attempts, response codes and retries.",
+  },
+  {
+    title: "Business Profile",
+    href: "/admin/merchant/profile",
+    icon: Building2,
+    description: "Merchant business details, pickup district and settlement info.",
+  },
+  {
+    title: "Overview",
+    href: "/admin/dispatcher",
+    icon: Headset,
+    description: "Branch dispatch queue and daily courier capacity.",
+  },
+  {
+    title: "Unassigned Parcels",
+    href: "/admin/dispatcher/unassigned",
+    icon: PackageOpen,
+    description: "Parcels waiting to be assigned to an eligible courier.",
+  },
+  {
+    title: "All Parcels",
+    href: "/admin/dispatcher/parcels",
+    icon: Package,
+    description: "Every parcel currently moving through dispatch.",
+  },
+  {
+    title: "Couriers",
+    href: "/admin/dispatcher/couriers",
+    icon: Bike,
+    description: "Active couriers available for parcel assignment.",
+  },
+  {
+    title: "Assign Courier",
+    href: "/admin/dispatcher/assign",
+    icon: UserCheck,
+    description: "Assign waiting parcels to active couriers by branch.",
+  },
+  {
+    title: "Live Tracking",
+    href: "/admin/dispatcher/tracking",
+    icon: Radar,
+    description: "Real-time courier route and parcel progress tracking.",
+  },
+  {
+    title: "Delivery Issues",
+    href: "/admin/dispatcher/issues",
+    icon: CircleAlert,
+    description: "Resolve failed delivery attempts and address exceptions.",
+  },
+  {
+    title: "Overview",
+    href: "/admin/courier",
+    icon: Truck,
+    description: "Courier shift overview and assigned route summary.",
+  },
+  {
+    title: "Today's Deliveries",
+    href: "/admin/courier/today",
+    icon: PackageCheck,
+    description: "Parcels scheduled for pickup and delivery today.",
+  },
+  {
+    title: "My Assignments",
+    href: "/admin/courier/assignments",
+    icon: ClipboardList,
+    description: "Current parcel manifest assigned to the courier.",
+  },
+  {
+    title: "Delivery Details",
+    href: "/admin/courier/delivery-details",
+    icon: FileText,
+    description: "Recipient contact, COD amount and address instructions.",
+  },
+  {
+    title: "Update Status",
+    href: "/admin/courier/update-status",
+    icon: CircleCheck,
+    description: "Record pickup, transit and proof-of-delivery updates.",
+  },
+  {
+    title: "Delivery History",
+    href: "/admin/courier/history",
+    icon: ListClock,
+    description: "Completed pickups and deliveries by date.",
+  },
+  {
+    title: "Failed Deliveries",
+    href: "/admin/courier/failed",
+    icon: PackageX,
+    description: "Parcels that could not be delivered and require follow-up.",
+  },
+  {
+    title: "Profile",
+    href: "/admin/courier/profile",
+    icon: UserCog,
+    description: "Courier vehicle, branch and contact details.",
+  },
+];
+
 /** "Help and support" sits at the bottom of every sidebar. */
 export function helpItem(role: Role): NavItem {
   return {
@@ -549,13 +526,13 @@ function allItems(role: Role): NavItem[] {
   return [...NAVIGATION[role].flatMap((group) => group.items), helpItem(role)];
 }
 
-/** Finds the menu item for a page, e.g. for the "coming soon" screen. */
+/** Finds the menu item or retained placeholder metadata for a page, e.g. for the "coming soon" screen. */
 export function findNavItem(href: string): NavItem | undefined {
   for (const role of ROLES) {
     const item = allItems(role).find((candidate) => candidate.href === href);
     if (item) return item;
   }
-  return undefined;
+  return RETAINED_ADMIN_PLACEHOLDER_ITEMS.find((candidate) => candidate.href === href);
 }
 
 /**
