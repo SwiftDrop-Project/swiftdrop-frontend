@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Store } from "lucide-react";
+import { PackageOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,13 +9,13 @@ export function DispatcherOverviewCard() {
   return (
     <Card className="p-6 sm:p-10">
       <EmptyState
-        icon={Store}
+        icon={PackageOpen}
         size="lg"
-        title="Nothing needs your attention yet"
-        description="Parcel and courier figures will appear here once deliveries start. New merchant applications are listed under Merchants."
+        title="No unassigned parcels waiting right now"
+        description="Branch parcel queues and active courier capacity will appear here once deliveries arrive at your branch."
         actions={
           <Button asChild>
-            <Link href="/dispatcher/merchants">Review merchants</Link>
+            <Link href="/dispatcher/assign">View unassigned parcels</Link>
           </Button>
         }
       />

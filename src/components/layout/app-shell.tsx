@@ -26,14 +26,18 @@ export function AppShell({ area, children }: { area: Role; children: React.React
       </a>
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-sidebar border-r border-grey-200 bg-white lg:block">
-        <SidebarContent role={area} />
+        <React.Suspense fallback={null}>
+          <SidebarContent role={area} />
+        </React.Suspense>
       </aside>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="left">
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <SheetDescription className="sr-only">Go to another part of SwiftDrop.</SheetDescription>
-          <SidebarContent role={area} onNavigate={() => setMenuOpen(false)} />
+          <React.Suspense fallback={null}>
+            <SidebarContent role={area} onNavigate={() => setMenuOpen(false)} />
+          </React.Suspense>
         </SheetContent>
       </Sheet>
 
@@ -50,9 +54,10 @@ export function AppShell({ area, children }: { area: Role; children: React.React
 }
 
 /**
- * Page content renders straight away (it is prerendered, and the proxy has already checked the
- * role from the cookie). Only parts that need the user, like the welcome heading, wait for /auth/me.
- * If /auth/me fails for a reason other than 401, the page is replaced by an error with a retry.
+ * Keeps `children` (and Next.js's `<OuterLayoutRouter>` boundary) mounted while `GET /auth/me`
+ * is loading so instant-navigation validation can render the active page segment, while
+ * page-level `<RequireCurrentUser>` guards render structural skeletons and block protected UI
+ * and API calls until an authorized, onboarded session is verified.
  */
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { state, retry, logoutError } = useCurrentUserState();

@@ -1,10 +1,11 @@
-import type { DistrictCode, ParcelsPerMonth, Role } from "@/types";
+import type { DistrictCode, ParcelsPerMonth, Role, VehicleType } from "@/types";
 
-/* Types matching the identity DTOs in API.md (User, auth requests). */
+/* Types matching the identity DTOs in API.md (User, auth requests, admin staff management). */
 
 /**
  * PENDING_EMAIL_VERIFICATION: signed up with a password and must still enter the emailed 6-digit code.
  * PROFILE_INCOMPLETE: signed up with Google and must still call POST /auth/complete-profile.
+ * REMOVED: soft-deleted internal staff account (history preserved, login permanently blocked).
  */
 export type UserStatus =
   | "ACTIVE"
@@ -12,7 +13,8 @@ export type UserStatus =
   | "PENDING_APPROVAL"
   | "REJECTED"
   | "DISABLED"
-  | "PROFILE_INCOMPLETE";
+  | "PROFILE_INCOMPLETE"
+  | "REMOVED";
 
 /** A merchant's approval. Part of the User response, so it lives here; merchants imports it. */
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -32,6 +34,8 @@ export interface User {
   phone: string | null;
   role: Role;
   status: UserStatus;
+  /** True when an admin created or reset this account's password and it must be changed before continuing. */
+  mustChangePassword: boolean;
   /** Only for role MERCHANT, otherwise null. */
   merchant: MerchantInfo | null;
 }
@@ -122,3 +126,75 @@ export type GoogleSignInError =
   | "account_pending_approval"
   | "account_rejected"
   | "account_disabled";
+
+/* Admin staff management DTOs (/admin/couriers, /admin/dispatchers). */
+
+export interface CourierDetail {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  branch: DistrictCode | null;
+  vehicleType: VehicleType | null;
+  status: UserStatus;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface CreateCourierRequest {
+  fullName: string;
+  phone: string;
+  email: string;
+  branch: DistrictCode;
+  vehicleType: VehicleType;
+  password: string;
+}
+
+export interface UpdateCourierRequest {
+  fullName: string;
+  phone: string;
+  email: string;
+  branch: DistrictCode;
+  vehicleType: VehicleType;
+}
+
+export interface AdminResetPasswordRequest {
+  newPassword: string;
+}
+
+export interface CourierListParams {
+  q?: string;
+  branch?: DistrictCode;
+  status?: UserStatus;
+  page?: number;
+  size?: number;
+}
+
+export interface DispatcherDetail {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  branch: DistrictCode | null;
+  status: UserStatus;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDispatcherRequest {
+  fullName: string;
+  phone: string;
+  branch: DistrictCode;
+  email: string;
+  password: string;
+}
+
+export interface DispatcherListParams {
+  q?: string;
+  branch?: DistrictCode;
+  page?: number;
+  size?: number;
+}
