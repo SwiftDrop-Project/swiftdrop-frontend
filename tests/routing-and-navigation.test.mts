@@ -250,100 +250,104 @@ test("proxy enforces role separation, mandatory password change, and loop-free r
   );
 });
 
-test("Admin sidebar has all 5 collapsible groups in exact order and every route has a page.tsx", () => {
+test("Admin sidebar has only non-collapsible admin navigation in exact order and every route has a page.tsx", () => {
   const adminGroups = navigation.NAVIGATION.ADMIN;
   assert.deepEqual(
     adminGroups.map((group) => group.label),
-    ["Customer", "Merchant", "Dispatcher", "Courier", "Admin"],
+    ["Admin"],
   );
-  assert.ok(adminGroups.every((group) => group.collapsible === true));
-  assert.deepEqual(
-    adminGroups.map((group) => group.defaultOpen),
-    [false, false, false, false, true],
-  );
+  assert.ok(adminGroups.every((group) => !group.collapsible));
+
+  const expectedAdminItems = [
+    { title: "Overview", href: "/admin" },
+    { title: "User Management", href: "/admin/users" },
+    { title: "Merchant Approvals", href: "/admin/merchants" },
+    { title: "Courier Management", href: "/admin/couriers" },
+    { title: "Dispatcher Management", href: "/admin/dispatchers" },
+    { title: "All Parcels", href: "/admin/parcels" },
+    { title: "Zones & Pricing", href: "/admin/zones" },
+    { title: "Delivery Rates", href: "/admin/rates" },
+    { title: "Reports & Analytics", href: "/admin/reports" },
+    { title: "System Settings", href: "/admin/settings" },
+  ];
 
   assert.deepEqual(
-    adminGroups[0].items.map((item) => item.title),
-    [
-      "Overview",
-      "Create Delivery",
-      "My Deliveries",
-      "Track Parcel",
-      "My Addresses",
-      "Delivery History",
-      "Payments & Receipts",
-      "Profile",
-    ],
-  );
-  assert.deepEqual(
-    adminGroups[1].items.map((item) => item.title),
-    [
-      "Overview",
-      "Create Order",
-      "My Orders",
-      "Track Shipments",
-      "Customers",
-      "API Keys",
-      "Webhooks",
-      "Webhook Logs",
-      "Business Profile",
-    ],
-  );
-  assert.deepEqual(
-    adminGroups[2].items.map((item) => item.title),
-    [
-      "Overview",
-      "Unassigned Parcels",
-      "All Parcels",
-      "Couriers",
-      "Assign Courier",
-      "Live Tracking",
-      "Delivery Issues",
-    ],
-  );
-  assert.deepEqual(
-    adminGroups[3].items.map((item) => item.title),
-    [
-      "Overview",
-      "Today's Deliveries",
-      "My Assignments",
-      "Delivery Details",
-      "Update Status",
-      "Delivery History",
-      "Failed Deliveries",
-      "Profile",
-    ],
-  );
-  assert.deepEqual(
-    adminGroups[4].items.map((item) => item.title),
-    [
-      "Overview",
-      "User Management",
-      "Merchant Approvals",
-      "Courier Management",
-      "Dispatcher Management",
-      "All Parcels",
-      "Zones & Pricing",
-      "Delivery Rates",
-      "Reports & Analytics",
-      "System Settings",
-    ],
+    adminGroups[0].items.map((item) => ({ title: item.title, href: item.href })),
+    expectedAdminItems,
   );
 
-  // Condition 6: System Settings (/admin/settings) is separate from personal Account settings (/admin/account)
+  // Explicit check that Courier Management and Dispatcher Management remain present
+  const adminHrefs = adminGroups.flatMap((group) => group.items.map((item) => item.href));
+  assert.ok(adminHrefs.includes("/admin/couriers"));
+  assert.ok(adminHrefs.includes("/admin/dispatchers"));
+
+  // Zero links to removed Customer/Merchant/Dispatcher/Courier role-preview sections
+  for (const forbiddenPrefix of [
+    "/admin/customer",
+    "/admin/merchant/",
+    "/admin/dispatcher/",
+    "/admin/courier/",
+  ]) {
+    assert.ok(
+      adminHrefs.every((href) => !href.startsWith(forbiddenPrefix) && href !== forbiddenPrefix.replace(/\/$/, "")),
+      `Unexpected role-preview link matching ${forbiddenPrefix} in ADMIN navigation`,
+    );
+  }
+  assert.ok(!adminHrefs.includes("/admin/merchant"));
+  assert.ok(!adminHrefs.includes("/admin/dispatcher"));
+  assert.ok(!adminHrefs.includes("/admin/courier"));
+
+  // Retained placeholder routes preserve ComingSoon metadata via findNavItem without entering admin sidebar
+  const retainedPlaceholderSample = navigation.findNavItem("/admin/merchant/api-keys");
+  assert.equal(retainedPlaceholderSample?.title, "API Keys");
+  assert.equal(retainedPlaceholderSample?.description, "Manage merchant store integration API keys.");
+
+  // System Settings (/admin/settings) is separate from personal Account settings (/admin/account), and help stays /admin/help
   assert.equal(navigation.settingsHref("ADMIN"), "/admin/account");
+  assert.equal(navigation.helpItem("ADMIN").href, "/admin/help");
 
-  // Dispatcher sidebar has zero /admin routes and no Merchant Approvals
-  const dispatcherHrefs = navigation.NAVIGATION.DISPATCHER.flatMap((group) =>
-    group.items.map((item) => item.href),
+  // Other roles' navigation definitions remain unchanged
+  assert.deepEqual(
+    navigation.NAVIGATION.CUSTOMER.map((g) => g.items.map((i) => i.href)),
+    [
+      ["/customer", "/customer/deliveries/new", "/customer/track", "/customer/deliveries"],
+      ["/customer/addresses", "/customer/payments", "/customer/settings"],
+    ],
   );
-  assert.ok(dispatcherHrefs.every((href) => href === "/dispatcher" || href.startsWith("/dispatcher/")));
-  assert.ok(!dispatcherHrefs.includes("/dispatcher/merchants"));
+  assert.deepEqual(
+    navigation.NAVIGATION.MERCHANT.map((g) => g.items.map((i) => i.href)),
+    [
+      ["/merchant", "/merchant/orders", "/merchant/orders/new", "/merchant/api-keys", "/merchant/webhooks"],
+      ["/merchant/settings"],
+    ],
+  );
+  assert.deepEqual(
+    navigation.NAVIGATION.COURIER.map((g) => g.items.map((i) => i.href)),
+    [["/courier", "/courier/history"], ["/courier/settings"]],
+  );
+  assert.deepEqual(
+    navigation.NAVIGATION.DISPATCHER.map((g) => g.items.map((i) => i.href)),
+    [
+      [
+        "/dispatcher",
+        "/dispatcher/assign",
+        "/dispatcher/parcels",
+        "/dispatcher/couriers",
+        "/dispatcher/tracking",
+        "/dispatcher/issues",
+      ],
+      ["/dispatcher/settings"],
+    ],
+  );
 
   // Active navigation matching
   assert.equal(navigation.activeHref("ADMIN", "/admin"), "/admin");
   assert.equal(navigation.activeHref("ADMIN", "/admin/couriers/abc-123"), "/admin/couriers");
+  assert.equal(navigation.activeHref("ADMIN", "/admin/dispatchers/xyz-789"), "/admin/dispatchers");
   assert.equal(navigation.activeHref("ADMIN", "/admin/account"), undefined);
+  assert.equal(navigation.activeHref("ADMIN", "/admin/help"), "/admin/help");
+  assert.equal(navigation.activeHref("ADMIN", "/admin/customer"), undefined);
+  assert.equal(navigation.activeHref("ADMIN", "/admin/merchant/api-keys"), undefined);
 
   // Every route in NAVIGATION + help + settings exists on disk under src/app
   for (const role of roles.ROLES) {
