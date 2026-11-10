@@ -7,6 +7,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { useForm, type FieldErrors, type Path, type UseFormRegister } from "react-hook-form";
 import { FormActions, FormSection } from "@/components/layout/form-page";
+import { PageColumns } from "@/components/layout/page-columns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
@@ -24,9 +25,11 @@ import { isApiError } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
 import { formatPhone, formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
 import { deliveryApi } from "../api";
+import { FLAT_FEE_ESTIMATE } from "../fee-estimate";
 import { deliveryHref } from "../routes";
 import { createDeliverySchema, type CreateDeliveryInput, type CreateDeliveryValues } from "../schemas";
 import type { Delivery } from "../types";
+import { FeeEstimateCard } from "./fee-estimate-card";
 import { SummaryCard } from "./summary-card";
 
 const STEPS = [{ label: "Details" }, { label: "Review" }];
@@ -151,16 +154,16 @@ export function CreateDelivery() {
 
   return (
     <div className="flex flex-col gap-8">
-      <Stepper steps={STEPS} current={step === "details" ? 0 : 1} />
+      <Stepper steps={STEPS} current={step === "details" ? 0 : 1} className="max-w-form-app" />
 
       {notice ? (
-        <InlineNotice tone="error" title="We couldn't create the delivery">
+        <InlineNotice tone="error" title="We couldn't create the delivery" className="max-w-form-app">
           {notice}
         </InlineNotice>
       ) : null}
 
       {step === "details" ? (
-        <form onSubmit={goToReview} noValidate className="flex flex-col gap-12">
+        <form onSubmit={goToReview} noValidate className="flex max-w-form-app flex-col gap-12">
           {(["pickup", "recipient"] as const).map((key) => (
             <ContactFields
               key={key}
@@ -207,24 +210,59 @@ export function CreateDelivery() {
           </FormActions>
         </form>
       ) : (
-        <form onSubmit={createDelivery} noValidate className="flex flex-col gap-6">
-          <ReviewDetails values={getValues()} districtName={districtName} />
-
-          <InlineNotice title="The fee and tracking number come next">
-            You&apos;ll see them as soon as the delivery is created.
-          </InlineNotice>
-
-          <FormActions>
-            <Button type="submit" loading={isSubmitting}>
-              Create delivery
-            </Button>
-            <Button type="button" variant="secondary" disabled={isSubmitting} onClick={() => setStep("details")}>
-              Edit details
-            </Button>
-          </FormActions>
-        </form>
+        <ReviewStep
+          values={getValues()}
+          districtName={districtName}
+          submitting={isSubmitting}
+          onCreate={createDelivery}
+          onEdit={() => setStep("details")}
+        />
       )}
     </div>
+  );
+}
+
+interface ReviewStepProps {
+  values: CreateDeliveryInput;
+  districtName: (code: string) => string;
+  submitting: boolean;
+  onCreate: React.FormEventHandler<HTMLFormElement>;
+  onEdit: () => void;
+}
+
+/**
+ * What will be booked, with the fee estimate beside it on wide screens (sticky while scrolling) and above the
+ * buttons on smaller ones, so it is always seen before "Create delivery".
+ */
+function ReviewStep({ values, districtName, submitting, onCreate, onEdit }: ReviewStepProps) {
+  const cod = values.codAmount.trim();
+  const estimate = (
+    <FeeEstimateCard
+      estimate={FLAT_FEE_ESTIMATE}
+      pickup={{ district: districtName(values.pickup.district), city: values.pickup.city }}
+      dropOff={{ district: districtName(values.recipient.district), city: values.recipient.city }}
+      weightKg={Number(values.weightKg)}
+      codAmount={cod === "" ? null : Number(cod)}
+    />
+  );
+
+  return (
+    <PageColumns aside={<div className="hidden xl:sticky xl:top-24 xl:block">{estimate}</div>}>
+      <form onSubmit={onCreate} noValidate className="flex flex-col gap-6">
+        <ReviewDetails values={values} districtName={districtName} />
+
+        <div className="xl:hidden">{estimate}</div>
+
+        <FormActions>
+          <Button type="submit" loading={submitting}>
+            Create delivery
+          </Button>
+          <Button type="button" variant="secondary" disabled={submitting} onClick={onEdit}>
+            Edit details
+          </Button>
+        </FormActions>
+      </form>
+    </PageColumns>
   );
 }
 
@@ -349,7 +387,7 @@ function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; on
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex max-w-form-app flex-col gap-8">
       <Stepper steps={STEPS} current={STEPS.length} />
 
       <InlineNotice tone="success" title="Delivery created">
