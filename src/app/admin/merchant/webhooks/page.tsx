@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { ComingSoon } from "@/components/layout/coming-soon";
 
-export const metadata: Metadata = { title: "Reports" };
+export const metadata: Metadata = { title: "Webhooks" };
 
 export default function Page() {
-  return <ComingSoon href="/dispatcher/reports" />;
+  return <ComingSoon href="/admin/merchant/webhooks" />;
 }

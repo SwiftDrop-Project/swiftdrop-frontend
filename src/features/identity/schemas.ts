@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PARCELS_PER_MONTH_VALUES } from "@/lib/reference";
+import { PARCELS_PER_MONTH_VALUES, VEHICLE_TYPE_VALUES } from "@/lib/reference";
 import { acceptTerms, code, email, MESSAGES, password, personName, phone } from "@/lib/validation";
 
 /*
@@ -76,10 +76,54 @@ export const changePasswordSchema = z
     newPassword: password,
     confirmPassword: z.string(),
   })
+  .refine((values) => values.newPassword !== values.currentPassword, {
+    message: MESSAGES.samePassword,
+    path: ["newPassword"],
+  })
   .refine((values) => values.confirmPassword === values.newPassword, {
     message: MESSAGES.confirmPassword,
     path: ["confirmPassword"],
   });
+
+/* Admin staff management schemas (CreateCourierRequest, UpdateCourierRequest, CreateDispatcherRequest). */
+
+const branchField = z.string({ error: MESSAGES.branch }).min(1, MESSAGES.branch);
+const vehicleTypeField = z.string().pipe(z.enum(VEHICLE_TYPE_VALUES, { error: MESSAGES.vehicleType }));
+
+export const createCourierSchema = z.object({
+  fullName: personName(MESSAGES.fullName),
+  phone,
+  email,
+  branch: branchField,
+  vehicleType: vehicleTypeField,
+  password,
+});
+
+export const updateCourierSchema = z.object({
+  fullName: personName(MESSAGES.fullName),
+  phone,
+  email,
+  branch: branchField,
+  vehicleType: vehicleTypeField,
+});
+
+export const adminResetPasswordSchema = z
+  .object({
+    newPassword: password,
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.confirmPassword === values.newPassword, {
+    message: MESSAGES.confirmPassword,
+    path: ["confirmPassword"],
+  });
+
+export const createDispatcherSchema = z.object({
+  fullName: personName(MESSAGES.fullName),
+  phone,
+  branch: branchField,
+  email,
+  password,
+});
 
 export type EmailOnlyValues = z.input<typeof emailOnlySchema>;
 export type ForgotPasswordValues = z.input<typeof forgotPasswordSchema>;
@@ -92,3 +136,10 @@ export type MerchantCompleteProfileValues = z.output<typeof merchantCompleteProf
 export type CustomerRegisterValues = z.input<typeof customerRegisterSchema>;
 export type MerchantRegisterInput = z.input<typeof merchantRegisterSchema>;
 export type MerchantRegisterValues = z.output<typeof merchantRegisterSchema>;
+export type CreateCourierInput = z.input<typeof createCourierSchema>;
+export type CreateCourierValues = z.output<typeof createCourierSchema>;
+export type UpdateCourierInput = z.input<typeof updateCourierSchema>;
+export type UpdateCourierValues = z.output<typeof updateCourierSchema>;
+export type AdminResetPasswordValues = z.input<typeof adminResetPasswordSchema>;
+export type CreateDispatcherInput = z.input<typeof createDispatcherSchema>;
+export type CreateDispatcherValues = z.output<typeof createDispatcherSchema>;

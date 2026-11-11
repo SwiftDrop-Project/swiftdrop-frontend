@@ -133,7 +133,7 @@ function UserMenu({ role }: { role: Role }) {
           <DropdownMenuItem asChild>
             <Link href={settings}>
               <SlidersHorizontal aria-hidden="true" />
-              Settings
+              {role === "ADMIN" ? "Account settings" : "Settings"}
             </Link>
           </DropdownMenuItem>
         ) : null}
