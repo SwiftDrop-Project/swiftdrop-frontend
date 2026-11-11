@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { TaskList } from "@/features/dispatch";
 
-export const metadata: Metadata = { title: "All parcels" };
+export const metadata: Metadata = { title: "Courier tasks" };
 
 export default function Page() {
-  return <ComingSoon href="/dispatcher/parcels" />;
+  return <TaskList />;
 }

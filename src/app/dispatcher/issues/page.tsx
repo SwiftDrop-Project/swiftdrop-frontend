@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { DeliveryIssues } from "@/features/dispatch";
 
 export const metadata: Metadata = { title: "Delivery issues" };
 
 export default function Page() {
-  return <ComingSoon href="/dispatcher/issues" />;
+  return <DeliveryIssues />;
 }
