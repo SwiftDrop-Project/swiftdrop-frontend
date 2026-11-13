@@ -17,11 +17,14 @@ export const MESSAGES = {
   businessRegNo: "Use at most 30 characters.",
   parcelsPerMonth: "Select a range.",
   pickupDistrict: "Select a district.",
+  branch: "Select a branch.",
+  vehicleType: "Select a vehicle type.",
   city: "Enter your city or town.",
   acceptTerms: "Accept the terms to continue.",
   code: "Enter the 6-digit code.",
   currentPassword: "Enter your current password.",
   confirmPassword: "The passwords don't match.",
+  samePassword: "Choose a different password from your current one.",
 } as const;
 
 /** 0771234567, 771234567 or +94771234567, spaces allowed. */

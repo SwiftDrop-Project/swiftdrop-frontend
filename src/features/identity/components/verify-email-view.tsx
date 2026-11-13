@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { TextButton, TextLink } from "@/components/ui/text-link";
 import { isApiError, retryMessage } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
-import { ROLE_HOME } from "@/lib/roles";
+import { onboardingFromUser, resolvePostAuthDestination } from "@/lib/roles";
 import { authApi } from "../api";
 import { useLeavingPage } from "../hooks/use-leaving-page";
 import { useHydrated, useQueryParam } from "../hooks/use-query-param";
@@ -108,7 +108,7 @@ function EnterCode({
       }
       // Customers are logged in now (the API set the cookie).
       startRedirecting();
-      router.replace(ROLE_HOME[user.role]);
+      router.replace(resolvePostAuthDestination(onboardingFromUser(user)));
     } catch (error) {
       const { title, body } = codeErrorNotice(error);
       setNotice({ tone: "error", title, body });
