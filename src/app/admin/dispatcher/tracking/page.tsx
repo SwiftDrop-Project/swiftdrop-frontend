@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { AdminParcelTracking } from "@/features/tracking";
 
-export const metadata: Metadata = { title: "Live Tracking" };
+export const metadata: Metadata = { title: "Parcel tracking" };
 
 export default function Page() {
-  return <ComingSoon href="/admin/dispatcher/tracking" />;
+  return <AdminParcelTracking />;
 }

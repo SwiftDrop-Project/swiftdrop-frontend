@@ -69,3 +69,32 @@ export interface LiveEvent {
 
 /** Whether updates are arriving: over the WebSocket, being polled, or not yet connected. */
 export type LiveState = "connecting" | "live" | "polling";
+
+/** An item of GET /admin/tracking/parcels: one parcel's latest status (tracking's own index). */
+export interface IndexedParcel {
+  parcelId: string;
+  trackingNumber: string;
+  status: TrackingStatus;
+  from: TrackingPlace | null;
+  to: TrackingPlace | null;
+  currentBranch: DistrictCode | null;
+  failureReason: FailureReason | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+/** Filters for the admin's all-parcels list. Dates are yyyy-MM-dd (Sri Lankan time); "" means not set. */
+export interface ParcelFilters {
+  q: string;
+  status: TrackingStatus | "";
+  district: DistrictCode | "";
+  from: string;
+  to: string;
+}
+
+/** GET /admin/tracking/parcels/counts: every status, 0 when none. */
+export interface ParcelStatusCounts {
+  total: number;
+  byStatus: Record<TrackingStatus, number>;
+}
