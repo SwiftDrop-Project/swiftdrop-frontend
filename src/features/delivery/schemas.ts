@@ -21,6 +21,10 @@ export const DELIVERY_MESSAGES = {
   codTooHigh: "Cash on delivery can be up to Rs. 500,000.",
   twoDecimals: "Use up to 2 decimal places.",
   instructionsTooLong: "Use 500 characters or fewer.",
+  length: "Enter the length.",
+  width: "Enter the width.",
+  height: "Enter the height.",
+  measurement: "Use whole centimetres from 1 to 300.",
 } as const;
 
 const M = DELIVERY_MESSAGES;
@@ -99,6 +103,24 @@ const instructions = z
   .max(500, M.instructionsTooLong)
   .transform((value) => (value === "" ? undefined : value));
 
+const WHOLE_NUMBER = /^\d+$/;
+
+/** Required, whole cm 1-300. A string while editing, a number once valid. */
+const centimetres = (missing: string) =>
+  z
+    .string()
+    .trim()
+    .superRefine((value, ctx) => {
+      const issue =
+        value === ""
+          ? missing
+          : !WHOLE_NUMBER.test(value) || Number(value) < 1 || Number(value) > 300
+            ? M.measurement
+            : null;
+      if (issue) ctx.addIssue({ code: "custom", message: issue });
+    })
+    .transform(Number);
+
 /** POST /deliveries. The field names match the API's fieldErrors keys, e.g. "pickup.phone". */
 export const createDeliverySchema = z.object({
   pickup: contactSchema,
@@ -106,6 +128,10 @@ export const createDeliverySchema = z.object({
   weightKg,
   codAmount,
   instructions,
+  lengthCm: centimetres(M.length),
+  widthCm: centimetres(M.width),
+  heightCm: centimetres(M.height),
+  keepUpright: z.boolean(),
 });
 
 /** What the form holds while the customer types (numbers as text). */

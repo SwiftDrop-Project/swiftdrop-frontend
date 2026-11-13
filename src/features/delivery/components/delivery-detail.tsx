@@ -11,10 +11,11 @@ import { InlineNotice } from "@/components/ui/inline-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PARCEL_STATUS_LABEL, StatusBadge } from "@/components/ui/status-badge";
 import { Timeline, type TimelineItem } from "@/components/ui/timeline";
+import { VEHICLE_LABEL } from "@/features/pricing";
 import { useDistricts } from "@/hooks/use-districts";
 import { formatDateTime, formatPhone, formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
 import { useDelivery } from "../hooks/use-deliveries";
-import { FAILURE_REASON_LABEL } from "../labels";
+import { FAILURE_REASON_LABEL, sizeText } from "../labels";
 import { MY_DELIVERIES_HREF } from "../routes";
 import type { Delivery, DeliveryContact, DeliveryHistoryEntry } from "../types";
 import { SummaryCard, type SummaryRow } from "./summary-card";
@@ -92,22 +93,29 @@ export function DeliveryDetail({ id }: { id: string }) {
       <WhereItIs delivery={delivery} districtName={districtName} />
       <SummaryCard title="Recipient" rows={contactRows(delivery.recipient, districtName)} />
       <SummaryCard title="Pickup" rows={contactRows(delivery.pickup, districtName)} />
-      <SummaryCard
-        title="Parcel"
-        rows={[
-          { label: "Weight", value: `${delivery.weightKg} kg`, tabular: true },
-          {
-            label: "Cash on delivery",
-            value: delivery.codAmount === null ? "None, already paid" : formatRs(delivery.codAmount),
-            tabular: delivery.codAmount !== null,
-          },
-          { label: "Delivery fee", value: formatRs(delivery.feeAmount), tabular: true },
-          { label: "Instructions", value: delivery.instructions ?? "None" },
-          { label: "Last update", value: formatDateTime(delivery.updatedAt), tabular: true },
-        ]}
-      />
+      <SummaryCard title="Parcel" rows={parcelRows(delivery)} />
     </DetailPage>
   );
+}
+
+/** The parcel and its fee. Size, billable weight and vehicle only for parcels booked with a size. */
+function parcelRows(delivery: Delivery): SummaryRow[] {
+  return [
+    { label: "Weight", value: `${delivery.weightKg} kg`, tabular: true },
+    ...(delivery.size ? [{ label: "Packed size", value: sizeText(delivery.size), tabular: true }] : []),
+    {
+      label: "Cash on delivery",
+      value: delivery.codAmount === null ? "None, already paid" : formatRs(delivery.codAmount),
+      tabular: delivery.codAmount !== null,
+    },
+    { label: "Delivery fee", value: formatRs(delivery.feeAmount), tabular: true },
+    ...(delivery.billableWeightKg
+      ? [{ label: "Charged for", value: `${delivery.billableWeightKg} kg`, tabular: true }]
+      : []),
+    ...(delivery.vehicle ? [{ label: "Pickup and drop-off by", value: VEHICLE_LABEL[delivery.vehicle] }] : []),
+    { label: "Instructions", value: delivery.instructions ?? "None" },
+    { label: "Last update", value: formatDateTime(delivery.updatedAt), tabular: true },
+  ];
 }
 
 /** A notice for the statuses that need a word of explanation: at a branch, delivered, or a failed attempt. */

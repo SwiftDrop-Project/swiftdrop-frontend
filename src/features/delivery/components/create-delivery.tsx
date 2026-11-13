@@ -5,11 +5,12 @@ import { Copy } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { flushSync } from "react-dom";
-import { useForm, type FieldErrors, type Path, type UseFormRegister } from "react-hook-form";
+import { Controller, useForm, type Control, type FieldErrors, type Path, type UseFormRegister } from "react-hook-form";
 import { FormActions, FormSection } from "@/components/layout/form-page";
 import { PageColumns } from "@/components/layout/page-columns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
@@ -20,15 +21,16 @@ import { TextButton } from "@/components/ui/text-link";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { useCurrentUser } from "@/features/identity";
+import { useFeeEstimate, type FeeEstimateRequest } from "@/features/pricing";
 import { useDistricts } from "@/hooks/use-districts";
 import { isApiError } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
 import { formatPhone, formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
 import { deliveryApi } from "../api";
-import { FLAT_FEE_ESTIMATE } from "../fee-estimate";
+import { sizeText } from "../labels";
 import { deliveryHref } from "../routes";
 import { createDeliverySchema, type CreateDeliveryInput, type CreateDeliveryValues } from "../schemas";
-import type { Delivery } from "../types";
+import type { Delivery, ParcelSize } from "../types";
 import { FeeEstimateCard } from "./fee-estimate-card";
 import { SummaryCard } from "./summary-card";
 
@@ -46,6 +48,9 @@ const SERVER_FIELDS: readonly Path<CreateDeliveryInput>[] = [
     (["name", "phone", "addressLine", "city", "district"] as const).map((field) => `${key}.${field}` as const),
   ),
   "weightKg",
+  "lengthCm",
+  "widthCm",
+  "heightCm",
   "codAmount",
   "instructions",
 ];
@@ -66,15 +71,40 @@ function startValues(user: { fullName: string; phone: string | null } | null): C
     pickup: { ...EMPTY_CONTACT, name: user?.fullName ?? "", phone: user?.phone ? localPhone(user.phone) : "" },
     recipient: { ...EMPTY_CONTACT },
     weightKg: "",
+    lengthCm: "",
+    widthCm: "",
+    heightCm: "",
+    keepUpright: false,
     codAmount: "",
     instructions: "",
   };
 }
 
+/** The size as typed, as numbers. Only used once the form is valid (the review step). */
+function sizeOf(values: CreateDeliveryInput): ParcelSize {
+  return {
+    lengthCm: Number(values.lengthCm),
+    widthCm: Number(values.widthCm),
+    heightCm: Number(values.heightCm),
+    keepUpright: values.keepUpright,
+  };
+}
+
+/** The estimate for what is about to be booked: the same route, weight, size and cash on delivery. */
+function estimateRequest(values: CreateDeliveryInput): FeeEstimateRequest {
+  return {
+    pickupDistrict: values.pickup.district,
+    dropOffDistrict: values.recipient.district,
+    weightKg: Number(values.weightKg),
+    ...sizeOf(values),
+    cashOnDelivery: values.codAmount.trim() !== "",
+  };
+}
+
 /**
  * Create delivery (POST /deliveries) for a logged-in customer: the details form, a review of what will be
- * booked, then the tracking number and the fee. The form keeps its values while the customer moves between
- * the steps, and a server validation error takes them back to the field it is about.
+ * booked with the estimated fee, then the tracking number and the fee. The form keeps its values while the
+ * customer moves between the steps, and a server validation error takes them back to the field it is about.
  */
 export function CreateDelivery() {
   const user = useCurrentUser();
@@ -85,6 +115,7 @@ export function CreateDelivery() {
 
   const {
     register,
+    control,
     handleSubmit,
     getValues,
     setValue,
@@ -129,6 +160,7 @@ export function CreateDelivery() {
         setNotice(unmatched.length > 0 ? unmatched.join(" ") : error.message);
         return;
       }
+      // Also 409 PARCEL_NEEDS_MANUAL_QUOTE: no vehicle carries or fits the parcel.
       setNotice(isApiError(error) ? error.message : UNKNOWN_ERROR);
     }
   });
@@ -179,6 +211,8 @@ export function CreateDelivery() {
             <FormField id="weightKg" label="Weight (kg)" helper="Up to 50 kg." error={errors.weightKg?.message}>
               {(a11y) => <Input {...a11y} {...register("weightKg")} inputMode="decimal" placeholder="e.g. 2.5" />}
             </FormField>
+
+            <SizeFields register={register} errors={errors} control={control} />
 
             <FormField
               id="codAmount"
@@ -231,30 +265,35 @@ interface ReviewStepProps {
 }
 
 /**
- * What will be booked, with the fee estimate beside it on wide screens (sticky while scrolling) and above the
- * buttons on smaller ones, so it is always seen before "Create delivery".
+ * What will be booked, with the fee estimate (POST /pricing/estimate) beside it on wide screens (sticky while
+ * scrolling) and above the buttons on smaller ones, so it is always seen before "Create delivery". A parcel that
+ * needs a manual quote can't be booked here, so the button is off.
  */
 function ReviewStep({ values, districtName, submitting, onCreate, onEdit }: ReviewStepProps) {
+  const { state: estimate, retry } = useFeeEstimate(estimateRequest(values));
+  const needsQuote = estimate.status === "ready" && estimate.estimate.status === "MANUAL_QUOTE";
   const cod = values.codAmount.trim();
-  const estimate = (
+  const feeCard = (
     <FeeEstimateCard
-      estimate={FLAT_FEE_ESTIMATE}
+      estimate={estimate}
+      onRetry={retry}
       pickup={{ district: districtName(values.pickup.district), city: values.pickup.city }}
       dropOff={{ district: districtName(values.recipient.district), city: values.recipient.city }}
       weightKg={Number(values.weightKg)}
+      size={sizeText(sizeOf(values))}
       codAmount={cod === "" ? null : Number(cod)}
     />
   );
 
   return (
-    <PageColumns aside={<div className="hidden xl:sticky xl:top-24 xl:block">{estimate}</div>}>
+    <PageColumns aside={<div className="hidden xl:sticky xl:top-24 xl:block">{feeCard}</div>}>
       <form onSubmit={onCreate} noValidate className="flex flex-col gap-6">
         <ReviewDetails values={values} districtName={districtName} />
 
-        <div className="xl:hidden">{estimate}</div>
+        <div className="xl:hidden">{feeCard}</div>
 
         <FormActions>
-          <Button type="submit" loading={submitting}>
+          <Button type="submit" loading={submitting} disabled={needsQuote}>
             Create delivery
           </Button>
           <Button type="button" variant="secondary" disabled={submitting} onClick={onEdit}>
@@ -338,6 +377,73 @@ function ContactFields({ contact, register, errors, districts, districtPlacehold
   );
 }
 
+const SIZE_FIELDS = [
+  { name: "lengthCm", label: "Length (cm)", placeholder: "e.g. 40" },
+  { name: "widthCm", label: "Width (cm)", placeholder: "e.g. 30" },
+  { name: "heightCm", label: "Height (cm)", placeholder: "e.g. 12" },
+] as const;
+
+interface SizeFieldsProps {
+  register: UseFormRegister<CreateDeliveryInput>;
+  errors: FieldErrors<CreateDeliveryInput>;
+  control: Control<CreateDeliveryInput, unknown, CreateDeliveryValues>;
+}
+
+/**
+ * The packed size in whole cm and "Keep upright". Pricing uses them for the billable weight (a large, light parcel
+ * is charged by its size) and for the vehicle of the pickup and drop-off legs.
+ */
+function SizeFields({ register, errors, control }: SizeFieldsProps) {
+  return (
+    <div role="group" aria-labelledby="size-label" aria-describedby="size-helper" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <span id="size-label" className="text-label text-grey-900">
+          Packed size
+        </span>
+        <p id="size-helper" className="text-caption text-grey-600">
+          Measure the outside of the packed parcel in whole centimetres. The size decides the vehicle, and a large,
+          light parcel is charged by its size.
+        </p>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-3 sm:gap-4">
+        {SIZE_FIELDS.map(({ name, label, placeholder }) => (
+          <FormField key={name} id={name} label={label} error={errors[name]?.message}>
+            {(a11y) => <Input {...a11y} {...register(name)} inputMode="numeric" placeholder={placeholder} />}
+          </FormField>
+        ))}
+      </div>
+
+      <Controller
+        name="keepUpright"
+        control={control}
+        render={({ field }) => (
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="keepUpright"
+              ref={field.ref}
+              name={field.name}
+              checked={field.value}
+              onCheckedChange={(checked) => field.onChange(checked === true)}
+              onBlur={field.onBlur}
+              aria-describedby="keepUpright-helper"
+              className="mt-0.5"
+            />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="keepUpright" className="cursor-pointer text-body text-grey-700">
+                Keep upright
+              </label>
+              <p id="keepUpright-helper" className="text-caption text-grey-600">
+                Tick this if the parcel must not lie on its side, like a cake or a plant.
+              </p>
+            </div>
+          </div>
+        )}
+      />
+    </div>
+  );
+}
+
 /** What will be booked, as the customer typed it, before anything is sent. */
 function ReviewDetails({
   values,
@@ -363,6 +469,7 @@ function ReviewDetails({
         title="Parcel"
         rows={[
           { label: "Weight", value: `${Number(values.weightKg)} kg`, tabular: true },
+          { label: "Packed size", value: sizeText(sizeOf(values)), tabular: true },
           {
             label: "Cash on delivery",
             value: cod === "" ? "None, already paid" : formatRs(Number(cod)),

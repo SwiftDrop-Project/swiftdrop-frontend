@@ -1,5 +1,6 @@
 // Types matching the backend delivery module's DTOs (see ../swiftdrop-backend/API.md "Deliveries").
 // ParcelStatus is shared (src/types/parcel.ts) because StatusBadge and other features use it too.
+import type { Vehicle } from "@/features/pricing";
 import type { DistrictCode, ParcelStatus } from "@/types";
 
 export type { ParcelStatus } from "@/types";
@@ -22,6 +23,14 @@ export interface DeliveryContact {
   district: DistrictCode;
 }
 
+/** The packed outside measurements in whole cm, and whether the parcel must stay upright. */
+export interface ParcelSize {
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  keepUpright: boolean;
+}
+
 /** Body of POST /deliveries. No customer id and no fee: the server takes them from the login and pricing. */
 export interface CreateDeliveryRequest {
   pickup: DeliveryContact;
@@ -30,6 +39,12 @@ export interface CreateDeliveryRequest {
   /** Cash to collect on delivery; left out when the parcel is already paid. */
   codAmount?: number;
   instructions?: string;
+  /** Whole cm, 1-300 each. */
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  /** Default false: the parcel may lie on its side. */
+  keepUpright?: boolean;
 }
 
 /** Who received a delivered parcel, and whether the courier added a photo. */
@@ -48,7 +63,7 @@ export interface Delivery {
   weightKg: number;
   codAmount: number | null;
   instructions: string | null;
-  /** Set by the server: a flat Rs. 450.00 until pricing (WP4) is connected. */
+  /** Set by the server: pricing's quote, the same as POST /pricing/estimate gave for this parcel. */
   feeAmount: number;
   currency: string;
   createdAt: string;
@@ -59,6 +74,12 @@ export interface Delivery {
   failureReason: FailureReason | null;
   /** Only once DELIVERED. */
   proof: DeliveryProof | null;
+  /** null for parcels booked before sizes. */
+  size: ParcelSize | null;
+  /** The vehicle of the pickup and drop-off legs the fee was worked out with; null before sizes. */
+  vehicle: Vehicle | null;
+  /** The weight the fee was charged for (whole kg); null before sizes. */
+  billableWeightKg: number | null;
 }
 
 /** One status change of a delivery. */
