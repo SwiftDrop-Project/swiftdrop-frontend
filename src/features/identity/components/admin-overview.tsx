@@ -1,3 +1,4 @@
+import type * as React from "react";
 import Link from "next/link";
 import { ArrowRight, Bike, Headset, Store, type LucideIcon } from "lucide-react";
 import { WelcomeHeading } from "@/components/layout/welcome-heading";
@@ -61,13 +62,26 @@ function AdminOverviewSkeleton() {
   );
 }
 
-export function AdminOverview() {
+/** The admin home page: welcome heading, then `children` (e.g. the reporting figures), then the workspace cards. */
+export function AdminOverview({ children }: { children?: React.ReactNode }) {
   return (
     <>
       <WelcomeHeading description="Manage couriers, dispatchers, merchant approvals and platform operations from one place." />
 
+      {children ? <div className="mb-10">{children}</div> : null}
+
+      {children ? (
+        <h2 id="admin-workspaces-heading" className="mb-4 text-h3 text-grey-900">
+          Workspaces
+        </h2>
+      ) : null}
+
       <RequireCurrentUser fallback={<AdminOverviewSkeleton />}>
-        <section aria-label="Administration workspaces" className="grid gap-4 md:grid-cols-3">
+        <section
+          aria-label={children ? undefined : "Administration workspaces"}
+          aria-labelledby={children ? "admin-workspaces-heading" : undefined}
+          className="grid gap-4 md:grid-cols-3"
+        >
           {WORKSPACES.map(({ title, description, href, cta, icon: Icon }) => (
             <Card key={href} className="flex flex-col justify-between gap-6 p-6">
               <div className="flex flex-col gap-4">
