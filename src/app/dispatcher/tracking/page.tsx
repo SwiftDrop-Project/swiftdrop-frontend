@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { LiveBoard } from "@/features/tracking";
 
 export const metadata: Metadata = { title: "Live tracking" };
 
 export default function Page() {
-  return <ComingSoon href="/dispatcher/tracking" />;
+  return <LiveBoard />;
 }
