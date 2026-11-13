@@ -5,6 +5,7 @@ import type { ParcelStatus } from "@/types";
 export const PARCEL_STATUS_LABEL: Record<ParcelStatus, string> = {
   CREATED: "Pending pickup",
   PICKED_UP: "Picked up",
+  AT_BRANCH: "At branch",
   IN_TRANSIT: "In transit",
   OUT_FOR_DELIVERY: "Out for delivery",
   DELIVERED: "Delivered",
@@ -14,6 +15,7 @@ export const PARCEL_STATUS_LABEL: Record<ParcelStatus, string> = {
 const PARCEL_STATUS_TONE: Record<ParcelStatus, BadgeTone> = {
   CREATED: "outline",
   PICKED_UP: "neutral",
+  AT_BRANCH: "neutral",
   IN_TRANSIT: "neutral",
   OUT_FOR_DELIVERY: "neutral",
   DELIVERED: "success",
