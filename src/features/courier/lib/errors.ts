@@ -1,44 +1,82 @@
 import { isApiError } from "@/lib/api";
 
 /*
- * How the courier screens react to a failed call (API.md "Courier"):
- * - unavailable: 503 SERVICE_UNAVAILABLE, parcels don't exist on the server yet → info notice
- * - not-found:   404, or a 400 for a bad parcel id → "We couldn't find this parcel"
- * - conflict:    409 INVALID_STATUS_TRANSITION → toast and reload
- * - validation:  400 VALIDATION_FAILED on a form → field errors
- * - other:       anything else (network, 500, 401) → error notice with the message
+ * How the courier screens react to a failed call (API.md "Courier", "Checks, in this order"):
+ * - validation:   400 VALIDATION_FAILED on a form → field errors (fieldErrors), message as a summary
+ * - not-found:    404 NOT_FOUND (not your task or parcel), or a 400 when loading by an id from the URL
+ * - closed:       409 ASSIGNMENT_CLOSED: the task was completed or cancelled → reload, nothing more to do
+ * - stale:        409 TASK_STEP_NOT_ALLOWED, ASSIGNMENT_CHANGED, INVALID_STATUS_TRANSITION: the task or the parcel
+ *                 changed since it was loaded (another device, the dispatcher, a double tap) → reload and look again
+ * - not-finished: 409 ASSIGNMENT_NOT_FINISHED: completing while a parcel is still open → reload
+ * - other:        anything else (network, 401, 403, 429, 500, an answer that doesn't match the contract)
+ * Nothing was saved in any of these cases: the backend writes the parcel and the task together or not at all.
  */
-export type CourierErrorKind = "unavailable" | "not-found" | "conflict" | "validation" | "other";
+export type CourierErrorKind = "validation" | "not-found" | "closed" | "stale" | "not-finished" | "other";
 
 export interface CourierError {
   kind: CourierErrorKind;
+  /** The API's message (plain words for the courier), or our own for errors without one. */
   message: string;
+  /** Per field, only for "validation". */
+  fieldErrors: Record<string, string>;
+  /** The task or parcel on screen is out of date: load it again. */
+  reload: boolean;
 }
 
 export const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
 
-export const UNAVAILABLE_TITLE = "Deliveries aren't available yet";
-
-export const CONFLICT_TITLE = "This parcel's status has changed";
-
-export const NOT_FOUND_TITLE = "This parcel isn't assigned to you any more";
+export const COURIER_ERROR_TITLE: Record<CourierErrorKind, string> = {
+  validation: "Check the details",
+  "not-found": "We couldn't find this",
+  closed: "This task is closed",
+  stale: "This task has changed",
+  "not-finished": "Some parcels still need an update",
+  other: "We couldn't do that",
+};
 
 /**
- * `loadingParcel`: the call loaded one parcel by its id, so a 400 can only mean the id in the URL
- * is not a UUID. That reads the same as a parcel that isn't yours.
+ * Thrown by api.ts when an answer doesn't have the shape of the courier contract (a backend and frontend out of step).
+ * `issues` says which fields; it never holds the values, so no personal data ends up in logs.
  */
-export function describeCourierError(error: unknown, { loadingParcel = false } = {}): CourierError {
-  if (!isApiError(error)) return { kind: "other", message: UNKNOWN_ERROR };
+export class CourierResponseError extends Error {
+  readonly endpoint: string;
+  readonly issues: { path: string; message: string }[];
+
+  constructor(endpoint: string, issues: { path: string; message: string }[]) {
+    super(`Unexpected response from ${endpoint}`);
+    this.name = "CourierResponseError";
+    this.endpoint = endpoint;
+    this.issues = issues;
+  }
+}
+
+/**
+ * `loadingById`: the call loaded a task or parcel by an id from the URL, so a 400 can only mean that id is not a
+ * UUID. That reads the same as a task or parcel that isn't yours.
+ */
+export function describeCourierError(error: unknown, { loadingById = false } = {}): CourierError {
+  const result = (kind: CourierErrorKind, message: string, fieldErrors: Record<string, string> = {}): CourierError => ({
+    kind,
+    message,
+    fieldErrors,
+    reload: kind === "closed" || kind === "stale" || kind === "not-finished",
+  });
+
+  if (!isApiError(error)) return result("other", UNKNOWN_ERROR);
   switch (error.code) {
-    case "SERVICE_UNAVAILABLE":
-      return { kind: "unavailable", message: error.message };
-    case "NOT_FOUND":
-      return { kind: "not-found", message: error.message };
-    case "INVALID_STATUS_TRANSITION":
-      return { kind: "conflict", message: error.message };
     case "VALIDATION_FAILED":
-      return { kind: loadingParcel ? "not-found" : "validation", message: error.message };
+      return loadingById ? result("not-found", error.message) : result("validation", error.message, error.fieldErrors);
+    case "NOT_FOUND":
+      return result("not-found", error.message);
+    case "ASSIGNMENT_CLOSED":
+      return result("closed", error.message);
+    case "TASK_STEP_NOT_ALLOWED":
+    case "ASSIGNMENT_CHANGED":
+    case "INVALID_STATUS_TRANSITION":
+      return result("stale", error.message);
+    case "ASSIGNMENT_NOT_FINISHED":
+      return result("not-finished", error.message);
     default:
-      return { kind: "other", message: error.message || UNKNOWN_ERROR };
+      return result("other", error.message || UNKNOWN_ERROR);
   }
 }

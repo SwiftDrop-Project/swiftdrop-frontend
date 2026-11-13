@@ -23,11 +23,11 @@ import { toast } from "@/components/ui/toast";
 import { isApiError } from "@/lib/api";
 import { formatTrackingNumber } from "@/lib/format";
 import { applyServerFieldErrors } from "@/lib/form-errors";
-import { courierApi } from "../api";
-import { CONFLICT_TITLE, describeCourierError, NOT_FOUND_TITLE, UNAVAILABLE_TITLE } from "../lib/errors";
-import { courierRoutes, isSimpleStep, STEP_ACTION_LABEL, STEP_WORDS } from "../lib/labels";
-import { NOTE_MAX_LENGTH, optionalNote, statusStepSchema, type StatusStepValues } from "../schemas";
-import type { CourierDeliveryDetail, SimpleStepStatus } from "../types";
+import { courierApi } from "../legacy/api";
+import { CONFLICT_TITLE, describeCourierError, NOT_FOUND_TITLE, UNAVAILABLE_TITLE } from "../legacy/errors";
+import { courierRoutes, isSimpleStep, STEP_ACTION_LABEL, STEP_WORDS } from "../legacy/labels";
+import { NOTE_MAX_LENGTH, optionalNote, statusStepSchema, type StatusStepValues } from "../legacy/schemas";
+import type { CourierDeliveryDetail, SimpleStepStatus } from "../legacy/types";
 
 /**
  * The buttons for what the courier may do next, taken only from `nextStatuses`:

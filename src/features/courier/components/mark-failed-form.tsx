@@ -14,17 +14,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { formatTrackingNumber } from "@/lib/format";
 import { applyServerFieldErrors } from "@/lib/form-errors";
-import { courierApi } from "../api";
+import { courierApi } from "../legacy/api";
 import { useStatusSubmitError } from "../hooks/use-status-submit-error";
-import { courierRoutes, FAILURE_REASON_OPTIONS, STEP_ACTION_LABEL } from "../lib/labels";
+import { courierRoutes, FAILURE_REASON_OPTIONS, STEP_ACTION_LABEL } from "../legacy/labels";
 import {
   markFailedSchema,
   NOTE_MAX_LENGTH,
   optionalNote,
   type MarkFailedInput,
   type MarkFailedValues,
-} from "../schemas";
-import type { CourierDeliveryDetail } from "../types";
+} from "../legacy/schemas";
+import type { CourierDeliveryDetail } from "../legacy/types";
 import { StatusFormPage } from "./status-form-page";
 
 /** /courier/deliveries/[parcelId]/failed: why the delivery failed, then FAILED. */

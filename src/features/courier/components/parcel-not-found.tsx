@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { courierRoutes } from "../lib/labels";
+import { courierRoutes } from "../legacy/labels";
 
 /** 404 (or a parcel id that isn't a UUID) on the detail page and the delivered / failed forms. */
 export function ParcelNotFound() {

@@ -8,8 +8,8 @@ import { PARCEL_STATUS_LABEL } from "@/components/ui/status-badge";
 import { TextLink } from "@/components/ui/text-link";
 import { formatTrackingNumber } from "@/lib/format";
 import { useCourierDelivery } from "../hooks/use-courier-delivery";
-import { courierRoutes } from "../lib/labels";
-import type { CourierDeliveryDetail } from "../types";
+import { courierRoutes } from "../legacy/labels";
+import type { CourierDeliveryDetail } from "../legacy/types";
 import { LoadError } from "./load-error";
 import { ParcelNotFound } from "./parcel-not-found";
 

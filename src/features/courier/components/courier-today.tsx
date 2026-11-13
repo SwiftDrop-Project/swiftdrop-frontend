@@ -8,11 +8,11 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/format";
-import { courierApi } from "../api";
+import { courierApi } from "../legacy/api";
 import { useDistrictName } from "../hooks/use-district-name";
-import { describeCourierError, type CourierError } from "../lib/errors";
-import { courierRoutes, isFinished } from "../lib/labels";
-import type { CourierToday as CourierTodayData } from "../types";
+import { describeCourierError, type CourierError } from "../legacy/errors";
+import { courierRoutes, isFinished } from "../legacy/labels";
+import type { CourierToday as CourierTodayData } from "../legacy/types";
 import { CourierDeliveryCard } from "./courier-delivery-card";
 import { LoadError } from "./load-error";
 

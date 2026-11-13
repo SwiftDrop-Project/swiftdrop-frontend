@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
-import { UNAVAILABLE_TITLE, type CourierError } from "../lib/errors";
+import { UNAVAILABLE_TITLE, type CourierError } from "../legacy/errors";
 
 /**
  * A screen that couldn't load. 503 (parcels aren't on the server yet) is an info notice, anything else an

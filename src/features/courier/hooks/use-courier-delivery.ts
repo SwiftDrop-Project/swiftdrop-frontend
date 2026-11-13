@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { courierApi } from "../api";
-import { describeCourierError, type CourierError } from "../lib/errors";
-import type { CourierDeliveryDetail } from "../types";
+import { courierApi } from "../legacy/api";
+import { describeCourierError, type CourierError } from "../legacy/errors";
+import type { CourierDeliveryDetail } from "../legacy/types";
 
 export type CourierDeliveryState =
   | { status: "loading" }

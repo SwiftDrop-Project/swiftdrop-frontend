@@ -3,8 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatRs, formatTime, formatTrackingNumber } from "@/lib/format";
-import { courierRoutes, isFinished, STOP_LABEL } from "../lib/labels";
-import type { CourierDelivery } from "../types";
+import { courierRoutes, isFinished, STOP_LABEL } from "../legacy/labels";
+import type { CourierDelivery } from "../legacy/types";
 import { cityAndDistrict, PhoneLink } from "./contact-details";
 
 /**
