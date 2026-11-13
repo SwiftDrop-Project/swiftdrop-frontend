@@ -14,6 +14,10 @@ Figures and reports for the admin portal: the admin overview (`/admin`) and, lat
 - `AdminOverviewStats` (`GET /admin/reports/overview`): deliveries today (booked, delivered, failed, 7-day success
   rate), the last 7 days per day, accounts per role with merchants waiting for approval, and the newest accounts.
   Shown on `/admin` inside identity's `AdminOverview`, above the workspace cards.
+- `ParcelDirectory` (`/admin/parcels`, `GET /admin/parcels` and `/stats`): summary cards, search, filters (status,
+  payment, pickup and delivery district, booking dates, sort), the parcel table and the CSV export link.
+- `ParcelDetailView` (`/admin/parcels/[id]`, `GET /admin/parcels/{id}`): sender and receiver, parcel details, proof of
+  delivery, the account that booked it and the tracking history. Read only: admins don't assign couriers.
 
 ## Layout
 
