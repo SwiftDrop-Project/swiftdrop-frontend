@@ -1,14 +1,25 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CustomerTracking } from "@/features/tracking";
+import { RequireCurrentUser } from "@/features/identity";
 
 export const metadata: Metadata = { title: "Track a parcel" };
 
 export default function Page() {
   return (
-    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+    <RequireCurrentUser
+      fallback={
+        <Card className="p-6" aria-busy="true" aria-label="Loading tracking">
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        </Card>
+      }
+    >
       <CustomerTracking />
-    </Suspense>
+    </RequireCurrentUser>
   );
 }
