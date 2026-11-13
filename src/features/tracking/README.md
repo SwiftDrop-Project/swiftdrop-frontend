@@ -16,7 +16,7 @@ Parcel tracking by tracking number, for customers and the public (`/track`), wit
 | `/track/[trackingNumber]` | `PublicTrackingResult` | One parcel, updated live |
 | `/customer/track?number=` | `CustomerTracking` | The same inside the app (the overview's `TrackParcelCard` links here) |
 | `/dispatcher/tracking` | `LiveBoard` | Every status change as it happens, per branch; follow any parcel beside it |
-| `/admin/dispatcher/tracking` | `AdminParcelTracking` | Every parcel's latest status with filters (tracking number, status with counts, district, last updated between two days) and paging; rows change live, select one to see its journey |
+| `/admin/parcels` (menu "All Parcels"), also `/admin/dispatcher/tracking` | `AdminParcelTracking` | Every parcel's latest status with filters (tracking number, status with counts, district, last updated between two days) and paging; rows change live, select one to see its journey |
 
 - `TrackingResult`: status, towns and journey (`Timeline`) for one parcel. `useParcelTracking` loads
   `GET /track/{number}`, then follows `/topic/parcels/{number}`; it reloads after every reconnect and polls every

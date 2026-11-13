@@ -45,7 +45,7 @@ function hasFilters(filters: ParcelFilters): boolean {
 }
 
 /**
- * /admin/dispatcher/tracking: every parcel's latest status, with filters (tracking number, status, district, last
+ * /admin/parcels (and /admin/dispatcher/tracking): every parcel's latest status, with filters (tracking number, status, district, last
  * updated between two days) and paging. Rows change live; select one to see its journey beside the list.
  */
 export function AdminParcelTracking() {
@@ -112,7 +112,7 @@ export function AdminParcelTracking() {
 
   return (
     <ListPage
-      title="Parcel tracking"
+      title="All parcels"
       description="Every parcel's latest status, updated live. Filter the list, then select a parcel to see its journey."
       toolbar={
         <div className="flex w-full flex-col gap-3">
