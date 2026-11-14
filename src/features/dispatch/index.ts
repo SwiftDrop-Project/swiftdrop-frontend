@@ -2,7 +2,6 @@
  * Public API of the dispatch feature (backend module: dispatch).
  * Other features and app/ import only from "@/features/dispatch".
  */
-export { AdminDispatchTabs } from "./components/admin-dispatch-tabs";
 export { CourierTodayCard } from "./components/courier-today-card";
 export { CourierWorkloadView } from "./components/courier-workload";
 export { DeliveryIssues } from "./components/delivery-issues";

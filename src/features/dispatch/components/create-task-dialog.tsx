@@ -48,14 +48,11 @@ export function CreateTaskDialog({
   open,
   onOpenChange,
   onCreated,
-  openTask = true,
 }: {
   parcels: QueueParcel[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
-  /** Go to the new task's page (/dispatcher/tasks/{id}) afterwards. Off for admins, who can't open it. */
-  openTask?: boolean;
 }) {
   const router = useRouter();
   const { name } = useDistrictName();
@@ -115,7 +112,7 @@ export function CreateTaskDialog({
       });
       handleOpenChange(false);
       onCreated();
-      if (openTask) router.push(`/dispatcher/tasks/${task.id}`);
+      router.push(`/dispatcher/tasks/${task.id}`);
     } catch (error) {
       if (!isApiError(error)) {
         setNotice("Something went wrong. Try again in a moment.");

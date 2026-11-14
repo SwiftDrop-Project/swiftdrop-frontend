@@ -27,16 +27,7 @@ async function loadOpenTasks(courierId: string, signal: AbortSignal): Promise<As
 }
 
 /** What a courier has been given and not finished yet: their open tasks and the parcels in them. */
-export function CourierParcels({
-  courierId,
-  courierName,
-  taskLinks = true,
-}: {
-  courierId: string;
-  courierName: string;
-  /** Link each task to /dispatcher/tasks/{id} (dispatchers only; admins can't open it). */
-  taskLinks?: boolean;
-}) {
+export function CourierParcels({ courierId, courierName }: { courierId: string; courierName: string }) {
   const { name } = useDistrictName();
   const tasks = useLoad(`courier-parcels:${courierId}`, (signal) => loadOpenTasks(courierId, signal));
 
@@ -80,14 +71,12 @@ export function CourierParcels({
                 </span>
                 <AssignmentStatusBadge status={task.status} />
               </div>
-              {taskLinks ? (
-                <Link
-                  href={`/dispatcher/tasks/${task.id}`}
-                  className="text-label text-orange-700 hover:text-orange-800 hover:underline"
-                >
-                  Open task
-                </Link>
-              ) : null}
+              <Link
+                href={`/dispatcher/tasks/${task.id}`}
+                className="text-label text-orange-700 hover:text-orange-800 hover:underline"
+              >
+                Open task
+              </Link>
             </div>
             <ul className="divide-y divide-grey-100">
               {task.items.map((item) => (

@@ -37,7 +37,7 @@ function legKey(parcel: QueueParcel): string {
  * The dispatcher's queue at one branch: new parcels to collect, or parcels at the branch waiting for a transfer or
  * delivery. Select parcels with the same next step and create one courier task for them.
  */
-export function DispatchQueue({ openTaskAfterCreate = true }: { openTaskAfterCreate?: boolean } = {}) {
+export function DispatchQueue() {
   const [branch, setBranch] = useDispatchBranch();
   const [kind, setKind] = React.useState<QueueKind>("PICKUP");
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -262,10 +262,8 @@ export function DispatchQueue({ openTaskAfterCreate = true }: { openTaskAfterCre
         parcels={chosen}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        openTask={openTaskAfterCreate}
-        // Dispatchers go to the new task's page. Otherwise the queue reloads (the parcels leave it); clearing the
-        // selection right away would empty the closing dialog.
-        onCreated={openTaskAfterCreate ? () => {} : queue.reload}
+        // The dialog opens the new task's page; clearing the selection here would empty the closing dialog.
+        onCreated={() => {}}
       />
     </ListPage>
   );
