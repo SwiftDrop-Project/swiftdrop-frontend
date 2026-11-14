@@ -1,8 +1,25 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LiveBoard } from "@/features/tracking";
+import { RequireCurrentUser } from "@/features/identity";
 
 export const metadata: Metadata = { title: "Live tracking" };
 
 export default function Page() {
-  return <ComingSoon href="/dispatcher/tracking" />;
+  return (
+    <RequireCurrentUser
+      fallback={
+        <Card className="p-6" aria-busy="true" aria-label="Loading live tracking">
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        </Card>
+      }
+    >
+      <LiveBoard />
+    </RequireCurrentUser>
+  );
 }

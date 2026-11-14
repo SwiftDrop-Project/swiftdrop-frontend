@@ -1,3 +1,9 @@
-// Pricing endpoints. Wrap apiFetch from "@/lib/api" and type the responses with ./types, e.g.
-// export const pricingApi = { list: (signal?: AbortSignal) => apiFetch<Thing[]>("/things", { signal }) };
-export {};
+import { apiFetch } from "@/lib/api";
+import type { FeeEstimate, FeeEstimateRequest } from "./types";
+
+/** Pricing endpoints (API.md "Pricing (WP4)"). */
+export const pricingApi = {
+  /** POST /pricing/estimate: the fee for a route, weight and size (CUSTOMER or MERCHANT). Nothing is saved. */
+  estimate: (body: FeeEstimateRequest, signal?: AbortSignal) =>
+    apiFetch<FeeEstimate>("/pricing/estimate", { method: "POST", body, signal }),
+};

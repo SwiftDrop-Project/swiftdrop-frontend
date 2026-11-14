@@ -1,6 +1,6 @@
 "use client";
 
-import { Store, User } from "lucide-react";
+import { CreditCard, MapPin, Package, Store, User } from "lucide-react";
 import * as React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CodeInput } from "@/components/ui/code-input";
@@ -8,6 +8,7 @@ import { FieldError, FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { RadioCards, type RadioCardOption } from "@/components/ui/radio-cards";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,24 @@ import { TextLink } from "@/components/ui/text-link";
 import { Example, ExampleGrid, Section } from "./gallery-parts";
 
 const noop = () => {};
+
+type PayWith = "ONLINE" | "AT_PICKUP" | "AT_DROP_OFF";
+
+const PAY_WITH: readonly RadioCardOption<PayWith>[] = [
+  { value: "ONLINE", label: "Online payment", description: "Pay now by card or online banking.", icon: CreditCard },
+  {
+    value: "AT_PICKUP",
+    label: "Pay at pickup",
+    description: "Pay the courier in cash when they collect the parcel.",
+    icon: Package,
+  },
+  {
+    value: "AT_DROP_OFF",
+    label: "Pay at drop-off",
+    description: "The recipient pays the courier in cash when the parcel arrives.",
+    icon: MapPin,
+  },
+];
 
 function DistrictOptions() {
   return (
@@ -34,6 +53,7 @@ export function Forms() {
   const [completed, setCompleted] = React.useState<string | null>(null);
   const [accountType, setAccountType] = React.useState<"CUSTOMER" | "MERCHANT">("CUSTOMER");
   const [keepLoggedIn, setKeepLoggedIn] = React.useState(true);
+  const [payWith, setPayWith] = React.useState<PayWith | null>(null);
 
   return (
     <>
@@ -289,6 +309,44 @@ export function Forms() {
               { value: "MERCHANT", label: "Merchant", icon: Store },
             ]}
           />
+        </div>
+      </Section>
+
+      <Section
+        id="radio-cards"
+        title="RadioCards"
+        description="A choice between a few options, each with a line of explanation (e.g. how a delivery is paid). Nothing is chosen at first. Chosen: orange-600 border and dot. One row from sm up, stacked on phones."
+      >
+        <div className="flex flex-col gap-10">
+          <Example label="Interactive" stack>
+            <RadioCards
+              name="g-pay"
+              legend="How will the delivery fee be paid?"
+              value={payWith}
+              options={PAY_WITH}
+              onChange={setPayWith}
+            />
+          </Example>
+          <Example label="Error (nothing chosen)" stack>
+            <RadioCards
+              name="g-pay-error"
+              legend="How will the delivery fee be paid?"
+              value={null}
+              options={PAY_WITH}
+              onChange={noop}
+              error="Choose how the delivery fee will be paid."
+            />
+          </Example>
+          <Example label="Disabled" stack>
+            <RadioCards
+              name="g-pay-disabled"
+              legend="How will the delivery fee be paid?"
+              value="AT_PICKUP"
+              options={PAY_WITH}
+              onChange={noop}
+              disabled
+            />
+          </Example>
         </div>
       </Section>
     </>
