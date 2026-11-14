@@ -4,7 +4,7 @@ import * as React from "react";
 import { isApiError } from "@/lib/api";
 import type { PageResponse } from "@/types";
 import { webhooksApi } from "../api";
-import type { DeliveryStatus, WebhookDelivery } from "../types";
+import type { DeliveryEventType, DeliveryStatus, WebhookDelivery } from "../types";
 
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
 export const DELIVERIES_PAGE_SIZE = 20;
@@ -23,8 +23,13 @@ type State =
  * on screen and swap them when the answer arrives. While a PENDING delivery is due within ~90 seconds (e.g. a test
  * ping just sent), it looks again every 3 seconds, only while the browser tab is visible.
  */
-export function useDeliveries(webhookId: string, status: DeliveryStatus | "", page: number) {
-  const key = `${webhookId}|${status}|${page}`;
+export function useDeliveries(
+  webhookId: string,
+  status: DeliveryStatus | "",
+  eventType: DeliveryEventType | "",
+  page: number,
+) {
+  const key = `${webhookId}|${status}|${eventType}|${page}`;
   const [tick, setTick] = React.useState(0);
   const [result, setResult] = React.useState<{ key: string; data?: PageResponse<WebhookDelivery>; error?: string } | null>(
     null,
@@ -33,14 +38,18 @@ export function useDeliveries(webhookId: string, status: DeliveryStatus | "", pa
   React.useEffect(() => {
     const controller = new AbortController();
     webhooksApi
-      .deliveries(webhookId, { status: status || undefined, page, size: DELIVERIES_PAGE_SIZE }, controller.signal)
+      .deliveries(
+        webhookId,
+        { status: status || undefined, eventType: eventType || undefined, page, size: DELIVERIES_PAGE_SIZE },
+        controller.signal,
+      )
       .then((data) => setResult({ key, data }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setResult({ key, error: isApiError(error) ? error.message : UNKNOWN_ERROR });
       });
     return () => controller.abort();
-  }, [key, webhookId, status, page, tick]);
+  }, [key, webhookId, status, eventType, page, tick]);
 
   const reload = React.useCallback(() => setTick((value) => value + 1), []);
 

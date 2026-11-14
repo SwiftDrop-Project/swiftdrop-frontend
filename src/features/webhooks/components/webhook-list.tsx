@@ -24,11 +24,11 @@ import { formatDate } from "@/lib/format";
 import { useWebhooks } from "../hooks/use-webhooks";
 import { MAX_ACTIVE_WEBHOOKS } from "../labels";
 import { webhookHref } from "../routes";
-import type { WebhookWithSecret } from "../types";
+import type { Webhook, WebhookEventType, WebhookWithSecret } from "../types";
 import { ActiveBadge } from "./active-badge";
 import { EventChips } from "./event-chips";
 import { SecretDialog } from "./secret-dialog";
-import { WebhookActions } from "./webhook-actions";
+import { WebhookActions, turnOnWebhook } from "./webhook-actions";
 import { WebhookFormDialog } from "./webhook-form-dialog";
 
 const COLUMNS = 5;
@@ -43,6 +43,10 @@ export function WebhookList() {
   const [adding, setAdding] = React.useState(false);
   const [created, setCreated] = React.useState<string | null>(null);
   const [notApproved, setNotApproved] = React.useState(false);
+  /** "Edit that webhook" from the Add dialog: which webhook, with which events to start from. */
+  const [editRequest, setEditRequest] = React.useState<{ webhook: Webhook; eventTypes: WebhookEventType[] } | null>(
+    null,
+  );
 
   const approval = user?.merchant?.approvalStatus;
   const approved = approval === "APPROVED" && !notApproved;
@@ -55,6 +59,23 @@ export function WebhookList() {
     const { secret, ...rest } = webhook;
     webhooks.upsert(rest);
     setCreated(secret);
+  }
+
+  /**
+   * The Add dialog found a webhook with the same address: switch to editing that one, with the chosen events merged
+   * in. A turned-off one is turned on first; if that's refused (limit of 5), the Add dialog stays open.
+   */
+  async function switchToExistingWebhook(match: Webhook, eventTypes: WebhookEventType[]): Promise<boolean> {
+    let target = match;
+    if (!match.active) {
+      const updated = await turnOnWebhook(match);
+      if (!updated) return false;
+      webhooks.upsert(updated);
+      target = updated;
+    }
+    setAdding(false);
+    setEditRequest({ webhook: target, eventTypes });
+    return true;
   }
 
   const addButton = (
@@ -119,7 +140,7 @@ export function WebhookList() {
                 <li key={webhook.id} className="flex flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <EndpointCell url={webhook.url} href={webhookHref(webhook.id)} />
-                    <WebhookActions webhook={webhook} onChange={webhooks.upsert} />
+                    <WebhookActions webhook={webhook} onChange={webhooks.upsert} existing={list} />
                   </div>
                   <EventChips eventTypes={webhook.eventTypes} />
                   <div className="flex items-center justify-between gap-3">
@@ -171,7 +192,7 @@ export function WebhookList() {
                         </TableCell>
                         <TableCell className="whitespace-nowrap tabular-nums">{formatDate(webhook.createdAt)}</TableCell>
                         <TableCell className="w-12 text-right">
-                          <WebhookActions webhook={webhook} onChange={webhooks.upsert} />
+                          <WebhookActions webhook={webhook} onChange={webhooks.upsert} existing={list} />
                         </TableCell>
                       </TableRow>
                     ))
@@ -188,9 +209,26 @@ export function WebhookList() {
       <WebhookFormDialog
         open={adding}
         onOpenChange={setAdding}
+        existing={list}
         onCreated={onCreated}
         onNotApproved={() => setNotApproved(true)}
+        onUseExisting={switchToExistingWebhook}
       />
+      {editRequest ? (
+        <WebhookFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditRequest(null);
+          }}
+          webhook={editRequest.webhook}
+          initialEventTypes={editRequest.eventTypes}
+          existing={list}
+          onUpdated={(updated) => {
+            webhooks.upsert(updated);
+            toast({ tone: "success", title: "Webhook saved" });
+          }}
+        />
+      ) : null}
       <SecretDialog secret={created} reason="created" onClose={() => setCreated(null)} />
     </ListPage>
   );

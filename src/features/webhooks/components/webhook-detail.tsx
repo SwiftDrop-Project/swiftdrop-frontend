@@ -89,7 +89,12 @@ export function WebhookDetail({ id: idProp }: { id?: string }) {
             <Send aria-hidden="true" />
             Send test
           </Button>
-          <WebhookActions webhook={webhook} onChange={webhooks.upsert} onTestSent={refreshHistory} />
+          <WebhookActions
+            webhook={webhook}
+            onChange={webhooks.upsert}
+            onTestSent={refreshHistory}
+            existing={webhooks.webhooks}
+          />
         </div>
       }
       aside={<WebhookSummary webhook={webhook} />}

@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api";
 import type { PageResponse } from "@/types";
 import type {
   CreateWebhookRequest,
+  DeliveryEventType,
   DeliveryStatus,
   UpdateWebhookRequest,
   Webhook,
@@ -35,14 +36,22 @@ export const webhooksApi = {
   /** Queues a webhook.ping (202), sent within seconds. Works while turned off too. */
   sendTest: (id: string) => apiFetch<WebhookDelivery>(path(id, "/test"), { method: "POST" }),
 
-  /** One webhook's delivery history, newest first. `status` empty means all; size 1-100. */
+  /**
+   * One webhook's delivery history, newest first. `status` and `eventType` (a wire name, including `webhook.ping`)
+   * are optional filters: left out means all. size 1-100.
+   */
   deliveries: (
     id: string,
-    { status, page, size }: { status?: DeliveryStatus; page: number; size: number },
+    {
+      status,
+      eventType,
+      page,
+      size,
+    }: { status?: DeliveryStatus; eventType?: DeliveryEventType; page: number; size: number },
     signal?: AbortSignal,
   ) =>
     apiFetch<PageResponse<WebhookDelivery>>(path(id, "/deliveries"), {
-      query: { status, page, size },
+      query: { status, eventType, page, size },
       signal,
     }),
 

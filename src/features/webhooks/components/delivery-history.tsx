@@ -24,6 +24,7 @@ import { formatDateTime } from "@/lib/format";
 import { webhooksApi } from "../api";
 import { useDeliveries } from "../hooks/use-deliveries";
 import {
+  DELIVERY_EVENT_TYPES,
   DELIVERY_STATUSES,
   DELIVERY_STATUS_LABEL,
   DELIVERY_STATUS_TONE,
@@ -32,19 +33,20 @@ import {
   lastResult,
   timeUntil,
 } from "../labels";
-import type { DeliveryStatus, WebhookDelivery } from "../types";
+import type { DeliveryEventType, DeliveryStatus, WebhookDelivery } from "../types";
 
 const COLUMNS = 6;
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
 
 /**
- * The delivery history of one webhook, newest first: status filter, pages of 20, Retry on failed deliveries.
- * `refreshSignal` changes when the parent queued something (e.g. "Send test"), so the list loads again.
+ * The delivery history of one webhook, newest first: status and event filters, pages of 20, Retry on failed
+ * deliveries. `refreshSignal` changes when the parent queued something (e.g. "Send test"), so the list loads again.
  */
 export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: string; refreshSignal: number }) {
   const [status, setStatus] = React.useState<DeliveryStatus | "">("");
+  const [eventType, setEventType] = React.useState<DeliveryEventType | "">("");
   const [page, setPage] = React.useState(0);
-  const deliveries = useDeliveries(webhookId, status, page);
+  const deliveries = useDeliveries(webhookId, status, eventType, page);
   const { reload } = deliveries;
 
   React.useEffect(() => {
@@ -52,7 +54,13 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
   }, [refreshSignal, reload]);
 
   const content = deliveries.status === "ready" ? deliveries.data.content : [];
-  const filtered = status !== "";
+  const filtered = status !== "" || eventType !== "";
+
+  function clearFilters() {
+    setStatus("");
+    setEventType("");
+    setPage(0);
+  }
 
   return (
     <Card aria-labelledby="deliveries-heading">
@@ -64,30 +72,58 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
             ? `${deliveries.data.totalElements} ${deliveries.data.totalElements === 1 ? "delivery" : "deliveries"}`
             : undefined
         }
-        aside={
-          <div className="w-36 sm:w-44">
-            <label htmlFor="deliveries-status" className="sr-only">
-              Status
-            </label>
-            <Select
-              id="deliveries-status"
-              size="md"
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value as DeliveryStatus | "");
-                setPage(0);
-              }}
-            >
-              <option value="">All statuses</option>
-              {DELIVERY_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {DELIVERY_STATUS_LABEL[value]}
-                </option>
-              ))}
-            </Select>
-          </div>
-        }
       />
+
+      {/* Filters: side by side from tablets up, stacked on phones. A change starts again at page 1. */}
+      <div className="flex flex-col gap-3 border-b border-grey-200 px-4 py-3 sm:flex-row sm:items-center sm:px-6">
+        <div className="w-full sm:w-48">
+          <label htmlFor="deliveries-event" className="sr-only">
+            Event
+          </label>
+          <Select
+            id="deliveries-event"
+            size="md"
+            value={eventType}
+            onChange={(event) => {
+              setEventType(event.target.value as DeliveryEventType | "");
+              setPage(0);
+            }}
+          >
+            <option value="">All events</option>
+            {DELIVERY_EVENT_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {deliveryEventLabel(value)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="w-full sm:w-44">
+          <label htmlFor="deliveries-status" className="sr-only">
+            Status
+          </label>
+          <Select
+            id="deliveries-status"
+            size="md"
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value as DeliveryStatus | "");
+              setPage(0);
+            }}
+          >
+            <option value="">All statuses</option>
+            {DELIVERY_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {DELIVERY_STATUS_LABEL[value]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {filtered ? (
+          <Button variant="tertiary" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        ) : null}
+      </div>
 
       {deliveries.status === "error" ? (
         <div className="p-4 sm:p-6">
@@ -107,7 +143,10 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
               <li className="p-4 text-body-sm text-grey-600">Loading deliveries…</li>
             ) : null}
             {deliveries.status === "ready" && content.length === 0 ? (
-              <li className="p-4 text-body-sm text-grey-600">{emptyText(filtered)}</li>
+              <li className="flex flex-col gap-1 p-4">
+                <span className="text-label text-grey-900">{emptyTitle(eventType, status)}</span>
+                <span className="text-body-sm text-grey-600">{emptyText(filtered)}</span>
+              </li>
             ) : null}
             {content.map((delivery) => (
               <li key={delivery.id} className="flex flex-col gap-2 p-4">
@@ -147,7 +186,7 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
                   <TableEmpty
                     columns={COLUMNS}
                     icon={History}
-                    title={filtered ? "No deliveries match this status" : "No deliveries yet"}
+                    title={emptyTitle(eventType, status)}
                     description={emptyText(filtered)}
                   />
                 ) : (
@@ -268,6 +307,15 @@ function nextAttemptText(delivery: WebhookDelivery): string | null {
 
 function emptyText(filtered: boolean): string {
   return filtered
-    ? "Choose another status to see more deliveries."
+    ? "Choose another event or status, or clear the filters."
     : "Send a test to check your endpoint. Parcel events appear here as your orders move.";
+}
+
+/** "No 'Delivered' deliveries that failed", "No failed deliveries", "No 'Test ping' deliveries", "No deliveries yet". */
+function emptyTitle(eventType: DeliveryEventType | "", status: DeliveryStatus | ""): string {
+  if (eventType === "" && status === "") return "No deliveries yet";
+  const statusWord = status === "" ? "" : DELIVERY_STATUS_LABEL[status].toLowerCase();
+  if (eventType === "") return `No ${statusWord} deliveries`;
+  const event = `'${deliveryEventLabel(eventType)}'`;
+  return status === "" ? `No ${event} deliveries` : `No ${statusWord} ${event} deliveries`;
 }

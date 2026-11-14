@@ -63,17 +63,39 @@ export async function sendTestPing(webhook: Webhook): Promise<boolean> {
 }
 
 /**
+ * Turns a webhook back on and says so in a toast. Returns the updated webhook, or null when the backend refused
+ * (e.g. 409 WEBHOOK_LIMIT_REACHED or WEBHOOK_URL_IN_USE; its message is shown).
+ */
+export async function turnOnWebhook(webhook: Webhook): Promise<Webhook | null> {
+  try {
+    const updated = await webhooksApi.update(webhook.id, { active: true });
+    toast({
+      tone: "success",
+      title: "Webhook turned on",
+      description: `New events go to ${hostOf(webhook.url)} again.`,
+    });
+    return updated;
+  } catch (error) {
+    toast({ tone: "error", title: "We couldn't turn it on", description: errorMessage(error) });
+    return null;
+  }
+}
+
+/**
  * The ⋯ menu of one webhook and the dialogs behind it. Every change is passed up with `onChange`;
- * `onTestSent` runs after a test ping was queued (the detail page reloads its history).
+ * `onTestSent` runs after a test ping was queued (the detail page reloads its history). `existing` (the merchant's
+ * other webhooks) lets the edit dialog warn about an address that's already in use.
  */
 export function WebhookActions({
   webhook,
   onChange,
   onTestSent,
+  existing,
 }: {
   webhook: Webhook;
   onChange: (webhook: Webhook) => void;
   onTestSent?: () => void;
+  existing?: readonly Webhook[];
 }) {
   const [dialog, setDialog] = React.useState<OpenDialog>(null);
   const [secret, setSecret] = React.useState<string | null>(null);
@@ -91,13 +113,8 @@ export function WebhookActions({
   }
 
   async function turnOn() {
-    try {
-      const updated = await webhooksApi.update(webhook.id, { active: true });
-      onChange(updated);
-      toast({ tone: "success", title: "Webhook turned on", description: `New events go to ${host} again.` });
-    } catch (error) {
-      toast({ tone: "error", title: "We couldn't turn it on", description: errorMessage(error) });
-    }
+    const updated = await turnOnWebhook(webhook);
+    if (updated) onChange(updated);
   }
 
   async function confirmTurnOff() {
@@ -171,6 +188,7 @@ export function WebhookActions({
         open={dialog === "edit"}
         onOpenChange={(open) => (open ? setDialog("edit") : closeDialog())}
         webhook={webhook}
+        existing={existing}
         onUpdated={(updated) => {
           onChange(updated);
           toast({ tone: "success", title: "Webhook saved" });

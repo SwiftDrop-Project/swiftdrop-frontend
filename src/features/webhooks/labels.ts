@@ -54,6 +54,12 @@ export function deliveryEventLabel(type: DeliveryEventType): string {
   return type === "webhook.ping" ? "Test ping" : WEBHOOK_EVENT_LABEL[type];
 }
 
+/**
+ * Choices for the history's event filter: every parcel event (not only the ones selected now, because older
+ * deliveries keep the type they were sent with) and the test ping.
+ */
+export const DELIVERY_EVENT_TYPES: readonly DeliveryEventType[] = [...WEBHOOK_EVENT_TYPES, "webhook.ping"];
+
 export const DELIVERY_STATUSES: readonly DeliveryStatus[] = ["PENDING", "SUCCEEDED", "FAILED"];
 
 export const DELIVERY_STATUS_LABEL: Record<DeliveryStatus, string> = {

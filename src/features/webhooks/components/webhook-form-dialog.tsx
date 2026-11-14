@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -22,7 +22,8 @@ import { applyServerFieldErrors } from "@/lib/form-errors";
 import { webhooksApi } from "../api";
 import { DEFAULT_EVENT_TYPES, WEBHOOK_EVENT_DESCRIPTION, WEBHOOK_EVENT_LABEL, WEBHOOK_EVENT_TYPES } from "../labels";
 import { webhookSchema, type WebhookValues } from "../schemas";
-import type { UpdateWebhookRequest, Webhook, WebhookWithSecret } from "../types";
+import type { UpdateWebhookRequest, Webhook, WebhookEventType, WebhookWithSecret } from "../types";
+import { findSameDestination, sameDestination, shortAddress } from "../url";
 
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
 const FIELDS = ["url", "eventTypes"] as const;
@@ -30,29 +31,50 @@ const FIELDS = ["url", "eventTypes"] as const;
 /**
  * Add a webhook (no `webhook`) or edit one. On create the parent shows the secret; on edit only the changed fields
  * are sent. Address checks the browser can't do (DNS, private networks) come back from the server under the field.
+ *
+ * With `existing` (the merchant's webhooks) it warns while typing when the address is already used by another
+ * webhook, and offers to add the chosen events to that one instead (`onUseExisting`). The backend's
+ * 409 WEBHOOK_URL_IN_USE is still the real rule; it appears under the address field.
  */
 export function WebhookFormDialog({
   open,
   onOpenChange,
   webhook,
+  existing,
+  initialEventTypes,
   onCreated,
   onUpdated,
   onNotApproved,
+  onUseExisting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   webhook?: Webhook;
+  /** The merchant's webhooks, to spot an address that's already in use. */
+  existing?: readonly Webhook[];
+  /** Events to start with instead of the webhook's own (e.g. merged in from the Add dialog). */
+  initialEventTypes?: readonly WebhookEventType[];
   onCreated?: (created: WebhookWithSecret) => void;
   onUpdated?: (updated: Webhook) => void;
   /** The backend said the merchant isn't approved (403 MERCHANT_NOT_APPROVED). */
   onNotApproved?: () => void;
+  /**
+   * Add only: "use that webhook instead". Gets the matching webhook and the events chosen here merged with its own;
+   * resolves to false when it couldn't continue (e.g. turning it on was refused), so this dialog stays open.
+   */
+  onUseExisting?: (match: Webhook, eventTypes: WebhookEventType[]) => Promise<boolean>;
 }) {
   const editing = webhook !== undefined;
   const [notice, setNotice] = React.useState<{ title: string; message: string } | null>(null);
-  // Edit starts from the webhook's own events; Add starts with the common ones ticked (one webhook, several events).
+  const [switching, setSwitching] = React.useState(false);
+  // Add starts with the common events ticked (one webhook, several events); Edit with the webhook's own events,
+  // unless the caller passes events to start with.
   const defaults = React.useMemo<WebhookValues>(
-    () => ({ url: webhook?.url ?? "", eventTypes: webhook ? webhook.eventTypes : [...DEFAULT_EVENT_TYPES] }),
-    [webhook],
+    () => ({
+      url: webhook?.url ?? "",
+      eventTypes: [...(initialEventTypes ?? (webhook ? webhook.eventTypes : DEFAULT_EVENT_TYPES))],
+    }),
+    [webhook, initialEventTypes],
   );
   const {
     register,
@@ -67,6 +89,28 @@ export function WebhookFormDialog({
   React.useEffect(() => {
     if (open) reset(defaults);
   }, [open, defaults, reset]);
+
+  const urlValue = useWatch({ control, name: "url" }) ?? "";
+  const eventTypesValue = useWatch({ control, name: "eventTypes" }) ?? [];
+  // Another webhook with the same destination. In Edit, only when the address was changed.
+  const match = React.useMemo(() => {
+    if (!existing) return undefined;
+    if (webhook && sameDestination(urlValue, webhook.url)) return undefined;
+    return findSameDestination(urlValue, existing, webhook?.id);
+  }, [existing, webhook, urlValue]);
+
+  async function switchToExisting(target: Webhook) {
+    if (!onUseExisting) return;
+    setSwitching(true);
+    try {
+      const merged = WEBHOOK_EVENT_TYPES.filter(
+        (type) => target.eventTypes.includes(type) || eventTypesValue.includes(type),
+      );
+      await onUseExisting(target, merged);
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   function handleOpenChange(next: boolean) {
     if (!next) setNotice(null);
@@ -96,6 +140,11 @@ export function WebhookFormDialog({
         return;
       }
       if (error.code === "MERCHANT_NOT_APPROVED") onNotApproved?.();
+      if (error.code === "WEBHOOK_URL_IN_USE") {
+        // the address is the problem, so the message goes under the address field
+        setError("url", { type: "server", message: error.message }, { shouldFocus: true });
+        return;
+      }
       const { handled, unmatched } = applyServerFieldErrors(error, setError, FIELDS);
       if (!handled || unmatched.length > 0) {
         setNotice({ title: saveFailedTitle(editing), message: unmatched[0] ?? error.message });
@@ -140,6 +189,16 @@ export function WebhookFormDialog({
                 />
               )}
             </FormField>
+
+            {match ? (
+              <SameAddressNotice
+                match={match}
+                editing={editing}
+                thisActive={webhook?.active ?? true}
+                busy={switching}
+                onUse={onUseExisting ? () => switchToExisting(match) : undefined}
+              />
+            ) : null}
 
             <Controller
               control={control}
@@ -227,6 +286,59 @@ export function WebhookFormDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * "This address is already used by another of your webhooks", worded for the case:
+ * - Add, the other one is active: use it instead (adds the chosen events to it).
+ * - Add, the other one is off: turn it on and use it instead.
+ * - Edit: only a problem when both would be active (the backend refuses that); there's nothing to switch to here.
+ */
+function SameAddressNotice({
+  match,
+  editing,
+  thisActive,
+  busy,
+  onUse,
+}: {
+  match: Webhook;
+  editing: boolean;
+  thisActive: boolean;
+  busy: boolean;
+  onUse?: () => void;
+}) {
+  const address = shortAddress(match.url);
+
+  if (editing) {
+    if (!thisActive || !match.active) return null;
+    return (
+      <InlineNotice title="Another of your webhooks already uses this address">
+        Only one active webhook can use {address}. Choose another address, or add these events to that webhook
+        instead.
+      </InlineNotice>
+    );
+  }
+
+  return (
+    <InlineNotice
+      title={
+        match.active
+          ? `You already have a webhook for ${address}`
+          : `You have a turned-off webhook for ${address}`
+      }
+    >
+      <p>
+        {match.active
+          ? "Add these events to it instead of creating a second webhook for the same address."
+          : "Turn it on and choose its events instead of creating a second webhook for the same address."}
+      </p>
+      {onUse ? (
+        <Button type="button" variant="secondary" className="mt-3" onClick={onUse} loading={busy}>
+          {match.active ? "Edit that webhook" : "Turn it on and edit"}
+        </Button>
+      ) : null}
+    </InlineNotice>
   );
 }
 
