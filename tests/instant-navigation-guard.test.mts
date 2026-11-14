@@ -83,6 +83,8 @@ test("Every protected role layout and page preserves instant-navigation validati
     "CourierDetailView",
     "DispatcherManagement",
     "DispatcherDetailView",
+    "UserDetailView",
+    "UserManagement",
   ];
 
   const protectedPages = PROTECTED_AREAS.flatMap((area) =>

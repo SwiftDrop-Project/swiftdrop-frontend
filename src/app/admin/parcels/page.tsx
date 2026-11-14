@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdminParcelTracking } from "@/features/tracking";
 import { RequireCurrentUser } from "@/features/identity";
+import { ParcelDirectory } from "@/features/reporting";
 
 export const metadata: Metadata = { title: "All Parcels" };
 
-export default function Page() {
+export default function AdminParcelsPage() {
   return (
     <RequireCurrentUser
       fallback={
@@ -19,7 +19,7 @@ export default function Page() {
         </Card>
       }
     >
-      <AdminParcelTracking />
+      <ParcelDirectory />
     </RequireCurrentUser>
   );
 }
