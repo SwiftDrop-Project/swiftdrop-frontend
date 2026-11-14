@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { MapPin, RotateCw, Truck } from "lucide-react";
 import * as React from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -23,9 +22,9 @@ import {
 } from "../courier-api";
 import { useDistrictName } from "../hooks/use-dispatch-branch";
 import { useLoad } from "../hooks/use-load";
-import { ASSIGNMENT_TYPE_LABEL, failureReasonLabel } from "../labels";
+import { failureReasonLabel } from "../labels";
 import type { DispatchParcelStatus } from "../types";
-import { OutcomeBadge, ParcelStatusBadge } from "./dispatch-badges";
+import { ParcelStatusBadge } from "./dispatch-badges";
 
 /** Button text for each step the courier can take. */
 const STEP_LABEL: Partial<Record<DispatchParcelStatus, string>> = {
@@ -156,29 +155,32 @@ function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChan
         <span className="text-label font-semibold text-grey-900 tabular-nums">
           {formatTrackingNumber(parcel.trackingNumber)}
         </span>
-        <Badge tone="outline" dot={false}>
-          {ASSIGNMENT_TYPE_LABEL[parcel.task.type]}
-        </Badge>
         <ParcelStatusBadge status={parcel.status} />
-        <OutcomeBadge outcome={parcel.task.outcome} />
       </div>
 
       <div className="flex items-start gap-2 text-body-sm text-grey-700">
         <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-grey-500" />
-        <div className="flex flex-col">
-          <span className="text-grey-900">
-            {parcel.stop === "PICKUP" ? "Collect from " : "Deliver to "}
-            {goingTo.name} · {formatPhone(goingTo.phone)}
-          </span>
-          <span>
-            {goingTo.address}, {goingTo.city}
-          </span>
-          <span className="text-grey-600">
-            Assigned {formatTime(parcel.assignedAt)}
-            {parcel.codAmount !== null ? ` · Collect ${formatRs(parcel.codAmount)}` : ""}
-            {parcel.instructions ? ` · ${parcel.instructions}` : ""}
-          </span>
-        </div>
+        {parcel.task.type === "TRANSFER" ? (
+          <div className="flex flex-col">
+            <span className="text-grey-900">Take to {branchName} branch</span>
+            <span className="text-grey-600">Assigned {formatTime(parcel.assignedAt)}</span>
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            <span className="text-grey-900">
+              {parcel.stop === "PICKUP" ? "Collect from " : "Deliver to "}
+              {goingTo.name} · {formatPhone(goingTo.phone)}
+            </span>
+            <span>
+              {goingTo.address}, {goingTo.city}
+            </span>
+            <span className="text-grey-600">
+              Assigned {formatTime(parcel.assignedAt)}
+              {parcel.codAmount !== null ? ` · Collect ${formatRs(parcel.codAmount)}` : ""}
+              {parcel.instructions ? ` · ${parcel.instructions}` : ""}
+            </span>
+          </div>
+        )}
       </div>
 
       {finished ? (

@@ -94,7 +94,7 @@ export function CourierWorkloadView() {
                     {courier.vehicleType ? ` · ${vehicleTypeLabel(courier.vehicleType)}` : ""}
                   </span>
                   <span className="text-body-sm text-grey-900 tabular-nums">
-                    {courier.openTasks} open tasks · {courier.openParcels} parcels · {courier.completedToday} done today
+                    {courier.openParcels} {courier.openParcels === 1 ? "parcel" : "parcels"} to handle
                   </span>
                   <div className="mt-2 w-fit">{parcelsButton(courier.courierId, courier.fullName)}</div>
                   {open.has(courier.courierId) ? (
@@ -111,9 +111,7 @@ export function CourierWorkloadView() {
                   <TableRow>
                     <TableHead>Courier</TableHead>
                     <TableHead>Vehicle</TableHead>
-                    <TableHead className="text-right">Open tasks</TableHead>
-                    <TableHead className="text-right">Open parcels</TableHead>
-                    <TableHead className="text-right">Done today</TableHead>
+                    <TableHead className="text-right">Parcels to handle</TableHead>
                     <TableHead className="text-right">
                       <span className="sr-only">Parcels</span>
                     </TableHead>
@@ -121,13 +119,13 @@ export function CourierWorkloadView() {
                 </TableHeader>
                 <TableBody>
                   {couriers.status === "loading" ? (
-                    <TableLoading columns={6} rows={4} label="Loading couriers" />
+                    <TableLoading columns={4} rows={4} label="Loading couriers" />
                   ) : rows.length === 0 ? (
                     <TableEmpty
-                      columns={6}
+                      columns={4}
                       icon={Bike}
                       title="No active couriers at this branch"
-                      description="Couriers an admin adds to this branch appear here. Blocked couriers can't take tasks."
+                      description="Couriers an admin adds to this branch appear here. Blocked couriers can't be given parcels."
                     />
                   ) : (
                     rows.map((courier) => (
@@ -140,16 +138,14 @@ export function CourierWorkloadView() {
                             </span>
                           </TableCell>
                           <TableCell>{courier.vehicleType ? vehicleTypeLabel(courier.vehicleType) : "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums">{courier.openTasks}</TableCell>
                           <TableCell className="text-right tabular-nums">{courier.openParcels}</TableCell>
-                          <TableCell className="text-right tabular-nums">{courier.completedToday}</TableCell>
                           <TableCell className="text-right">
                             {parcelsButton(courier.courierId, courier.fullName)}
                           </TableCell>
                         </TableRow>
                         {open.has(courier.courierId) ? (
                           <TableRow>
-                            <TableCell colSpan={6} id={`courier-parcels-${courier.courierId}`} className="bg-grey-50">
+                            <TableCell colSpan={4} id={`courier-parcels-${courier.courierId}`} className="bg-grey-50">
                               <CourierParcels courierId={courier.courierId} courierName={courier.fullName} />
                             </TableCell>
                           </TableRow>
