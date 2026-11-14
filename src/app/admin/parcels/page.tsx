@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminParcelTracking } from "@/features/tracking";
 import { RequireCurrentUser } from "@/features/identity";
+import { ParcelDirectory } from "@/features/reporting";
 
 export const metadata: Metadata = { title: "All Parcels" };
 
@@ -22,4 +23,6 @@ export default function Page() {
       <AdminParcelTracking />
     </RequireCurrentUser>
   );
+export default function AdminParcelsPage() {
+  return <ParcelDirectory />;
 }
