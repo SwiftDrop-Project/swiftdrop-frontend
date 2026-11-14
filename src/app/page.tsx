@@ -1,6 +1,12 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { LandingView } from "@/features/landing";
 
-// Logged-in users are sent to their home by src/proxy.ts before reaching this page.
+export const metadata: Metadata = {
+  title: "SwiftDrop · Courier & Parcel Delivery Across Sri Lanka",
+  description: "Send and track parcels across all 25 districts in Sri Lanka with live tracking.",
+};
+
+// Logged-in users are sent to their role's home by src/proxy.ts before reaching this page.
 export default function RootPage() {
-  redirect("/login");
+  return <LandingView />;
 }

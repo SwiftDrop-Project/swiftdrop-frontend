@@ -36,7 +36,7 @@ export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
         id={SCROLL_CONTAINER_ID}
         className="relative flex min-h-dvh flex-col px-4 py-10 short:py-8 lg:min-w-0 lg:py-8 lg:short:py-6 lg:flex-1 lg:overflow-y-auto lg:px-16 xl:px-20"
       >
-        <Link href="/login" className="w-fit shrink-0 rounded-sm">
+        <Link href="/" className="w-fit shrink-0 rounded-sm">
           <Logo priority className="h-8" />
         </Link>
 
