@@ -14,6 +14,12 @@ export type FailureReason =
   | "PARCEL_DAMAGED"
   | "OTHER";
 
+/**
+ * How the delivery fee is paid, chosen on the review step. UI only for now: POST /deliveries doesn't take it yet, so
+ * it isn't in CreateDeliveryRequest. The payments work adds it there (and takes the online payment).
+ */
+export type PaymentMethod = "ONLINE" | "AT_PICKUP" | "AT_DROP_OFF";
+
 /** A pickup or recipient. Phones go out as typed and come back as +947XXXXXXXX. */
 export interface DeliveryContact {
   name: string;

@@ -30,12 +30,14 @@ import { deliveryApi } from "../api";
 import { sizeText } from "../labels";
 import { deliveryHref } from "../routes";
 import { createDeliverySchema, type CreateDeliveryInput, type CreateDeliveryValues } from "../schemas";
-import type { Delivery, ParcelSize } from "../types";
+import type { Delivery, ParcelSize, PaymentMethod } from "../types";
 import { FeeEstimateCard } from "./fee-estimate-card";
+import { PaymentMethodCard } from "./payment-method-card";
 import { SummaryCard } from "./summary-card";
 
 const STEPS = [{ label: "Details" }, { label: "Review" }];
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
+const PAYMENT_METHOD_REQUIRED = "Choose how the delivery fee will be paid.";
 
 type Step = "details" | "review" | "done";
 type ContactKey = "pickup" | "recipient";
@@ -112,6 +114,8 @@ export function CreateDelivery() {
   const [step, setStep] = React.useState<Step>("details");
   const [created, setCreated] = React.useState<Delivery | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+  // Kept here, not in the form: it isn't part of the POST /deliveries body yet (see PaymentMethod).
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod | null>(null);
 
   const {
     register,
@@ -148,6 +152,8 @@ export function CreateDelivery() {
   const createDelivery = handleSubmit(async (values) => {
     setNotice(null);
     try {
+      // TODO(payments): send paymentMethod with the booking (and start the online payment) once POST /deliveries
+      // takes it. Until then the review step only asks for it.
       setCreated(await deliveryApi.create(values));
       setStep("done");
       window.scrollTo({ top: 0 });
@@ -169,6 +175,7 @@ export function CreateDelivery() {
     reset(startValues(user));
     setCreated(null);
     setNotice(null);
+    setPaymentMethod(null);
     setStep("details");
     window.scrollTo({ top: 0 });
   };
@@ -248,6 +255,8 @@ export function CreateDelivery() {
           values={getValues()}
           districtName={districtName}
           submitting={isSubmitting}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
           onCreate={createDelivery}
           onEdit={() => setStep("details")}
         />
@@ -260,18 +269,31 @@ interface ReviewStepProps {
   values: CreateDeliveryInput;
   districtName: (code: string) => string;
   submitting: boolean;
+  paymentMethod: PaymentMethod | null;
+  onPaymentMethodChange: (value: PaymentMethod) => void;
   onCreate: React.FormEventHandler<HTMLFormElement>;
   onEdit: () => void;
 }
 
 /**
- * What will be booked, with the fee estimate (POST /pricing/estimate) beside it on wide screens (sticky while
- * scrolling) and above the buttons on smaller ones, so it is always seen before "Create delivery". A parcel that
- * needs a manual quote can't be booked here, so the button is off.
+ * What will be booked and how the fee will be paid, with the fee estimate (POST /pricing/estimate) beside it on wide
+ * screens (sticky while scrolling) and above the buttons on smaller ones, so it is always seen before "Create
+ * delivery". A payment method is required. A parcel that needs a manual quote can't be booked here, so the button
+ * is off.
  */
-function ReviewStep({ values, districtName, submitting, onCreate, onEdit }: ReviewStepProps) {
+function ReviewStep({
+  values,
+  districtName,
+  submitting,
+  paymentMethod,
+  onPaymentMethodChange,
+  onCreate,
+  onEdit,
+}: ReviewStepProps) {
   const { state: estimate, retry } = useFeeEstimate(estimateRequest(values));
   const needsQuote = estimate.status === "ready" && estimate.estimate.status === "MANUAL_QUOTE";
+  const [paymentError, setPaymentError] = React.useState<string | null>(null);
+  const firstPaymentOption = React.useRef<HTMLInputElement>(null);
   const cod = values.codAmount.trim();
   const feeCard = (
     <FeeEstimateCard
@@ -285,10 +307,33 @@ function ReviewStep({ values, districtName, submitting, onCreate, onEdit }: Revi
     />
   );
 
+  // Without a payment method nothing is sent: the error shows under the options and the focus moves there.
+  const create = (event: React.FormEvent<HTMLFormElement>) => {
+    if (paymentMethod === null) {
+      event.preventDefault();
+      setPaymentError(PAYMENT_METHOD_REQUIRED);
+      firstPaymentOption.current?.focus();
+      return;
+    }
+    onCreate(event);
+  };
+
+  const choosePaymentMethod = (value: PaymentMethod) => {
+    setPaymentError(null);
+    onPaymentMethodChange(value);
+  };
+
   return (
     <PageColumns aside={<div className="hidden xl:sticky xl:top-24 xl:block">{feeCard}</div>}>
-      <form onSubmit={onCreate} noValidate className="flex flex-col gap-6">
+      <form onSubmit={create} noValidate className="flex flex-col gap-6">
         <ReviewDetails values={values} districtName={districtName} />
+
+        <PaymentMethodCard
+          ref={firstPaymentOption}
+          value={paymentMethod}
+          onChange={choosePaymentMethod}
+          error={paymentError ?? undefined}
+        />
 
         <div className="xl:hidden">{feeCard}</div>
 

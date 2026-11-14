@@ -67,11 +67,11 @@ export function FeeEstimateCard({
       </ol>
 
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t border-grey-200 p-6 text-body-sm">
-        <dt className="text-grey-600">Weight</dt>
+        <dt className="whitespace-nowrap text-grey-600">Weight</dt>
         <dd className="text-right text-grey-900 tabular-nums">{weightKg} kg</dd>
-        <dt className="text-grey-600">Packed size</dt>
+        <dt className="whitespace-nowrap text-grey-600">Packed size</dt>
         <dd className="text-right text-grey-900 tabular-nums">{size}</dd>
-        <dt className="text-grey-600">Cash to collect</dt>
+        <dt className="whitespace-nowrap text-grey-600">Cash to collect</dt>
         <dd className="text-right text-grey-900 tabular-nums">{codAmount === null ? "None" : formatRs(codAmount)}</dd>
       </dl>
 
@@ -139,7 +139,7 @@ function FeeLines({ estimate }: { estimate: FeeEstimate }) {
     >
       {estimate.lines.map((line) => (
         <React.Fragment key={line.component}>
-          <dt className="text-grey-600">{lineLabel(line.component, estimate)}</dt>
+          <dt className="whitespace-nowrap text-grey-600">{lineLabel(line.component, estimate)}</dt>
           <dd className="text-right text-grey-900 tabular-nums">{formatRs(line.amount)}</dd>
         </React.Fragment>
       ))}
