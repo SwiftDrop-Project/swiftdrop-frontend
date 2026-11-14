@@ -30,6 +30,7 @@ import { EventChips } from "./event-chips";
 import { SecretDialog } from "./secret-dialog";
 import { WebhookActions, turnOnWebhook } from "./webhook-actions";
 import { WebhookFormDialog } from "./webhook-form-dialog";
+import { WebhookGuideButton } from "./webhook-guide";
 
 const COLUMNS = 5;
 
@@ -78,18 +79,21 @@ export function WebhookList() {
     return true;
   }
 
-  const addButton = (
-    <Button onClick={() => setAdding(true)} disabled={!canAdd}>
-      <Plus aria-hidden="true" />
-      Add webhook
-    </Button>
+  const actions = (
+    <div className="flex items-center gap-2">
+      <WebhookGuideButton onAdd={() => setAdding(true)} canAdd={canAdd} />
+      <Button onClick={() => setAdding(true)} disabled={!canAdd}>
+        <Plus aria-hidden="true" />
+        Add webhook
+      </Button>
+    </div>
   );
 
   return (
     <ListPage
       title="Webhooks"
       description="Get a message on your server whenever one of your orders changes status."
-      action={addButton}
+      action={actions}
     >
       {!approved && user ? (
         <InlineNotice title="Your account is waiting for approval">
@@ -184,7 +188,7 @@ export function WebhookList() {
                         <TableCell className="max-w-sm">
                           <EndpointCell url={webhook.url} href={webhookHref(webhook.id)} />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-64">
                           <EventChips eventTypes={webhook.eventTypes} />
                         </TableCell>
                         <TableCell>
