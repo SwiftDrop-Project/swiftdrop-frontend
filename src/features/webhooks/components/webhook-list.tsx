@@ -1,9 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { Copy, Plus, RotateCw, ShieldCheck, Timer, Webhook as WebhookIcon } from "lucide-react";
 import * as React from "react";
 import { ListPage } from "@/components/layout/list-page";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
@@ -23,7 +23,9 @@ import { useCurrentUser } from "@/features/identity";
 import { formatDate } from "@/lib/format";
 import { useWebhooks } from "../hooks/use-webhooks";
 import { MAX_ACTIVE_WEBHOOKS } from "../labels";
+import { webhookHref } from "../routes";
 import type { WebhookWithSecret } from "../types";
+import { ActiveBadge } from "./active-badge";
 import { EventChips } from "./event-chips";
 import { SecretDialog } from "./secret-dialog";
 import { WebhookActions } from "./webhook-actions";
@@ -116,7 +118,7 @@ export function WebhookList() {
               {list.map((webhook) => (
                 <li key={webhook.id} className="flex flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <EndpointCell url={webhook.url} />
+                    <EndpointCell url={webhook.url} href={webhookHref(webhook.id)} />
                     <WebhookActions webhook={webhook} onChange={webhooks.upsert} />
                   </div>
                   <EventChips eventTypes={webhook.eventTypes} />
@@ -159,7 +161,7 @@ export function WebhookList() {
                     list.map((webhook) => (
                       <TableRow key={webhook.id}>
                         <TableCell className="max-w-sm">
-                          <EndpointCell url={webhook.url} />
+                          <EndpointCell url={webhook.url} href={webhookHref(webhook.id)} />
                         </TableCell>
                         <TableCell>
                           <EventChips eventTypes={webhook.eventTypes} />
@@ -196,8 +198,8 @@ export function WebhookList() {
 
 /* ---------------------------------------------------------------- Pieces */
 
-/** The host in full, the path below it, and a copy button. Long URLs are cut in the middle by the browser. */
-function EndpointCell({ url }: { url: string }) {
+/** The host (a link to the webhook's page), the path below it, and a copy button. Long URLs are truncated. */
+function EndpointCell({ url, href }: { url: string; href: string }) {
   const { host, rest } = splitUrl(url);
 
   async function copy() {
@@ -212,9 +214,13 @@ function EndpointCell({ url }: { url: string }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-label text-grey-900" title={url}>
+        <Link
+          href={href}
+          className="truncate text-label font-medium text-grey-900 hover:text-orange-700 hover:underline"
+          title={url}
+        >
           {host}
-        </span>
+        </Link>
         {rest ? (
           <span className="truncate text-caption text-grey-600" title={url}>
             {rest}
@@ -236,10 +242,6 @@ function splitUrl(url: string): { host: string; rest: string } {
   } catch {
     return { host: url, rest: "" };
   }
-}
-
-function ActiveBadge({ active }: { active: boolean }) {
-  return active ? <Badge tone="success">Active</Badge> : <Badge tone="outline">Off</Badge>;
 }
 
 /** Five small bars, one per allowed active webhook. Grey only: it's a count, not a status. */

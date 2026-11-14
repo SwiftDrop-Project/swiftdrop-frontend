@@ -10,6 +10,9 @@ export type WebhookEventType =
   | "parcel.delivered"
   | "parcel.failed";
 
+/** What a delivery carries: a parcel event, or the test ping sent by "Send test". */
+export type DeliveryEventType = WebhookEventType | "webhook.ping";
+
 /** A subscription (API.md "Subscription (response)"). Never holds the secret. */
 export interface Webhook {
   id: string;
@@ -46,7 +49,7 @@ export interface WebhookDelivery {
   id: string;
   subscriptionId: string;
   eventId: string;
-  eventType: WebhookEventType | "webhook.ping";
+  eventType: DeliveryEventType;
   status: DeliveryStatus;
   attempts: number;
   lastStatusCode: number | null;

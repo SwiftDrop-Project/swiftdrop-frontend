@@ -12,9 +12,12 @@ Merchant webhook subscriptions and the log of parcel events sent to merchant URL
 
 - `WebhookList` (`/merchant/webhooks`): the merchant's endpoints with add, edit, send test, rotate secret and
   turn off/on; the signing secret is shown once (`SecretDialog`) and kept only in that dialog's state.
-- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest).
+- `WebhookDetail` (`/merchant/webhooks/[id]`): one webhook with its delivery history (status filter, pages of
+  20, retry on failed deliveries, refreshes every 3 s while a delivery is about to be sent) and a setup guide
+  (payload, headers, signature check in Node.js, Python and PHP).
+- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry).
 
-Next: the webhook detail page with its delivery history and retry (`/merchant/webhooks/[id]`).
+Next: the admin webhook logs page (`/admin/webhooks/deliveries`).
 
 ## Layout
 

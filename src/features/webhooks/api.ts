@@ -1,6 +1,8 @@
 import { apiFetch } from "@/lib/api";
+import type { PageResponse } from "@/types";
 import type {
   CreateWebhookRequest,
+  DeliveryStatus,
   UpdateWebhookRequest,
   Webhook,
   WebhookDelivery,
@@ -32,4 +34,19 @@ export const webhooksApi = {
 
   /** Queues a webhook.ping (202), sent within seconds. Works while turned off too. */
   sendTest: (id: string) => apiFetch<WebhookDelivery>(path(id, "/test"), { method: "POST" }),
+
+  /** One webhook's delivery history, newest first. `status` empty means all; size 1-100. */
+  deliveries: (
+    id: string,
+    { status, page, size }: { status?: DeliveryStatus; page: number; size: number },
+    signal?: AbortSignal,
+  ) =>
+    apiFetch<PageResponse<WebhookDelivery>>(path(id, "/deliveries"), {
+      query: { status, page, size },
+      signal,
+    }),
+
+  /** Sends a FAILED delivery again with a new set of attempts; 409 WEBHOOK_DELIVERY_NOT_RETRYABLE otherwise. */
+  retry: (deliveryId: string) =>
+    apiFetch<WebhookDelivery>(`${BASE}/deliveries/${encodeURIComponent(deliveryId)}/retry`, { method: "POST" }),
 };

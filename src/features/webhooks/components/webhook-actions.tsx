@@ -46,8 +46,35 @@ export function hostOf(url: string): string {
 
 type OpenDialog = "edit" | "rotate" | "turnOff" | null;
 
-/** The ⋯ menu of one webhook and the dialogs behind it. Every change is passed up with `onChange`. */
-export function WebhookActions({ webhook, onChange }: { webhook: Webhook; onChange: (webhook: Webhook) => void }) {
+/** Queues a test ping and says so in a toast. Returns whether it was queued. */
+export async function sendTestPing(webhook: Webhook): Promise<boolean> {
+  try {
+    await webhooksApi.sendTest(webhook.id);
+    toast({
+      tone: "success",
+      title: "Test sent",
+      description: `A webhook.ping request should reach ${hostOf(webhook.url)} within a few seconds.`,
+    });
+    return true;
+  } catch (error) {
+    toast({ tone: "error", title: "We couldn't send the test", description: errorMessage(error) });
+    return false;
+  }
+}
+
+/**
+ * The ⋯ menu of one webhook and the dialogs behind it. Every change is passed up with `onChange`;
+ * `onTestSent` runs after a test ping was queued (the detail page reloads its history).
+ */
+export function WebhookActions({
+  webhook,
+  onChange,
+  onTestSent,
+}: {
+  webhook: Webhook;
+  onChange: (webhook: Webhook) => void;
+  onTestSent?: () => void;
+}) {
   const [dialog, setDialog] = React.useState<OpenDialog>(null);
   const [secret, setSecret] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -60,16 +87,7 @@ export function WebhookActions({ webhook, onChange }: { webhook: Webhook; onChan
   }
 
   async function sendTest() {
-    try {
-      await webhooksApi.sendTest(webhook.id);
-      toast({
-        tone: "success",
-        title: "Test sent",
-        description: `A webhook.ping request should reach ${host} within a few seconds.`,
-      });
-    } catch (error) {
-      toast({ tone: "error", title: "We couldn't send the test", description: errorMessage(error) });
-    }
+    if (await sendTestPing(webhook)) onTestSent?.();
   }
 
   async function turnOn() {
