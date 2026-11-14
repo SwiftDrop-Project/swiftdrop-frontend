@@ -8,7 +8,7 @@ import vm from "node:vm";
 import ts from "typescript";
 
 /*
- * The courier task screens (F2A, read only): the display helpers, the task row and the parcel row rendered to HTML,
+ * The courier task screens: the display helpers, the task row and the parcel row rendered to HTML,
  * and the route pages' guard and dynamic-route conventions. Fixtures follow API.md "Courier".
  */
 
@@ -163,7 +163,7 @@ test("a task planned for a later day shows its date", () => {
 
 // ---- Parcel row (task detail) ----
 
-test("a parcel row shows the steps the API allows, disabled until F2B, and links to the parcel", () => {
+test("a parcel row shows the steps the API allows (disabled without a handler) and links to the parcel", () => {
   const markup = html(React.createElement(TaskItemRow, { item: item(), districtName }));
   assert.match(markup, /href="\/courier\/parcels\/ab598d39-d554-42f5-b609-6fa90f3a5357"/);
   assert.match(markup, /1\. SD 2611 0600 01/);

@@ -21,15 +21,21 @@ function isRecordable(outcome: string): outcome is RecordableOutcome {
 
 /**
  * One parcel in a task: tracking number (opens the parcel), its status and its outcome in this task, where it goes,
- * cash to collect, who to meet, what happened so far, and the next steps the API allows. The step buttons are shown
- * disabled until recording updates is built (F2B). Render it inside a <ul>.
+ * cash to collect, who to meet, what happened so far, and one button per next step the API allows
+ * (item.allowedOutcomes, in its order). Render it inside a <ul>.
  */
 export function TaskItemRow({
   item,
   districtName,
+  onStep,
+  busy = false,
 }: {
   item: CourierTaskItem;
   districtName: (code: string) => string;
+  /** Opens the form for that outcome. Without it the buttons are shown disabled. */
+  onStep?: (outcome: RecordableOutcome) => void;
+  /** Another update is being saved or the task is reloading: the buttons wait. */
+  busy?: boolean;
 }) {
   const tracking = formatTrackingNumber(item.trackingNumber);
   const steps = item.allowedOutcomes.filter(isRecordable);
@@ -81,7 +87,14 @@ export function TaskItemRow({
       {steps.length > 0 ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap" aria-label={`Next steps for ${tracking}`}>
           {steps.map((outcome) => (
-            <Button key={outcome} variant="secondary" disabled className="w-full sm:w-auto">
+            <Button
+              key={outcome}
+              type="button"
+              variant="secondary"
+              className="w-full sm:w-auto"
+              disabled={!onStep || busy}
+              onClick={() => onStep?.(outcome)}
+            >
               {OUTCOME_ACTION_LABEL[outcome]}
             </Button>
           ))}
