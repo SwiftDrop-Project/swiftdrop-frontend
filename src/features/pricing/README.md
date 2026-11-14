@@ -10,7 +10,9 @@ Delivery rates by district, weight and service level; price quotes for new deliv
 
 ## Built so far
 
-Nothing yet. Start with `types.ts` and `api.ts` from the backend contract, then the components.
+- `useFeeEstimate` (`hooks/use-fee-estimate.ts`): `POST /pricing/estimate` for one parcel (loading, error, retry; a request that is no longer wanted is cancelled). Used by the delivery feature's review step (`FeeEstimateCard`).
+- `labels.ts`: words for vehicles (`VEHICLE_LABEL`) and fee lines (`FEE_COMPONENT_LABEL`).
+- `types.ts` and `api.ts`: the estimate request and response.
 
 ## Layout
 

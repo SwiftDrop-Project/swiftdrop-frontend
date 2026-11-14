@@ -21,6 +21,7 @@ export type ApiErrorCode =
   | "EMAIL_ALREADY_REGISTERED"
   | "PHONE_ALREADY_REGISTERED"
   | "PROFILE_ALREADY_COMPLETE"
+  | "PARCEL_NEEDS_MANUAL_QUOTE"
   | "INVALID_STATUS_TRANSITION"
   // Courier tasks (API.md "Courier"); ASSIGNMENT_CHANGED also comes from dispatch.
   | "TASK_STEP_NOT_ALLOWED"
