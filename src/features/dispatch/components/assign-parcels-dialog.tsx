@@ -78,6 +78,12 @@ function plural(count: number, word: string) {
   return `${count} ${count === 1 ? word : `${word}s`}`;
 }
 
+/** Someone assigned a selected parcel meanwhile (another tab or dispatcher), or its status changed. */
+const TAKEN_CODES = new Set(["PARCEL_ALREADY_ASSIGNED", "PARCEL_NOT_READY_FOR_TASK"]);
+const TAKEN_MESSAGE =
+  "A parcel you selected was already given to a courier or has changed, maybe from another screen. " +
+  "It's been taken off the list.";
+
 /** Assigns the selected parcels (any mix of pickups, transfers and deliveries at one branch) to one courier. */
 export function AssignParcelsDialog({
   parcels,
@@ -139,7 +145,17 @@ export function AssignParcelsDialog({
         });
         assigned += batch.parcels.length;
       } catch (error) {
-        if (assigned > 0) onAssigned();
+        const taken = isApiError(error) && TAKEN_CODES.has(error.code);
+        // Reloading the queue drops the taken parcel from the selection, so the rest can be assigned again.
+        if (assigned > 0 || taken) onAssigned();
+        if (taken) {
+          setNotice(
+            assigned > 0
+              ? `${plural(assigned, "parcel")} were assigned. ${TAKEN_MESSAGE} Assign the rest again.`
+              : `${TAKEN_MESSAGE} Check the parcels below and assign again.`,
+          );
+          return;
+        }
         if (!isApiError(error)) {
           setNotice("Something went wrong. Try again in a moment.");
         } else if (error.code === "VALIDATION_FAILED") {
@@ -188,7 +204,9 @@ export function AssignParcelsDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Assign {plural(parcels.length, "parcel")} to a courier</DialogTitle>
+          <DialogTitle>
+            Assign {parcels.length > 0 ? plural(parcels.length, "parcel") : "parcels"} to a courier
+          </DialogTitle>
           <DialogDescription>The courier sees each parcel on their Today page with what to do next.</DialogDescription>
         </DialogHeader>
 
@@ -201,7 +219,9 @@ export function AssignParcelsDialog({
             ) : null}
 
             <div className="rounded-lg border border-grey-200 bg-grey-50 p-4">
-              <p className="text-label text-grey-900">{summary}</p>
+              <p className="text-label text-grey-900">
+                {parcels.length > 0 ? summary : "None of the selected parcels are waiting any more."}
+              </p>
               <p className="mt-1 text-body-sm text-grey-600 tabular-nums">
                 {parcels
                   .slice(0, 4)
@@ -250,7 +270,7 @@ export function AssignParcelsDialog({
             <Button type="button" variant="secondary" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" loading={isSubmitting}>
+            <Button type="submit" loading={isSubmitting} disabled={parcels.length === 0}>
               Assign {plural(parcels.length, "parcel")}
             </Button>
           </DialogFooter>
