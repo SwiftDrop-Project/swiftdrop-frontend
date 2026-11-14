@@ -21,6 +21,10 @@ export const trackingApi = {
   recent: (branch: DistrictCode | undefined, signal?: AbortSignal) =>
     apiFetch<LiveEvent[]>("/tracking/live/recent", { query: { branch }, signal }),
 
+  /** Customers and merchants: their own parcels, newest first (live updates on /user/queue/parcels). */
+  mine: (page: number, size: number, signal?: AbortSignal) =>
+    apiFetch<PageResponse<IndexedParcel>>("/tracking/mine", { query: { page, size }, signal }),
+
   /** Admins: every parcel's latest status, most recently updated first. */
   adminParcels: (filters: ParcelFilters, page: number, size: number, signal?: AbortSignal) =>
     apiFetch<PageResponse<IndexedParcel>>("/admin/tracking/parcels", {

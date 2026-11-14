@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -186,11 +187,9 @@ export function DeliveryOperationsCard() {
                   key={day}
                   className="flex items-center gap-2 text-body-sm text-grey-800"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={settings.operatingDays.includes(day)}
-                    onChange={() => toggleDay(day)}
-                    className="accent-orange-600"
+                    onCheckedChange={() => toggleDay(day)}
                   />
                   {day}
                 </label>
