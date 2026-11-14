@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
 import { webhooksApi } from "../api";
-import { WEBHOOK_EVENT_DESCRIPTION, WEBHOOK_EVENT_LABEL, WEBHOOK_EVENT_TYPES } from "../labels";
+import { DEFAULT_EVENT_TYPES, WEBHOOK_EVENT_DESCRIPTION, WEBHOOK_EVENT_LABEL, WEBHOOK_EVENT_TYPES } from "../labels";
 import { webhookSchema, type WebhookValues } from "../schemas";
 import type { UpdateWebhookRequest, Webhook, WebhookWithSecret } from "../types";
 
@@ -49,8 +49,9 @@ export function WebhookFormDialog({
 }) {
   const editing = webhook !== undefined;
   const [notice, setNotice] = React.useState<{ title: string; message: string } | null>(null);
+  // Edit starts from the webhook's own events; Add starts with the common ones ticked (one webhook, several events).
   const defaults = React.useMemo<WebhookValues>(
-    () => ({ url: webhook?.url ?? "", eventTypes: webhook?.eventTypes ?? [] }),
+    () => ({ url: webhook?.url ?? "", eventTypes: webhook ? webhook.eventTypes : [...DEFAULT_EVENT_TYPES] }),
     [webhook],
   );
   const {
@@ -94,8 +95,7 @@ export function WebhookFormDialog({
         setNotice({ title: saveFailedTitle(editing), message: UNKNOWN_ERROR });
         return;
       }
-      // 403 MERCHANT_NOT_APPROVED (the shared ApiErrorCode type doesn't list webhook-related codes yet)
-      if (error.status === 403 && error.code !== "FORBIDDEN") onNotApproved?.();
+      if (error.code === "MERCHANT_NOT_APPROVED") onNotApproved?.();
       const { handled, unmatched } = applyServerFieldErrors(error, setError, FIELDS);
       if (!handled || unmatched.length > 0) {
         setNotice({ title: saveFailedTitle(editing), message: unmatched[0] ?? error.message });
@@ -111,7 +111,7 @@ export function WebhookFormDialog({
           <DialogDescription>
             {editing
               ? "Changes apply to new events. Deliveries already waiting keep the address they were made for."
-              : "We'll send a signed POST request to this address whenever one of your parcels reaches a chosen status."}
+              : "One webhook per server or system. Choose all the events it handles; your server tells them apart by type."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
@@ -147,6 +147,9 @@ export function WebhookFormDialog({
               render={({ field }) => {
                 const selected = new Set(field.value);
                 const allSelected = selected.size === WEBHOOK_EVENT_TYPES.length;
+                const describedBy = ["webhook-events-help", errors.eventTypes ? "webhook-events-error" : null]
+                  .filter(Boolean)
+                  .join(" ");
                 const toggle = (type: (typeof WEBHOOK_EVENT_TYPES)[number], checked: boolean) => {
                   const next = new Set(selected);
                   if (checked) next.add(type);
@@ -155,19 +158,32 @@ export function WebhookFormDialog({
                   field.onChange(WEBHOOK_EVENT_TYPES.filter((item) => next.has(item)));
                 };
                 return (
-                  <fieldset
-                    className="flex flex-col gap-3"
-                    aria-describedby={errors.eventTypes ? "webhook-events-error" : undefined}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <legend className="text-label text-grey-900">Events</legend>
-                      <Button
-                        type="button"
-                        variant="link"
-                        onClick={() => field.onChange(allSelected ? [] : [...WEBHOOK_EVENT_TYPES])}
-                      >
-                        {allSelected ? "Clear all" : "Select all"}
-                      </Button>
+                  <fieldset className="flex flex-col gap-3" aria-describedby={describedBy}>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between gap-4">
+                        <legend className="text-label text-grey-900">Events</legend>
+                        <div className="flex items-center gap-4">
+                          {!allSelected ? (
+                            <Button
+                              type="button"
+                              variant="link"
+                              onClick={() => field.onChange([...WEBHOOK_EVENT_TYPES])}
+                            >
+                              Select all
+                            </Button>
+                          ) : null}
+                          {selected.size > 0 ? (
+                            <Button type="button" variant="link" onClick={() => field.onChange([])}>
+                              Clear
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <p id="webhook-events-help" className="text-body-sm text-grey-600">
+                        {editing
+                          ? "Add or remove events here instead of creating another webhook for the same address."
+                          : "You can change these later. There's no need for a separate webhook per status."}
+                      </p>
                     </div>
                     <ul className="grid gap-2 sm:grid-cols-2">
                       {WEBHOOK_EVENT_TYPES.map((type) => {

@@ -33,6 +33,17 @@ export const WEBHOOK_EVENT_DESCRIPTION: Record<WebhookEventType, string> = {
   "parcel.failed": "The delivery attempt didn't succeed.",
 };
 
+/**
+ * Ticked when adding a webhook: the events most shops act on. One webhook with several events is the normal setup
+ * (API.md "One subscription per destination"); the merchant can change the selection before saving.
+ */
+export const DEFAULT_EVENT_TYPES: readonly WebhookEventType[] = [
+  "parcel.picked_up",
+  "parcel.out_for_delivery",
+  "parcel.delivered",
+  "parcel.failed",
+];
+
 /** API.md: a merchant has at most 5 active subscriptions. */
 export const MAX_ACTIVE_WEBHOOKS = 5;
 
