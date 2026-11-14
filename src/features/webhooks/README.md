@@ -5,12 +5,16 @@ Merchant webhook subscriptions and the log of parcel events sent to merchant URL
 | | |
 |---|---|
 | Backend module | `com.swiftdrop.webhooks` (`../swiftdrop-backend/src/main/java/com/swiftdrop/webhooks`) |
-| Owner | TBD |
+| Owner | chanuka (WP6) |
 | Import as | `@/features/webhooks` (only what `index.ts` exports) |
 
 ## Built so far
 
-Nothing yet. Start with `types.ts` and `api.ts` from the backend contract, then the components.
+- `WebhookList` (`/merchant/webhooks`): the merchant's endpoints with add, edit, send test, rotate secret and
+  turn off/on; the signing secret is shown once (`SecretDialog`) and kept only in that dialog's state.
+- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest).
+
+Next: the webhook detail page with its delivery history and retry (`/merchant/webhooks/[id]`).
 
 ## Layout
 
