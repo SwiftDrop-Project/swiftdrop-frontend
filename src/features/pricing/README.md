@@ -17,7 +17,11 @@ Delivery rates by district, weight and service level; price quotes for new deliv
   from a branch (`GET /admin/pricing/routes`), branches with their centres (`GET /admin/pricing/districts`), the active
   rate card with its vehicles (`GET /admin/pricing/rate-card`). Its "See older versions" button opens the older
   versions' table at the top of the page (`GET /admin/pricing/rate-cards`, loaded on that click; "View" opens one
-  with the values that changed since marked, "Hide" closes the table). Its own files: `admin-api.ts`, `admin-types.ts`,
+  with the values that changed since marked, "Hide" closes the table).
+- `DeliveryRates` (`/admin/rates`, WP4, ADMIN only, read only): `GET /admin/pricing/tariff` for the active card or a
+  picked older version: the four key figures, fees for typical parcels by distance, pickup and delivery by vehicle,
+  and the weight charge for every kg from 1 to 50. Components: `delivery-rates`, `sample-fees-card`,
+  `vehicle-tariff-card`, `weight-tiers-card`. Its own files: `admin-api.ts`, `admin-types.ts`,
   `hooks/use-admin-pricing.ts`, `schemas.ts` (calculator form) and the components in `components/`.
 
 ## Layout

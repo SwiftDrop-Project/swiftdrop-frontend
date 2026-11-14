@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import type { DistrictCode } from "@/types";
-import type { AdminRateCard, DistrictCentre, RouteTable } from "./admin-types";
+import type { AdminRateCard, AdminTariff, DistrictCentre, RouteTable } from "./admin-types";
 import type { FeeEstimate, FeeEstimateRequest } from "./types";
 
 /* The admin's Zones & Pricing page (API.md "Zones & pricing (admin, WP4)"). ADMIN only, read only. */
@@ -13,6 +13,12 @@ export const adminPricingApi = {
   /** Every rate card version, newest first, each with its own vehicles. */
   rateCards(signal?: AbortSignal) {
     return apiFetch<AdminRateCard[]>("/admin/pricing/rate-cards", { signal });
+  },
+
+  /** What a rate card charges (Delivery Rates page); the active card without `version`. */
+  tariff(version?: number, signal?: AbortSignal) {
+    const query = version === undefined ? "" : `?version=${encodeURIComponent(String(version))}`;
+    return apiFetch<AdminTariff>(`/admin/pricing/tariff${query}`, { signal });
   },
 
   /** All 25 districts (branches) with their centres. */

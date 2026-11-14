@@ -4,7 +4,7 @@ import * as React from "react";
 import { isApiError } from "@/lib/api";
 import type { DistrictCode } from "@/types";
 import { adminPricingApi } from "../admin-api";
-import type { AdminRateCard, DistrictCentre, RouteTable } from "../admin-types";
+import type { AdminRateCard, AdminTariff, DistrictCentre, RouteTable } from "../admin-types";
 
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
 
@@ -64,6 +64,35 @@ export function useRateCardHistory() {
   }, []);
 
   return { state, retry };
+}
+
+/**
+ * GET /admin/pricing/tariff for one rate card version (the active one when undefined). It loads again when the
+ * version changes or on retry; while it does, the previous tariff stays on screen (`refreshing` is true) so the page
+ * doesn't jump.
+ */
+export function useTariff(version: number | undefined) {
+  const [attempt, setAttempt] = React.useState(0);
+  const [settled, setSettled] = React.useState<{ key: string; state: LoadState<AdminTariff> } | null>(null);
+  const key = `${version ?? "active"}|${attempt}`;
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    adminPricingApi
+      .tariff(version, controller.signal)
+      .then((data) => setSettled({ key, state: { status: "ready", data } }))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setSettled({ key, state: { status: "error", message: errorMessage(error) } });
+      });
+    return () => controller.abort();
+  }, [version, key]);
+
+  const retry = React.useCallback(() => setAttempt((value) => value + 1), []);
+  const current = settled?.key === key ? settled.state : null;
+  // Keep showing the last tariff while another version loads.
+  const state: LoadState<AdminTariff> =
+    current ?? (settled?.state.status === "ready" ? settled.state : { status: "loading" });
+  return { state, refreshing: current === null && settled?.state.status === "ready", retry };
 }
 
 /** How a request ended, kept with the branch it belongs to, so a slow answer for an old branch is never shown. */
