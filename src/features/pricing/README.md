@@ -13,6 +13,12 @@ Delivery rates by district, weight and service level; price quotes for new deliv
 - `useFeeEstimate` (`hooks/use-fee-estimate.ts`): `POST /pricing/estimate` for one parcel (loading, error, retry; a request that is no longer wanted is cancelled). Used by the delivery feature's review step (`FeeEstimateCard`).
 - `labels.ts`: words for vehicles (`VEHICLE_LABEL`) and fee lines (`FEE_COMPONENT_LABEL`).
 - `types.ts` and `api.ts`: the estimate request and response.
+- `ZonesPricing` (`/admin/zones`, WP4, ADMIN only, read only): price calculator (`POST /admin/pricing/estimate`), routes
+  from a branch (`GET /admin/pricing/routes`), branches with their centres (`GET /admin/pricing/districts`), the active
+  rate card with its vehicles (`GET /admin/pricing/rate-card`). Its "See older versions" button opens the older
+  versions' table at the top of the page (`GET /admin/pricing/rate-cards`, loaded on that click; "View" opens one
+  with the values that changed since marked, "Hide" closes the table). Its own files: `admin-api.ts`, `admin-types.ts`,
+  `hooks/use-admin-pricing.ts`, `schemas.ts` (calculator form) and the components in `components/`.
 
 ## Layout
 
