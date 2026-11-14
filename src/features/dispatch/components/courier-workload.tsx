@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Bike, RotateCw } from "lucide-react";
+import { Bike, ChevronDown, ChevronUp, RotateCw } from "lucide-react";
 import * as React from "react";
 import { ListPage } from "@/components/layout/list-page";
 import { Button } from "@/components/ui/button";
@@ -23,10 +22,34 @@ import { dispatchApi } from "../api";
 import { useDispatchBranch, useDistrictName } from "../hooks/use-dispatch-branch";
 import { useLoad } from "../hooks/use-load";
 import { BranchSelect } from "./branch-select";
+import { CourierParcels } from "./courier-parcels";
 
-/** Active couriers at a branch and how much work each has, least busy first. */
+/** Active couriers at a branch and how much work each has, least busy first; each opens to show its parcels. */
 export function CourierWorkloadView() {
   const [branch, setBranch] = useDispatchBranch();
+  const [open, setOpen] = React.useState<ReadonlySet<string>>(new Set());
+  const toggle = (courierId: string) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(courierId)) next.delete(courierId);
+      else next.add(courierId);
+      return next;
+    });
+  const parcelsButton = (courierId: string, fullName: string) => {
+    const expanded = open.has(courierId);
+    return (
+      <Button
+        variant="secondary"
+        aria-expanded={expanded}
+        aria-controls={`courier-parcels-${courierId}`}
+        onClick={() => toggle(courierId)}
+      >
+        {expanded ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+        {expanded ? "Hide parcels" : "Show parcels"}
+        <span className="sr-only"> for {fullName}</span>
+      </Button>
+    );
+  };
   const { name } = useDistrictName();
   const couriers = useLoad(`workload:${branch}`, (signal) => dispatchApi.workload(branch, signal));
   const rows = couriers.data ?? [];
@@ -34,7 +57,7 @@ export function CourierWorkloadView() {
   return (
     <ListPage
       title="Couriers"
-      description="Active couriers at the branch and the work they have, least busy first."
+      description="Active couriers at the branch and the work they have, least busy first. Open a courier to see the parcels assigned to them."
       toolbar={<BranchSelect id="couriers-branch" value={branch} onChange={(code) => code && setBranch(code)} />}
     >
       <Card aria-labelledby="couriers-heading">
@@ -42,7 +65,9 @@ export function CourierWorkloadView() {
           title={`Couriers at ${name(branch)}`}
           titleId="couriers-heading"
           description={
-            couriers.status === "ready" ? `${rows.length} active ${rows.length === 1 ? "courier" : "couriers"}` : undefined
+            couriers.status === "ready"
+              ? `${rows.length} active ${rows.length === 1 ? "courier" : "couriers"}`
+              : undefined
           }
         />
         {couriers.status === "error" ? (
@@ -69,15 +94,14 @@ export function CourierWorkloadView() {
                     {courier.vehicleType ? ` · ${vehicleTypeLabel(courier.vehicleType)}` : ""}
                   </span>
                   <span className="text-body-sm text-grey-900 tabular-nums">
-                    {courier.openTasks} open tasks · {courier.openParcels} parcels · {courier.completedToday} done
-                    today
+                    {courier.openTasks} open tasks · {courier.openParcels} parcels · {courier.completedToday} done today
                   </span>
-                  <Link
-                    href={`/dispatcher/parcels?courierId=${courier.courierId}`}
-                    className="w-fit text-label text-orange-700 hover:text-orange-800 hover:underline"
-                  >
-                    View tasks
-                  </Link>
+                  <div className="mt-2 w-fit">{parcelsButton(courier.courierId, courier.fullName)}</div>
+                  {open.has(courier.courierId) ? (
+                    <div id={`courier-parcels-${courier.courierId}`} className="mt-2">
+                      <CourierParcels courierId={courier.courierId} courierName={courier.fullName} />
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -91,7 +115,7 @@ export function CourierWorkloadView() {
                     <TableHead className="text-right">Open parcels</TableHead>
                     <TableHead className="text-right">Done today</TableHead>
                     <TableHead className="text-right">
-                      <span className="sr-only">Tasks</span>
+                      <span className="sr-only">Parcels</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -107,23 +131,30 @@ export function CourierWorkloadView() {
                     />
                   ) : (
                     rows.map((courier) => (
-                      <TableRow key={courier.courierId}>
-                        <TableCell>
-                          <span className="font-medium">{courier.fullName}</span>
-                          <span className="block text-caption text-grey-600 tabular-nums">
-                            {formatPhone(courier.phone)}
-                          </span>
-                        </TableCell>
-                        <TableCell>{courier.vehicleType ? vehicleTypeLabel(courier.vehicleType) : "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{courier.openTasks}</TableCell>
-                        <TableCell className="text-right tabular-nums">{courier.openParcels}</TableCell>
-                        <TableCell className="text-right tabular-nums">{courier.completedToday}</TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="secondary">
-                            <Link href={`/dispatcher/parcels?courierId=${courier.courierId}`}>View tasks</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                      <React.Fragment key={courier.courierId}>
+                        <TableRow>
+                          <TableCell>
+                            <span className="font-medium">{courier.fullName}</span>
+                            <span className="block text-caption text-grey-600 tabular-nums">
+                              {formatPhone(courier.phone)}
+                            </span>
+                          </TableCell>
+                          <TableCell>{courier.vehicleType ? vehicleTypeLabel(courier.vehicleType) : "—"}</TableCell>
+                          <TableCell className="text-right tabular-nums">{courier.openTasks}</TableCell>
+                          <TableCell className="text-right tabular-nums">{courier.openParcels}</TableCell>
+                          <TableCell className="text-right tabular-nums">{courier.completedToday}</TableCell>
+                          <TableCell className="text-right">
+                            {parcelsButton(courier.courierId, courier.fullName)}
+                          </TableCell>
+                        </TableRow>
+                        {open.has(courier.courierId) ? (
+                          <TableRow>
+                            <TableCell colSpan={6} id={`courier-parcels-${courier.courierId}`} className="bg-grey-50">
+                              <CourierParcels courierId={courier.courierId} courierName={courier.fullName} />
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </React.Fragment>
                     ))
                   )}
                 </TableBody>
