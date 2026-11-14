@@ -25,7 +25,7 @@ import { BranchSelect } from "./branch-select";
 import { CourierParcels } from "./courier-parcels";
 
 /** Active couriers at a branch and how much work each has, least busy first; each opens to show its parcels. */
-export function CourierWorkloadView() {
+export function CourierWorkloadView({ taskLinks = true }: { taskLinks?: boolean } = {}) {
   const [branch, setBranch] = useDispatchBranch();
   const [open, setOpen] = React.useState<ReadonlySet<string>>(new Set());
   const toggle = (courierId: string) =>
@@ -99,7 +99,11 @@ export function CourierWorkloadView() {
                   <div className="mt-2 w-fit">{parcelsButton(courier.courierId, courier.fullName)}</div>
                   {open.has(courier.courierId) ? (
                     <div id={`courier-parcels-${courier.courierId}`} className="mt-2">
-                      <CourierParcels courierId={courier.courierId} courierName={courier.fullName} />
+                      <CourierParcels
+                        courierId={courier.courierId}
+                        courierName={courier.fullName}
+                        taskLinks={taskLinks}
+                      />
                     </div>
                   ) : null}
                 </li>
@@ -150,7 +154,11 @@ export function CourierWorkloadView() {
                         {open.has(courier.courierId) ? (
                           <TableRow>
                             <TableCell colSpan={6} id={`courier-parcels-${courier.courierId}`} className="bg-grey-50">
-                              <CourierParcels courierId={courier.courierId} courierName={courier.fullName} />
+                              <CourierParcels
+                                courierId={courier.courierId}
+                                courierName={courier.fullName}
+                                taskLinks={taskLinks}
+                              />
                             </TableCell>
                           </TableRow>
                         ) : null}
