@@ -25,6 +25,31 @@ const EXAMPLE_PAYLOAD = `{
   }
 }`;
 
+const ROUTING_EXAMPLE = `app.post("/webhooks/swiftdrop", express.raw({ type: "application/json" }), (req, res) => {
+  if (!isFromSwiftDrop(req.body, req.headers, process.env.SWIFTDROP_WEBHOOK_SECRET)) {
+    return res.sendStatus(401);
+  }
+  const event = JSON.parse(req.body);
+  if (alreadyProcessed(event.id)) return res.sendStatus(200); // the same event can arrive twice
+
+  switch (event.type) {
+    case "parcel.picked_up":
+    case "parcel.out_for_delivery":
+      markShipping(event.data.merchantOrderRef, event.data);
+      break;
+    case "parcel.delivered":
+      markDelivered(event.data.merchantOrderRef);
+      break;
+    case "parcel.failed":
+      flagDeliveryProblem(event.data.merchantOrderRef, event.data.failureReason);
+      break;
+    case "webhook.ping":
+    default:
+      break; // nothing to do
+  }
+  res.sendStatus(200); // answer quickly; do slow work afterwards
+});`;
+
 const HEADERS: { name: string; value: string }[] = [
   { name: "X-SwiftDrop-Event-Id", value: "Same as id in the body. The same on every attempt and retry." },
   { name: "X-SwiftDrop-Event-Type", value: "Same as type, e.g. parcel.delivered or webhook.ping." },
@@ -135,6 +160,21 @@ export function SetupGuide() {
             ))}
           </TableBody>
         </Table>
+      </Card>
+
+      <Card aria-labelledby="guide-route-heading">
+        <CardHeader
+          title="Handle every event in one endpoint"
+          titleId="guide-route-heading"
+          description="One webhook can carry all the events you chose. Check the signature first, then branch on type."
+        />
+        <CardContent className="flex flex-col gap-4">
+          <CodeBlock code={ROUTING_EXAMPLE} label="Node.js example" />
+          <p className="text-body-sm text-grey-600">
+            Answer a <code className="font-mono">webhook.ping</code> with 200 and nothing else: it only checks that
+            your endpoint is reachable. Answer unknown types with 200 too, so a new event type never causes retries.
+          </p>
+        </CardContent>
       </Card>
 
       <Card aria-labelledby="guide-verify-heading">

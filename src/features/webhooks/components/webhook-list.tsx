@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, Plus, RotateCw, ShieldCheck, Timer, Webhook as WebhookIcon } from "lucide-react";
+import { Copy, Network, Plus, RotateCw, ShieldCheck, Timer, Webhook as WebhookIcon } from "lucide-react";
 import * as React from "react";
 import { ListPage } from "@/components/layout/list-page";
 import { Button } from "@/components/ui/button";
@@ -107,7 +107,7 @@ export function WebhookList() {
             webhooks.status === "ready" ? (
               <span className="tabular-nums">
                 {activeCount} of {MAX_ACTIVE_WEBHOOKS} active
-                {atLimit ? " · turn one off before adding another" : null}
+                {atLimit ? " · add events to an existing webhook, or turn one off" : null}
               </span>
             ) : undefined
           }
@@ -315,9 +315,14 @@ function EmptyHint({ approved, onAdd }: { approved: boolean; onAdd: () => void }
   );
 }
 
-/** Three facts every integrator needs before writing their endpoint. */
+/** Four facts every integrator needs before writing their endpoint. */
 function HowItWorks() {
   const facts = [
+    {
+      icon: Network,
+      title: "One webhook per destination",
+      text: "Choose every event that server needs. Add another webhook only for a different system, like billing.",
+    },
     {
       icon: ShieldCheck,
       title: "Every request is signed",
@@ -339,7 +344,7 @@ function HowItWorks() {
     <Card aria-labelledby="webhooks-how-heading">
       <CardHeader title="How webhooks work" titleId="webhooks-how-heading" />
       <CardContent>
-        <ul className="grid gap-6 md:grid-cols-3">
+        <ul className="grid gap-6 md:grid-cols-2">
           {facts.map(({ icon: Icon, title, text }) => (
             <li key={title} className="flex gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-grey-200 bg-grey-50 text-grey-700">
