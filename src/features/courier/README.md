@@ -29,6 +29,17 @@ frontend never works it out. `scheduledFor` is information only: a task for a la
 
 Tests: `tests/courier-data-layer.test.mts`.
 
+## Screens (F2A, read only)
+
+| Route | Component | |
+|---|---|---|
+| `/courier` | `CourierTodayTasks` | Today's tasks in three groups (In progress, Assigned, Done today); later-day tasks show their date |
+| `/courier/tasks/[assignmentId]` | `CourierTaskView` | One task: details, its parcels, the next steps the API allows (buttons disabled until F2B) |
+| `/courier/parcels/[parcelId]` | `CourierParcelView` | One parcel: where it is, contact, your tasks for it, history |
+
+Display helpers in `lib/task-view.ts` (grouping by the API's status, progress and route words). Tests:
+`tests/courier-task-screens.test.mts`.
+
 ## Temporary: `legacy/`
 
 The Stage 0 screens (today's deliveries, parcel detail, delivered and failed forms) still use the old

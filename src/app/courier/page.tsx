@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { WelcomeHeading } from "@/components/layout/welcome-heading";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CourierToday } from "@/features/courier";
+import { CourierTodayTasks } from "@/features/courier";
 import { RequireCurrentUser } from "@/features/identity";
 
 export const metadata: Metadata = { title: "Today's tasks" };
@@ -22,7 +22,7 @@ export default function CourierTodayPage() {
           </Card>
         }
       >
-        <CourierToday />
+        <CourierTodayTasks />
       </RequireCurrentUser>
     </>
   );

@@ -1,7 +1,7 @@
 import { TextLink } from "@/components/ui/text-link";
 import { formatPhone } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Contact } from "../legacy/types";
+import type { Contact } from "../types";
 
 /** A pickup or delivery contact as a key/value list. The mobile number is a tel: link, so it can be called. */
 export function ContactDetails({
