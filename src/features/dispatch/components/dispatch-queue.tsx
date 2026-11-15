@@ -25,17 +25,12 @@ import { useLoad } from "../hooks/use-load";
 import { ASSIGNMENT_TYPE_LABEL } from "../labels";
 import type { QueueKind, QueueParcel } from "../types";
 import { BranchSelect } from "./branch-select";
-import { CreateTaskDialog } from "./create-task-dialog";
+import { AssignParcelsDialog } from "./assign-parcels-dialog";
 import { ParcelStatusBadge } from "./dispatch-badges";
-
-/** Parcels that can share one task: same next step between the same branches. */
-function legKey(parcel: QueueParcel): string {
-  return `${parcel.suggestedType}:${parcel.suggestedOrigin ?? ""}:${parcel.suggestedDestination ?? ""}`;
-}
 
 /**
  * The dispatcher's queue at one branch: new parcels to collect, or parcels at the branch waiting for a transfer or
- * delivery. Select parcels with the same next step and create one courier task for them.
+ * delivery. Select any parcels and assign them to a courier.
  */
 export function DispatchQueue() {
   const [branch, setBranch] = useDispatchBranch();
@@ -47,8 +42,7 @@ export function DispatchQueue() {
 
   const rows = React.useMemo(() => queue.data ?? [], [queue.data]);
   const chosen = rows.filter((parcel) => selected.has(parcel.parcelId));
-  const legs = new Set(chosen.map(legKey));
-  const mixed = legs.size > 1;
+  const allSelected = rows.length > 0 && chosen.length === rows.length;
 
   function changeBranch(code: string) {
     if (!code) return;
@@ -70,12 +64,8 @@ export function DispatchQueue() {
     });
   }
 
-  /** Select every parcel with the same next step as the first selected one (or the first row). */
-  function selectSameStep() {
-    const anchor = chosen[0] ?? rows[0];
-    if (!anchor) return;
-    const key = legKey(anchor);
-    setSelected(new Set(rows.filter((parcel) => legKey(parcel) === key).slice(0, 50).map((p) => p.parcelId)));
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(rows.map((parcel) => parcel.parcelId)));
   }
 
   function nextStep(parcel: QueueParcel): string {
@@ -92,18 +82,15 @@ export function DispatchQueue() {
       : `Parcels dropped at ${name(branch)} branch appear here until they're sent on or out for delivery.`;
 
   const createButton = (
-    <Button
-      onClick={() => setDialogOpen(true)}
-      disabled={chosen.length === 0 || mixed || chosen.length > 50}
-    >
-      {chosen.length > 0 ? `Create task (${chosen.length})` : "Create task"}
+    <Button onClick={() => setDialogOpen(true)} disabled={chosen.length === 0}>
+      {chosen.length > 0 ? `Assign to courier (${chosen.length})` : "Assign to courier"}
     </Button>
   );
 
   return (
     <ListPage
       title="Unassigned parcels"
-      description="Choose parcels with the same next step and give them to one courier as a task."
+      description="Select parcels and assign them to a courier."
       action={createButton}
       toolbar={
         <>
@@ -122,18 +109,6 @@ export function DispatchQueue() {
         </>
       }
     >
-      {mixed ? (
-        <InlineNotice title="These parcels need different steps">
-          One task holds parcels with the same next step between the same branches. Select only one kind, or use
-          &quot;Select same step&quot;.
-        </InlineNotice>
-      ) : null}
-      {chosen.length > 50 ? (
-        <InlineNotice tone="error" title="Too many parcels">
-          A task can hold up to 50 parcels.
-        </InlineNotice>
-      ) : null}
-
       <Card aria-labelledby="queue-heading">
         <CardHeader
           title={kind === "PICKUP" ? `Pickups in ${name(branch)}` : `At ${name(branch)} branch`}
@@ -145,8 +120,8 @@ export function DispatchQueue() {
           }
           aside={
             rows.length > 0 ? (
-              <Button variant="secondary" onClick={selectSameStep}>
-                Select same step
+              <Button variant="secondary" onClick={toggleAll}>
+                {allSelected ? "Clear selection" : "Select all"}
               </Button>
             ) : null
           }
@@ -258,12 +233,14 @@ export function DispatchQueue() {
         )}
       </Card>
 
-      <CreateTaskDialog
+      <AssignParcelsDialog
         parcels={chosen}
+        branch={branch}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        // The dialog opens the new task's page; clearing the selection here would empty the closing dialog.
-        onCreated={() => {}}
+        // The assigned parcels leave the queue when it reloads; clearing the selection now would empty the closing
+        // dialog.
+        onAssigned={queue.reload}
       />
     </ListPage>
   );

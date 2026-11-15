@@ -2,6 +2,11 @@ import { apiFetch, backendOrigin } from "@/lib/api";
 import type { PageResponse } from "@/types";
 import type {
   AdminResetPasswordRequest,
+  AdminUser,
+  AdminUserDetail,
+  UpdateUserRequest,
+  UserListParams,
+  UserStats,
   ChangePasswordRequest,
   CompleteProfileRequest,
   CourierDetail,
@@ -162,5 +167,42 @@ export const staffApi = {
 
   createDispatcher(body: CreateDispatcherRequest) {
     return apiFetch<DispatcherDetail>("/admin/dispatchers", { method: "POST", body });
+  },
+};
+
+/** Admin user management for every account (API.md "Users (admin)", role ADMIN only). */
+export const userAdminApi = {
+  listUsers(params: UserListParams = {}, signal?: AbortSignal) {
+    const query = buildQuery({
+      q: params.q?.trim() || undefined,
+      role: params.role,
+      status: params.status,
+      registeredFrom: params.registeredFrom || undefined,
+      registeredTo: params.registeredTo || undefined,
+      sort: params.sort,
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+    });
+    return apiFetch<PageResponse<AdminUser>>(`/admin/users${query}`, { signal });
+  },
+
+  stats(signal?: AbortSignal) {
+    return apiFetch<UserStats>("/admin/users/stats", { signal });
+  },
+
+  getUser(id: string, signal?: AbortSignal) {
+    return apiFetch<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}`, { signal });
+  },
+
+  updateUser(id: string, body: UpdateUserRequest) {
+    return apiFetch<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}`, { method: "PUT", body });
+  },
+
+  /** BLOCKED: an active account is blocked and logged out. ACTIVE: a blocked account gets its access back. */
+  setStatus(id: string, status: "BLOCKED" | "ACTIVE") {
+    return apiFetch<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: { status },
+    });
   },
 };

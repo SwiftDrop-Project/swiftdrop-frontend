@@ -59,7 +59,11 @@ export function backendOrigin(): string {
   return new URL(apiBase()).origin;
 }
 
-function apiUrl(path: string, query?: RequestOptions["query"]): string {
+/**
+ * The full backend URL for `path`, e.g. for a file download link that the browser opens directly (it sends the
+ * SD_TOKEN cookie itself). Use apiFetch for everything that returns JSON.
+ */
+export function apiUrl(path: string, query?: RequestOptions["query"]): string {
   const url = new URL(apiBase() + path);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined) url.searchParams.set(key, String(value));
