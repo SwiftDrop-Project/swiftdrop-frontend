@@ -143,3 +143,13 @@ export type UpdateCourierValues = z.output<typeof updateCourierSchema>;
 export type AdminResetPasswordValues = z.input<typeof adminResetPasswordSchema>;
 export type CreateDispatcherInput = z.input<typeof createDispatcherSchema>;
 export type CreateDispatcherValues = z.output<typeof createDispatcherSchema>;
+
+/** PUT /admin/users/{id}: the details an admin may edit for any account (same rules as sign-up). */
+export const updateUserSchema = z.object({
+  fullName: personName(MESSAGES.fullName),
+  phone,
+  email,
+});
+
+export type UpdateUserInput = z.input<typeof updateUserSchema>;
+export type UpdateUserValues = z.output<typeof updateUserSchema>;

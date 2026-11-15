@@ -14,7 +14,7 @@ Parcel tracking by tracking number, for customers and the public (`/track`), wit
 |---|---|---|
 | `/track` | `PublicTrackingSearch` | Tracking-number form, no login |
 | `/track/[trackingNumber]` | `PublicTrackingResult` | One parcel, updated live |
-| `/customer/track?number=` | `CustomerTracking` | The same inside the app (the overview's `TrackParcelCard` links here) |
+| `/customer/track?number=` | `CustomerTracking` | The same inside the app (the overview's `TrackParcelCard` links here), plus "Your parcels": the customer's newest parcels from `GET /tracking/mine`, updated live on their private queue `/user/queue/parcels` (logged-in WebSocket) |
 | `/dispatcher/tracking` | `LiveBoard` | Every status change as it happens, per branch; follow any parcel beside it |
 | `/admin/parcels` (menu "All Parcels"), also `/admin/dispatcher/tracking` | `AdminParcelTracking` | Every parcel's latest status with filters (tracking number, status with counts, district, last updated between two days) and paging; rows change live, select one to see its journey |
 

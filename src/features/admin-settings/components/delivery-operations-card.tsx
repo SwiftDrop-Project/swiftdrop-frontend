@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -104,7 +104,6 @@ export function DeliveryOperationsCard() {
       } catch (error: unknown) {
         if (!active) return;
 
-        // First-time setup: no saved row exists yet.
         const status =
           error && typeof error === "object" && "status" in error
             ? error.status
@@ -114,7 +113,9 @@ export function DeliveryOperationsCard() {
           setApiError(getErrorMessage(error));
         }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
@@ -126,13 +127,23 @@ export function DeliveryOperationsCard() {
   }, []);
 
   function updateField(field: keyof DeliveryForm, value: string) {
-    setSettings((previous) => ({ ...previous, [field]: value }));
-    setErrors((previous) => ({ ...previous, [field]: "" }));
+    setSettings((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+
+    setErrors((previous) => ({
+      ...previous,
+      [field]: "",
+    }));
+
     setMessage("");
     setApiError("");
   }
 
   function toggleDay(day: string) {
+    if (loading || saving) return;
+
     setSettings((previous) => ({
       ...previous,
       operatingDays: previous.operatingDays.includes(day)
@@ -143,7 +154,11 @@ export function DeliveryOperationsCard() {
           ),
     }));
 
-    setErrors((previous) => ({ ...previous, operatingDays: "" }));
+    setErrors((previous) => ({
+      ...previous,
+      operatingDays: "",
+    }));
+
     setMessage("");
     setApiError("");
   }
@@ -201,6 +216,7 @@ export function DeliveryOperationsCard() {
     }
 
     setErrors(nextErrors);
+
     return Object.keys(nextErrors).length === 0;
   }
 
@@ -326,12 +342,10 @@ export function DeliveryOperationsCard() {
                   key={day}
                   className="flex items-center gap-2 text-body-sm text-grey-800"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={settings.operatingDays.includes(day)}
-                    onChange={() => toggleDay(day)}
+                    onCheckedChange={() => toggleDay(day)}
                     disabled={loading || saving}
-                    className="accent-orange-600"
                   />
                   {day}
                 </label>

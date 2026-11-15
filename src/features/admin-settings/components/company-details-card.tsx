@@ -2,19 +2,14 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-
 import { isApiError } from "@/lib/api/client";
-import {
-  adminSettingsApi,
-  type CompanyDetails,
-} from "../api";
+import { adminSettingsApi, type CompanyDetails } from "../api";
 
 const initialDetails: CompanyDetails = {
   companyName: "",
@@ -26,11 +21,9 @@ const initialDetails: CompanyDetails = {
 
 export function CompanyDetailsCard() {
   const [details, setDetails] = useState<CompanyDetails>(initialDetails);
-
   const [errors, setErrors] = useState<
     Partial<Record<keyof CompanyDetails, string>>
   >({});
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -88,19 +81,13 @@ export function CompanyDetailsCard() {
   }
 
   function validate() {
-    const nextErrors: Partial<
-      Record<keyof CompanyDetails, string>
-    > = {};
+    const nextErrors: Partial<Record<keyof CompanyDetails, string>> = {};
 
     if (!details.companyName.trim()) {
       nextErrors.companyName = "Enter the company name.";
     }
 
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        details.supportEmail.trim()
-      )
-    ) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(details.supportEmail.trim())) {
       nextErrors.supportEmail =
         "Enter a valid email address, like support@example.com.";
     }
@@ -113,8 +100,7 @@ export function CompanyDetailsCard() {
     }
 
     if (!details.headOfficeAddress.trim()) {
-      nextErrors.headOfficeAddress =
-        "Enter the head office address.";
+      nextErrors.headOfficeAddress = "Enter the head office address.";
     }
 
     setErrors(nextErrors);

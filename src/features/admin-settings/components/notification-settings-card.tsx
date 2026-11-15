@@ -51,7 +51,7 @@ export function NotificationSettingsCard() {
 
         if (getErrorStatus(error) !== 404) {
           setErrorMessage(
-            "Failed to load notification settings.",
+            "Failed to load notification settings."
           );
         }
       } finally {
@@ -70,7 +70,7 @@ export function NotificationSettingsCard() {
 
   function updateSetting(
     field: keyof NotificationSettings,
-    value: boolean | string,
+    value: boolean | string
   ) {
     setSettings((previous) => ({
       ...previous,
@@ -82,11 +82,13 @@ export function NotificationSettingsCard() {
   }
 
   async function handleSave() {
+    if (loading || saving) return;
+
     const senderName = settings.senderName.trim();
 
     if (!senderName || senderName.length > 100) {
       setErrorMessage(
-        "Sender name must contain 1 to 100 characters.",
+        "Sender name must contain 1 to 100 characters."
       );
       setMessage("");
       return;
@@ -106,7 +108,7 @@ export function NotificationSettingsCard() {
       setMessage("Notification settings saved successfully!");
     } catch {
       setErrorMessage(
-        "Failed to save notification settings. Please try again.",
+        "Failed to save notification settings. Please try again."
       );
     } finally {
       setSaving(false);
@@ -134,7 +136,7 @@ export function NotificationSettingsCard() {
                 onCheckedChange={(checked) =>
                   updateSetting(
                     "parcelStatusEmails",
-                    checked === true,
+                    checked === true
                   )
                 }
                 aria-label="Parcel status emails"
@@ -156,7 +158,7 @@ export function NotificationSettingsCard() {
                 onCheckedChange={(checked) =>
                   updateSetting(
                     "merchantDecisionEmails",
-                    checked === true,
+                    checked === true
                   )
                 }
                 aria-label="Merchant approval and rejection emails"
@@ -204,7 +206,7 @@ export function NotificationSettingsCard() {
                 onChange={(event) =>
                   updateSetting(
                     "senderName",
-                    event.target.value,
+                    event.target.value
                   )
                 }
                 placeholder="SwiftDrop Support"
@@ -216,6 +218,7 @@ export function NotificationSettingsCard() {
             <h3 className="text-h3 text-grey-900">
               Test email
             </h3>
+
             <p className="text-body-sm text-grey-600">
               Send a test notification to the administrator email address.
             </p>

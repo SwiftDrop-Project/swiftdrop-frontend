@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { UserManagement } from "@/features/identity";
 
 export const metadata: Metadata = { title: "User Management" };
 
-export default function Page() {
-  return <ComingSoon href="/admin/users" />;
+export default function AdminUsersPage() {
+  return <UserManagement />;
 }

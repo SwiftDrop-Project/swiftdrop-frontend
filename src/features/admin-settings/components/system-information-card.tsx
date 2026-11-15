@@ -77,7 +77,7 @@ export function SystemInformationCard() {
             Loading system information...
           </p>
         ) : error ? (
-          <p className="py-4 text-body-sm text-red-600">
+          <p role="alert" className="py-4 text-body-sm text-red-600">
             Unable to load system information.
           </p>
         ) : (
