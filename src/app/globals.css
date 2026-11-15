@@ -132,6 +132,7 @@
 
   html {
     font-family: var(--font-sans);
+    scroll-padding-top: calc(var(--spacing-topbar) + 2rem);
   }
 
   body {

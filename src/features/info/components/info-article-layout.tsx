@@ -80,7 +80,7 @@ export function InfoSection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-heading`} className="flex scroll-mt-24 flex-col gap-3">
+    <section id={id} aria-labelledby={`${id}-heading`} className="flex flex-col gap-3">
       <h2 id={`${id}-heading`} className="text-h2 text-grey-900">
         {title}
       </h2>

@@ -5,6 +5,7 @@ import * as React from "react";
 import { SiteContainer } from "@/components/layout/site-container";
 import { Logo } from "@/components/ui/logo";
 import { SUPPORT_EMAIL } from "@/features/info";
+import { HomeLink } from "./home-link";
 
 function subscribeToNothing() {
   return () => {};
@@ -63,12 +64,13 @@ export function LandingFooter() {
                   Help
                 </Link>
               </li>
-              <li>
+              <li className="min-w-0">
                 <a
                   href={`mailto:${SUPPORT_EMAIL}`}
-                  className="inline-flex min-h-8 items-center rounded-sm hover:text-grey-900 hover:underline focus-visible:outline-2 focus-visible:outline-orange-600"
+                  className="inline-flex min-h-8 max-w-full flex-col items-start rounded-sm break-words hover:text-grey-900 hover:underline focus-visible:outline-2 focus-visible:outline-orange-600"
                 >
-                  Contact: {SUPPORT_EMAIL}
+                  <span>Email us</span>
+                  <span className="break-all text-grey-700">{SUPPORT_EMAIL}</span>
                 </a>
               </li>
             </ul>
@@ -92,7 +94,9 @@ export function LandingFooter() {
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-grey-200 pt-6 sm:flex-row sm:items-center text-body-sm text-grey-600">
-          <Logo className="h-6" />
+          <HomeLink>
+            <Logo className="h-6" />
+          </HomeLink>
           <span>© {year} SwiftDrop</span>
         </div>
       </SiteContainer>

@@ -4,6 +4,12 @@ import { LandingView } from "@/features/landing";
 export const metadata: Metadata = {
   title: "SwiftDrop · Courier & Parcel Delivery Across Sri Lanka",
   description: "Send and track parcels across all 25 districts in Sri Lanka with live tracking.",
+  openGraph: {
+    title: "SwiftDrop · Courier & Parcel Delivery Across Sri Lanka",
+    description: "Send and track parcels across all 25 districts in Sri Lanka with live tracking.",
+    siteName: "SwiftDrop",
+    type: "website",
+  },
 };
 
 // Logged-in users are sent to their role's home by src/proxy.ts before reaching this page.

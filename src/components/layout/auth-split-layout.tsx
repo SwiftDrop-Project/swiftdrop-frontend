@@ -13,7 +13,7 @@ export function BrandPanel({ className }: { className?: string }) {
 }
 
 const FOOTER_LINKS = [
-  { href: "/help", label: "Help centre" },
+  { href: "/help", label: "Help" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
 ];
