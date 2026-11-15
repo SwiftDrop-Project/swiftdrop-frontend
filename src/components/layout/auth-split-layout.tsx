@@ -1,6 +1,16 @@
 import Link from "next/link";
 import * as React from "react";
 import { Logo } from "@/components/ui/logo";
+import { cn } from "@/lib/utils";
+
+/** Solid orange-500 brand panel with a centred white logo (DESIGN.md §4). */
+export function BrandPanel({ className }: { className?: string }) {
+  return (
+    <div aria-hidden="true" className={cn("items-center justify-center bg-orange-500", className)}>
+      <Logo variant="white" className="h-auto w-full max-w-sm" />
+    </div>
+  );
+}
 
 const FOOTER_LINKS = [
   { href: "/help", label: "Help centre" },
@@ -54,12 +64,7 @@ export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
         </footer>
       </div>
 
-      <div
-        aria-hidden="true"
-        className="hidden bg-orange-500 px-16 lg:flex lg:w-[45%] lg:shrink-0 lg:items-center lg:justify-center"
-      >
-        <Logo variant="white" className="h-auto w-full max-w-sm" />
-      </div>
+      <BrandPanel className="hidden px-16 lg:flex lg:w-[45%] lg:shrink-0" />
     </div>
   );
 }

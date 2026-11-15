@@ -2,13 +2,17 @@
 
 import * as React from "react";
 import { TextLink } from "@/components/ui/text-link";
+import { useQueryParam } from "../hooks/use-query-param";
 import { AccountTypeSwitch, type AccountType } from "./account-type-switch";
 import { CustomerRegisterForm } from "./customer-register-form";
 import { MerchantRegisterForm } from "./merchant-register-form";
 
 /** /register. Both account types continue on /verify-email after sign-up. */
 export function RegisterView() {
-  const [accountType, setAccountType] = React.useState<AccountType>("CUSTOMER");
+  const typeParam = useQueryParam("type");
+  const [selectedType, setSelectedType] = React.useState<AccountType | null>(null);
+  const accountType: AccountType =
+    selectedType ?? (typeParam === "business" || typeParam === "merchant" ? "MERCHANT" : "CUSTOMER");
 
   return (
     <div className="flex flex-col">
@@ -18,7 +22,7 @@ export function RegisterView() {
       </p>
 
       <div className="mt-8">
-        <AccountTypeSwitch value={accountType} onChange={setAccountType} />
+        <AccountTypeSwitch value={accountType} onChange={setSelectedType} />
       </div>
 
       <div className="mt-6">{accountType === "CUSTOMER" ? <CustomerRegisterForm /> : <MerchantRegisterForm />}</div>
