@@ -81,6 +81,7 @@
   --spacing-topbar: 64px;   /* h-topbar */
 
   --container-content: 1200px; /* max-w-content: app content */
+  --container-wide: 1440px;    /* max-w-wide: public landing and info pages */
   --container-form: 440px;     /* max-w-form: auth form column (login and register) */
   --container-form-app: 640px; /* max-w-form-app: in-app forms */
 
@@ -131,6 +132,7 @@
 
   html {
     font-family: var(--font-sans);
+    scroll-padding-top: calc(var(--spacing-topbar) + 2rem);
   }
 
   body {
