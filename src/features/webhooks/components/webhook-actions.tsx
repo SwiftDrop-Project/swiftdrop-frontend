@@ -1,6 +1,7 @@
 "use client";
 
-import { MoreHorizontal, Pencil, Power, PowerOff, RefreshCw, Send } from "lucide-react";
+import Link from "next/link";
+import { History, MoreHorizontal, Pencil, Power, PowerOff, RefreshCw, Send } from "lucide-react";
 import * as React from "react";
 import {
   AlertDialog,
@@ -53,7 +54,7 @@ export async function sendTestPing(webhook: Webhook): Promise<boolean> {
     toast({
       tone: "success",
       title: "Test sent",
-      description: `A webhook.ping request should reach ${hostOf(webhook.url)} within a few seconds.`,
+      description: `A test message should reach ${hostOf(webhook.url)} within a few seconds.`,
     });
     return true;
   } catch (error) {
@@ -91,11 +92,14 @@ export function WebhookActions({
   onChange,
   onTestSent,
   existing,
+  deliveriesHref,
 }: {
   webhook: Webhook;
   onChange: (webhook: Webhook) => void;
   onTestSent?: () => void;
   existing?: readonly Webhook[];
+  /** The webhook's own page (delivery history, search, setup guide); left out on that page itself. */
+  deliveriesHref?: string;
 }) {
   const [dialog, setDialog] = React.useState<OpenDialog>(null);
   const [secret, setSecret] = React.useState<string | null>(null);
@@ -157,6 +161,17 @@ export function WebhookActions({
           </IconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {deliveriesHref ? (
+            <>
+              <DropdownMenuItem asChild>
+                <Link href={deliveriesHref}>
+                  <History aria-hidden="true" />
+                  View deliveries
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem onSelect={sendTest}>
             <Send />
             Send test

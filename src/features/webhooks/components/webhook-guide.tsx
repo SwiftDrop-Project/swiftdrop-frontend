@@ -20,7 +20,7 @@ import { MAX_ACTIVE_WEBHOOKS } from "../labels";
 const STEPS: { title: string; text: string }[] = [
   {
     title: "Prepare an endpoint on your server",
-    text: "A public https:// address that accepts a POST request with a JSON body and answers with any 2xx status within 10 seconds.",
+    text: "A public https:// address on your server that can receive our messages and confirm each one within 10 seconds. Your developer sets this up.",
   },
   {
     title: "Add one webhook",
@@ -31,16 +31,16 @@ const STEPS: { title: string; text: string }[] = [
     text: "It's shown only once. Store it in your server's settings, for example an environment variable. If you lose it, use Rotate secret to get a new one.",
   },
   {
-    title: "Check every request",
-    text: "Before trusting a request, check the X-SwiftDrop-Signature header with your secret and reject old timestamps. Ready-made code is on each webhook's Setup guide tab.",
+    title: "Check every message",
+    text: "Your server should use the secret to check that each message really comes from SwiftDrop and is recent. Ready-made code for your developer is on each webhook's Setup guide tab.",
   },
   {
     title: "Send a test",
-    text: "Use Send test from the ⋯ menu, then open the webhook: the test ping should show as Succeeded within a few seconds.",
+    text: "Use Send test from the ⋯ menu, then open the webhook: the test message should show as Succeeded within a few seconds.",
   },
   {
     title: "Handle the events",
-    text: "Branch on the type field (for example parcel.delivered), find your order with merchantOrderRef, and ignore an id you have already processed.",
+    text: "Each message says what happened (for example Delivered) and includes your order number, so your system can update the right order. It should ignore a message it has already handled.",
   },
 ];
 

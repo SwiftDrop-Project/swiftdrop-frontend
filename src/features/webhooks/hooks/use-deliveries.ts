@@ -4,7 +4,7 @@ import * as React from "react";
 import { isApiError } from "@/lib/api";
 import type { PageResponse } from "@/types";
 import { webhooksApi } from "../api";
-import type { DeliveryEventType, DeliveryStatus, WebhookDelivery } from "../types";
+import type { DeliveryFilterValues, WebhookDelivery } from "../types";
 
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
 export const DELIVERIES_PAGE_SIZE = 20;
@@ -22,14 +22,13 @@ type State =
  * One webhook's delivery history. A new filter or page shows the loading state; `reload` and polling keep the rows
  * on screen and swap them when the answer arrives. While a PENDING delivery is due within ~90 seconds (e.g. a test
  * ping just sent), it looks again every 3 seconds, only while the browser tab is visible.
+ * A filter the backend refuses (400) comes back as its field message, e.g. "The end date can't be before the start
+ * date."
  */
-export function useDeliveries(
-  webhookId: string,
-  status: DeliveryStatus | "",
-  eventType: DeliveryEventType | "",
-  page: number,
-) {
-  const key = `${webhookId}|${status}|${eventType}|${page}`;
+export function useDeliveries(webhookId: string, filters: DeliveryFilterValues, page: number) {
+  const { status, eventType, search, from, to } = filters;
+  const term = search.trim();
+  const key = JSON.stringify([webhookId, status, eventType, term, from, to, page]);
   const [tick, setTick] = React.useState(0);
   const [result, setResult] = React.useState<{ key: string; data?: PageResponse<WebhookDelivery>; error?: string } | null>(
     null,
@@ -40,16 +39,28 @@ export function useDeliveries(
     webhooksApi
       .deliveries(
         webhookId,
-        { status: status || undefined, eventType: eventType || undefined, page, size: DELIVERIES_PAGE_SIZE },
+        {
+          status: status || undefined,
+          eventType: eventType || undefined,
+          search: term || undefined,
+          from: from || undefined,
+          to: to || undefined,
+          page,
+          size: DELIVERIES_PAGE_SIZE,
+        },
         controller.signal,
       )
       .then((data) => setResult({ key, data }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        setResult({ key, error: isApiError(error) ? error.message : UNKNOWN_ERROR });
+        // a refused filter: show what's wrong with it rather than the general message
+        const message = isApiError(error)
+          ? (Object.values(error.fieldErrors)[0] ?? error.message)
+          : UNKNOWN_ERROR;
+        setResult({ key, error: message });
       });
     return () => controller.abort();
-  }, [key, webhookId, status, eventType, page, tick]);
+  }, [key, webhookId, status, eventType, term, from, to, page, tick]);
 
   const reload = React.useCallback(() => setTick((value) => value + 1), []);
 

@@ -44,12 +44,29 @@ export interface UpdateWebhookRequest {
 
 export type DeliveryStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 
+/**
+ * The delivery history's filters (API.md "Searching deliveries"); "" means not set. `search` is a tracking number,
+ * part of an order number, or a delivery, event or parcel id; `from`/`to` are days like "2026-11-15" (Sri Lankan
+ * time, both included).
+ */
+export interface DeliveryFilterValues {
+  status: DeliveryStatus | "";
+  eventType: DeliveryEventType | "";
+  search: string;
+  from: string;
+  to: string;
+}
+
 /** A delivery (API.md "Delivery (response)"). Returned by POST /merchant/webhooks/{id}/test. */
 export interface WebhookDelivery {
   id: string;
   subscriptionId: string;
   eventId: string;
   eventType: DeliveryEventType;
+  /** The parcel the event is about, e.g. "SD2611004817". Null for a test ping. */
+  trackingNumber: string | null;
+  /** The merchant's own order number. Null for a test ping or a parcel without one. */
+  merchantOrderRef: string | null;
   status: DeliveryStatus;
   attempts: number;
   lastStatusCode: number | null;

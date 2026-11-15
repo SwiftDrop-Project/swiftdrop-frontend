@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { InlineNotice } from "@/components/ui/inline-notice";
+import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toast";
 import { isApiError } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatTrackingNumber } from "@/lib/format";
 import { webhooksApi } from "../api";
 import { useDeliveries } from "../hooks/use-deliveries";
 import {
@@ -33,34 +34,69 @@ import {
   lastResult,
   timeUntil,
 } from "../labels";
-import type { DeliveryEventType, DeliveryStatus, WebhookDelivery } from "../types";
+import type { DeliveryEventType, DeliveryFilterValues, DeliveryStatus, WebhookDelivery } from "../types";
 
 const COLUMNS = 6;
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
 
+const NO_FILTERS: DeliveryFilterValues = { status: "", eventType: "", search: "", from: "", to: "" };
+/** Search after the merchant stops typing for this long (Enter searches at once). */
+const SEARCH_DELAY_MS = 400;
+/** Same limit as the backend. */
+const MAX_SEARCH_LENGTH = 64;
+
 /**
- * The delivery history of one webhook, newest first: status and event filters, pages of 20, Retry on failed
- * deliveries. `refreshSignal` changes when the parent queued something (e.g. "Send test"), so the list loads again.
+ * The delivery history of one webhook, newest first: search (tracking number, order number or an id), event,
+ * status and date filters, pages of 20, Retry on failed deliveries. Any filter change starts again at page 1.
+ * `refreshSignal` changes when the parent queued something (e.g. "Send test"), so the list loads again.
  */
 export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: string; refreshSignal: number }) {
-  const [status, setStatus] = React.useState<DeliveryStatus | "">("");
-  const [eventType, setEventType] = React.useState<DeliveryEventType | "">("");
+  const [filters, setFilters] = React.useState<DeliveryFilterValues>(NO_FILTERS);
+  /** What's typed in the search box; it becomes `filters.search` after a short pause or on Enter. */
+  const [searchText, setSearchText] = React.useState("");
   const [page, setPage] = React.useState(0);
-  const deliveries = useDeliveries(webhookId, status, eventType, page);
+  const deliveries = useDeliveries(webhookId, filters, page);
   const { reload } = deliveries;
 
   React.useEffect(() => {
     if (refreshSignal > 0) reload();
   }, [refreshSignal, reload]);
 
-  const content = deliveries.status === "ready" ? deliveries.data.content : [];
-  const filtered = status !== "" || eventType !== "";
+  // Search once typing pauses, so there's no request per key press.
+  React.useEffect(() => {
+    if (searchText.trim() === filters.search.trim()) return undefined;
+    const timer = setTimeout(() => {
+      setFilters((current) => ({ ...current, search: searchText }));
+      setPage(0);
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchText, filters.search]);
 
-  function clearFilters() {
-    setStatus("");
-    setEventType("");
+  const content = deliveries.status === "ready" ? deliveries.data.content : [];
+  const filtered =
+    filters.status !== "" ||
+    filters.eventType !== "" ||
+    filters.search.trim() !== "" ||
+    filters.from !== "" ||
+    filters.to !== "" ||
+    searchText.trim() !== "";
+
+  function update(change: Partial<DeliveryFilterValues>) {
+    setFilters((current) => ({ ...current, ...change }));
     setPage(0);
   }
+
+  function clearFilters() {
+    setFilters(NO_FILTERS);
+    setSearchText("");
+    setPage(0);
+  }
+
+  const clearButton = (
+    <Button variant="tertiary" onClick={clearFilters}>
+      Clear filters
+    </Button>
+  );
 
   return (
     <Card aria-labelledby="deliveries-heading">
@@ -74,65 +110,96 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
         }
       />
 
-      {/* Filters: side by side from tablets up, stacked on phones. A change starts again at page 1. */}
-      <div className="flex flex-col gap-3 border-b border-grey-200 px-4 py-3 sm:flex-row sm:items-center sm:px-6">
-        <div className="w-full sm:w-48">
-          <label htmlFor="deliveries-event" className="sr-only">
-            Event
-          </label>
-          <Select
-            id="deliveries-event"
-            size="md"
-            value={eventType}
-            onChange={(event) => {
-              setEventType(event.target.value as DeliveryEventType | "");
-              setPage(0);
-            }}
-          >
-            <option value="">All events</option>
-            {DELIVERY_EVENT_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {deliveryEventLabel(value)}
-              </option>
-            ))}
-          </Select>
+      {/* Filters: search on its own line, then four filters (2 per row on tablets, 4 on desktops, stacked on phones). */}
+      <div className="flex flex-col gap-3 border-b border-grey-200 px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <label htmlFor="deliveries-search" className="sr-only">
+              Search deliveries
+            </label>
+            <Input
+              id="deliveries-search"
+              type="search"
+              size="md"
+              value={searchText}
+              maxLength={MAX_SEARCH_LENGTH}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Search tracking number, order number or ID"
+              onChange={(event) => setSearchText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") update({ search: searchText });
+              }}
+            />
+          </div>
+          {filtered ? clearButton : null}
         </div>
-        <div className="w-full sm:w-44">
-          <label htmlFor="deliveries-status" className="sr-only">
-            Status
-          </label>
-          <Select
-            id="deliveries-status"
-            size="md"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as DeliveryStatus | "");
-              setPage(0);
-            }}
-          >
-            <option value="">All statuses</option>
-            {DELIVERY_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {DELIVERY_STATUS_LABEL[value]}
-              </option>
-            ))}
-          </Select>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <FilterField id="deliveries-event" label="Event">
+            <Select
+              id="deliveries-event"
+              size="md"
+              value={filters.eventType}
+              onChange={(event) => update({ eventType: event.target.value as DeliveryEventType | "" })}
+            >
+              <option value="">All events</option>
+              {DELIVERY_EVENT_TYPES.map((value) => (
+                <option key={value} value={value}>
+                  {deliveryEventLabel(value)}
+                </option>
+              ))}
+            </Select>
+          </FilterField>
+          <FilterField id="deliveries-status" label="Status">
+            <Select
+              id="deliveries-status"
+              size="md"
+              value={filters.status}
+              onChange={(event) => update({ status: event.target.value as DeliveryStatus | "" })}
+            >
+              <option value="">All statuses</option>
+              {DELIVERY_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {DELIVERY_STATUS_LABEL[value]}
+                </option>
+              ))}
+            </Select>
+          </FilterField>
+          <FilterField id="deliveries-from" label="From">
+            <Input
+              id="deliveries-from"
+              type="date"
+              size="md"
+              value={filters.from}
+              max={filters.to || undefined}
+              onChange={(event) => update({ from: event.target.value })}
+            />
+          </FilterField>
+          <FilterField id="deliveries-to" label="To">
+            <Input
+              id="deliveries-to"
+              type="date"
+              size="md"
+              value={filters.to}
+              min={filters.from || undefined}
+              onChange={(event) => update({ to: event.target.value })}
+            />
+          </FilterField>
         </div>
-        {filtered ? (
-          <Button variant="tertiary" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        ) : null}
       </div>
 
       {deliveries.status === "error" ? (
         <div className="p-4 sm:p-6">
           <InlineNotice tone="error" title="We couldn't load the deliveries">
             <p>{deliveries.error}</p>
-            <Button variant="secondary" className="mt-3" onClick={reload}>
-              <RotateCw aria-hidden="true" />
-              Try again
-            </Button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={reload}>
+                <RotateCw aria-hidden="true" />
+                Try again
+              </Button>
+              {filtered ? clearButton : null}
+            </div>
           </InlineNotice>
         </div>
       ) : (
@@ -143,9 +210,10 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
               <li className="p-4 text-body-sm text-grey-600">Loading deliveries…</li>
             ) : null}
             {deliveries.status === "ready" && content.length === 0 ? (
-              <li className="flex flex-col gap-1 p-4">
-                <span className="text-label text-grey-900">{emptyTitle(eventType, status)}</span>
+              <li className="flex flex-col items-start gap-1 p-4">
+                <span className="text-label text-grey-900">{emptyTitle(filters, filtered)}</span>
                 <span className="text-body-sm text-grey-600">{emptyText(filtered)}</span>
+                {filtered ? <div className="mt-2">{clearButton}</div> : null}
               </li>
             ) : null}
             {content.map((delivery) => (
@@ -186,8 +254,9 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
                   <TableEmpty
                     columns={COLUMNS}
                     icon={History}
-                    title={emptyTitle(eventType, status)}
+                    title={emptyTitle(filters, filtered)}
                     description={emptyText(filtered)}
+                    action={filtered ? clearButton : undefined}
                   />
                 ) : (
                   content.map((delivery) => (
@@ -242,9 +311,9 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
 
       <CardContent className="border-t border-grey-200">
         <p className="text-body-sm text-grey-600">
-          Failed requests are retried right away, then after 1 min, 5 min, 15 min, 1 h and 6 h. After{" "}
-          {MAX_ATTEMPTS} attempts, or a 4xx answer other than 408 and 429, the delivery is marked Failed and you can
-          retry it here. A test ping is retried the same way.
+          If your server doesn&apos;t receive a message, we try again right away, then after 1 min, 5 min, 15 min,
+          1 h and 6 h. After {MAX_ATTEMPTS} tries, or if your server clearly refuses the message, it&apos;s marked
+          Failed and you can send it again here. A test message is retried the same way.
         </p>
       </CardContent>
     </Card>
@@ -257,11 +326,33 @@ function DeliveryStatusBadge({ status }: { status: DeliveryStatus }) {
   return <Badge tone={DELIVERY_STATUS_TONE[status]}>{DELIVERY_STATUS_LABEL[status]}</Badge>;
 }
 
-/** "Delivered" and the event id, which the merchant can search for in their own logs. */
+/** A filter with a small visible label above it, so date fields say which end they are. */
+function FilterField({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-caption text-grey-600">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * "Delivered", the parcel (tracking number and the merchant's order number) and the event id, which the merchant
+ * can match in their own logs. A test ping has no parcel.
+ */
 function EventCell({ delivery }: { delivery: WebhookDelivery }) {
+  const parcel = [
+    delivery.trackingNumber ? formatTrackingNumber(delivery.trackingNumber) : null,
+    delivery.merchantOrderRef,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div className="flex min-w-0 flex-col">
       <span className="text-label text-grey-900">{deliveryEventLabel(delivery.eventType)}</span>
+      {parcel ? <span className="text-body-sm text-grey-900 tabular-nums">{parcel}</span> : null}
       <span className="truncate font-mono text-caption text-grey-600" title={delivery.eventId}>
         {delivery.eventId}
       </span>
@@ -307,15 +398,20 @@ function nextAttemptText(delivery: WebhookDelivery): string | null {
 
 function emptyText(filtered: boolean): string {
   return filtered
-    ? "Choose another event or status, or clear the filters."
+    ? "Try another search, event, status or dates, or clear the filters."
     : "Send a test to check your endpoint. Parcel events appear here as your orders move.";
 }
 
-/** "No 'Delivered' deliveries that failed", "No failed deliveries", "No 'Test ping' deliveries", "No deliveries yet". */
-function emptyTitle(eventType: DeliveryEventType | "", status: DeliveryStatus | ""): string {
-  if (eventType === "" && status === "") return "No deliveries yet";
-  const statusWord = status === "" ? "" : DELIVERY_STATUS_LABEL[status].toLowerCase();
-  if (eventType === "") return `No ${statusWord} deliveries`;
-  const event = `'${deliveryEventLabel(eventType)}'`;
-  return status === "" ? `No ${event} deliveries` : `No ${statusWord} ${event} deliveries`;
+/**
+ * Names the filters when only event and status are set ("No failed 'Delivered' deliveries"); with a search or dates
+ * it says so plainly ("No deliveries match these filters").
+ */
+function emptyTitle(filters: DeliveryFilterValues, filtered: boolean): string {
+  if (!filtered) return "No deliveries yet";
+  const { eventType, status } = filters;
+  const onlyEventOrStatus = filters.search.trim() === "" && filters.from === "" && filters.to === "";
+  if (!onlyEventOrStatus) return "No deliveries match these filters";
+  const statusWord = status === "" ? "" : `${DELIVERY_STATUS_LABEL[status].toLowerCase()} `;
+  if (eventType === "") return `No ${statusWord}deliveries`;
+  return `No ${statusWord}'${deliveryEventLabel(eventType)}' deliveries`;
 }

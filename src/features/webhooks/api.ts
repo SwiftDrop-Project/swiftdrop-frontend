@@ -37,21 +37,35 @@ export const webhooksApi = {
   sendTest: (id: string) => apiFetch<WebhookDelivery>(path(id, "/test"), { method: "POST" }),
 
   /**
-   * One webhook's delivery history, newest first. `status` and `eventType` (a wire name, including `webhook.ping`)
-   * are optional filters: left out means all. size 1-100.
+   * One webhook's delivery history, newest first. Every filter is optional (left out means all): `status`,
+   * `eventType` (a wire name, including `webhook.ping`), `search`, `from` and `to`. size 1-100.
    */
   deliveries: (
     id: string,
     {
       status,
       eventType,
+      search,
+      from,
+      to,
       page,
       size,
-    }: { status?: DeliveryStatus; eventType?: DeliveryEventType; page: number; size: number },
+    }: {
+      status?: DeliveryStatus;
+      eventType?: DeliveryEventType;
+      /** Tracking number, part of an order number, or a delivery/event/parcel id. */
+      search?: string;
+      /** First day, "2026-11-01" (Sri Lankan time, included). */
+      from?: string;
+      /** Last day, "2026-11-15" (Sri Lankan time, included). */
+      to?: string;
+      page: number;
+      size: number;
+    },
     signal?: AbortSignal,
   ) =>
     apiFetch<PageResponse<WebhookDelivery>>(path(id, "/deliveries"), {
-      query: { status, eventType, page, size },
+      query: { status, eventType, search, from, to, page, size },
       signal,
     }),
 

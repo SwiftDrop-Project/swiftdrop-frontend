@@ -144,7 +144,12 @@ export function WebhookList() {
                 <li key={webhook.id} className="flex flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <EndpointCell url={webhook.url} href={webhookHref(webhook.id)} />
-                    <WebhookActions webhook={webhook} onChange={webhooks.upsert} existing={list} />
+                    <WebhookActions
+                      webhook={webhook}
+                      onChange={webhooks.upsert}
+                      existing={list}
+                      deliveriesHref={webhookHref(webhook.id)}
+                    />
                   </div>
                   <EventChips eventTypes={webhook.eventTypes} />
                   <div className="flex items-center justify-between gap-3">
@@ -196,7 +201,12 @@ export function WebhookList() {
                         </TableCell>
                         <TableCell className="whitespace-nowrap tabular-nums">{formatDate(webhook.createdAt)}</TableCell>
                         <TableCell className="w-12 text-right">
-                          <WebhookActions webhook={webhook} onChange={webhooks.upsert} existing={list} />
+                          <WebhookActions
+                      webhook={webhook}
+                      onChange={webhooks.upsert}
+                      existing={list}
+                      deliveriesHref={webhookHref(webhook.id)}
+                    />
                         </TableCell>
                       </TableRow>
                     ))
@@ -329,18 +339,18 @@ function HowItWorks() {
     },
     {
       icon: ShieldCheck,
-      title: "Every request is signed",
-      text: "Check the X-SwiftDrop-Signature header with your secret before you trust a request.",
+      title: "Every message is signed",
+      text: "Your server uses your secret to check that each message really comes from SwiftDrop before trusting it.",
     },
     {
       icon: Timer,
-      title: "Answer within 10 seconds",
-      text: "Any 2xx answer counts as delivered. Do slow work after you've answered.",
+      title: "Reply within 10 seconds",
+      text: "Your server should confirm it received the message quickly, then do any slow work afterwards.",
     },
     {
       icon: RotateCw,
-      title: "Failed requests are retried",
-      text: "Right away, then after 1 min, 5 min, 15 min, 1 h and 6 h. The same event can arrive twice: use its id.",
+      title: "Missed messages are sent again",
+      text: "Right away, then after 1 min, 5 min, 15 min, 1 h and 6 h. A message can arrive twice, so your system should ignore repeats.",
     },
   ];
 

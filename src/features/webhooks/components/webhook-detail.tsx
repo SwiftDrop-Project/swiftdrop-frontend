@@ -101,8 +101,8 @@ export function WebhookDetail({ id: idProp }: { id?: string }) {
     >
       {!webhook.active ? (
         <InlineNotice title="This webhook is turned off">
-          It gets no new parcel events, and deliveries still waiting aren&apos;t sent. A test ping is still sent, so
-          you can check the address before you turn it on again.
+          It gets no new parcel events, and deliveries still waiting aren&apos;t sent. A test message is still sent,
+          so you can check the address before you turn it on again.
         </InlineNotice>
       ) : null}
       <Tabs defaultValue="deliveries">

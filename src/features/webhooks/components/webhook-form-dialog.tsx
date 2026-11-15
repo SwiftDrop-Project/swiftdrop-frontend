@@ -174,7 +174,7 @@ export function WebhookFormDialog({
             <FormField
               id="webhook-url"
               label="Endpoint URL"
-              helper="A public https:// address on your server. Requests time out after 10 seconds."
+              helper="A public https:// address on your server. Your server must reply within 10 seconds."
               error={errors.url?.message}
             >
               {(a11y) => (
