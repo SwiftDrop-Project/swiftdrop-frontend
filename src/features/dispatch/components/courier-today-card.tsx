@@ -23,6 +23,7 @@ import {
 import { useDistrictName } from "../hooks/use-dispatch-branch";
 import { useLoad } from "../hooks/use-load";
 import { failureReasonLabel } from "../labels";
+import { normalizeReceivedBy } from "../courier-validation";
 import type { DispatchParcelStatus } from "../types";
 import { ParcelStatusBadge } from "./dispatch-badges";
 
@@ -109,12 +110,14 @@ export function CourierTodayCard() {
 function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChanged: () => void }) {
   const { name } = useDistrictName();
   const [pending, setPending] = React.useState(false);
-  const [form, setForm] = React.useState<"DELIVERED" | "FAILED" | null>(null);
+  const [form, setForm] = React.useState<"AT_BRANCH" | "DELIVERED" | "FAILED" | null>(null);
   const [recipientName, setRecipientName] = React.useState("");
+  const [receivedBy, setReceivedBy] = React.useState("");
   const [reason, setReason] = React.useState<CourierFailureReason>("RECIPIENT_UNAVAILABLE");
   const [note, setNote] = React.useState("");
 
   const goingTo = parcel.stop === "PICKUP" ? parcel.pickup : parcel.recipient;
+  const place = parcel.stop === "PICKUP" ? parcel.from : parcel.to;
   const finished = parcel.nextStatuses.length === 0;
   const branchName = parcel.task.branch ? name(parcel.task.branch) : "the branch";
 
@@ -167,13 +170,26 @@ function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChan
           </div>
         ) : (
           <div className="flex flex-col">
-            <span className="text-grey-900">
-              {parcel.stop === "PICKUP" ? "Collect from " : "Deliver to "}
-              {goingTo.name} · {formatPhone(goingTo.phone)}
-            </span>
-            <span>
-              {goingTo.address}, {goingTo.city}
-            </span>
+            {goingTo ? (
+              <>
+                <span className="text-grey-900">
+                  {parcel.stop === "PICKUP" ? "Collect from " : "Deliver to "}
+                  {goingTo.name} · {formatPhone(goingTo.phone)}
+                </span>
+                <span>
+                  {goingTo.address}, {goingTo.city}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-grey-900">
+                  {parcel.stop === "PICKUP" ? "Pickup" : "Delivery"} contact details unavailable for this step
+                </span>
+                <span>
+                  {place.city}, {name(place.district)}
+                </span>
+              </>
+            )}
             <span className="text-grey-600">
               Assigned {formatTime(parcel.assignedAt)}
               {parcel.codAmount !== null ? ` · Collect ${formatRs(parcel.codAmount)}` : ""}
@@ -192,7 +208,11 @@ function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChan
               key={status}
               variant={status === "FAILED" ? "secondary" : "primary"}
               disabled={pending}
-              onClick={() => (status === "DELIVERED" || status === "FAILED" ? setForm(status) : void send({ status }))}
+              onClick={() =>
+                status === "AT_BRANCH" || status === "DELIVERED" || status === "FAILED"
+                  ? setForm(status)
+                  : void send({ status })
+              }
             >
               {stepLabel(status)}
             </Button>
@@ -203,7 +223,17 @@ function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChan
           className="flex flex-col gap-3 rounded-md border border-grey-200 p-3 sm:flex-row sm:items-end"
           onSubmit={(event) => {
             event.preventDefault();
-            if (form === "DELIVERED") {
+            if (form === "AT_BRANCH") {
+              const normalized = normalizeReceivedBy(receivedBy);
+              if (!normalized) {
+                toast({
+                  tone: "error",
+                  title: "Enter the name of the person at the branch who received the parcel.",
+                });
+                return;
+              }
+              void send({ status: "AT_BRANCH", receivedBy: normalized });
+            } else if (form === "DELIVERED") {
               if (recipientName.trim().length < 2) {
                 toast({
                   tone: "error",
@@ -228,7 +258,20 @@ function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChan
             }
           }}
         >
-          {form === "DELIVERED" ? (
+          {form === "AT_BRANCH" ? (
+            <div className="flex flex-1 flex-col gap-1">
+              <label htmlFor={`${idBase}-received-by`} className="text-label text-grey-900">
+                Received by
+              </label>
+              <Input
+                id={`${idBase}-received-by`}
+                size="md"
+                maxLength={100}
+                value={receivedBy}
+                onChange={(event) => setReceivedBy(event.target.value)}
+              />
+            </div>
+          ) : form === "DELIVERED" ? (
             <div className="flex flex-1 flex-col gap-1">
               <label htmlFor={`${idBase}-recipient`} className="text-label text-grey-900">
                 Received by
@@ -276,7 +319,13 @@ function CourierParcelRow({ parcel, onChanged }: { parcel: CourierParcel; onChan
           )}
           <div className="flex gap-2">
             <Button type="submit" disabled={pending}>
-              {form === "DELIVERED" ? "Confirm delivery" : "Confirm failure"}
+              {form === "AT_BRANCH"
+                ? parcel.task.type === "DELIVERY"
+                  ? "Confirm return"
+                  : "Confirm handover"
+                : form === "DELIVERED"
+                  ? "Confirm delivery"
+                  : "Confirm failure"}
             </Button>
             <Button type="button" variant="tertiary" disabled={pending} onClick={() => setForm(null)}>
               Cancel
