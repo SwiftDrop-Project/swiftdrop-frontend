@@ -15,6 +15,11 @@ export interface CourierContact {
   district: DistrictCode;
 }
 
+export interface CourierPlace {
+  city: string;
+  district: DistrictCode;
+}
+
 export interface CourierTaskStep {
   assignmentId: string;
   type: AssignmentType;
@@ -28,8 +33,10 @@ export interface CourierParcel {
   trackingNumber: string;
   status: DispatchParcelStatus;
   stop: "PICKUP" | "DELIVERY";
-  pickup: CourierContact;
-  recipient: CourierContact;
+  pickup?: CourierContact | null;
+  recipient?: CourierContact | null;
+  from: CourierPlace;
+  to: CourierPlace;
   weightKg: number;
   codAmount: number | null;
   instructions: string | null;
@@ -57,12 +64,14 @@ export const COURIER_FAILURE_REASONS = [
 
 export type CourierFailureReason = (typeof COURIER_FAILURE_REASONS)[number];
 
-export interface CourierStatusChange {
-  status: DispatchParcelStatus;
-  note?: string;
-  recipientName?: string;
-  failureReason?: CourierFailureReason;
-}
+export type CourierStatusChange =
+  | { status: "AT_BRANCH"; receivedBy: string; note?: string }
+  | { status: "DELIVERED"; recipientName: string; note?: string }
+  | { status: "FAILED"; failureReason: CourierFailureReason; note?: string }
+  | {
+      status: Exclude<DispatchParcelStatus, "AT_BRANCH" | "DELIVERED" | "FAILED">;
+      note?: string;
+    };
 
 export const courierApi = {
   today(signal?: AbortSignal) {
