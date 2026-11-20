@@ -24,7 +24,8 @@ export function WeightTiersCard({ tariff }: { tariff: AdminTariff | null }) {
               "en-LK",
             )}), rounded up.`
           ) : (
-            <Skeleton className="mt-1 h-4 w-72 max-w-full" />
+            // A span, not Skeleton (a div): the description is rendered inside a <p>.
+            <span aria-hidden="true" className="mt-1 block h-4 w-72 max-w-full animate-pulse rounded-md bg-grey-100" />
           )
         }
       />
