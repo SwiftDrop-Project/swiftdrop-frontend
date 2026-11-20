@@ -13,7 +13,14 @@ import type { AssistantChat } from "../hooks/use-assistant-chat";
 import { AssistantCardView } from "./assistant-cards";
 
 const SUGGESTIONS = ["Where is my parcel?", "How much to send 2 kg to Kandy?", "Which districts do you deliver to?"];
-const ADMIN_SUGGESTIONS = ["Today's report", "This week's report", "This month's report"];
+const ADMIN_SUGGESTIONS = [
+  "Today's report",
+  "This week's report",
+  "This month's report",
+  "How many parcels are out for delivery?",
+  "Success rate this month",
+  "Show failed parcels",
+];
 
 /**
  * The chat inside the assistant sheet: the conversation, suggestions for a first question, and the message box.
@@ -53,7 +60,7 @@ export function AssistantPanel({ chat, signedIn, admin }: { chat: AssistantChat;
           <div className="space-y-3">
             <p className="text-body-sm text-grey-700">
               {admin
-                ? "Hi! I can make a daily, weekly or monthly service report, and you can download it as a CSV file."
+                ? "Hi! Ask me for a daily, weekly or monthly report (with a CSV download), figures such as deliveries or the success rate, parcels in each status, accounts, or parcels by status, district or branch."
                 : "Hi! I can tell you where a parcel is, estimate a delivery fee, or list the districts we deliver to."}
             </p>
             <div className="flex flex-wrap gap-2">

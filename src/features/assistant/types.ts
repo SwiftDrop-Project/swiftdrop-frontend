@@ -95,9 +95,19 @@ export interface AssistantReport {
   };
 }
 
+/** A short list of figures in an admin answer: "Couriers" / "3". */
+export interface AssistantFacts {
+  title: string;
+  /** The period, e.g. "16 Nov 2026 to 22 Nov 2026", or null for figures of right now. */
+  subtitle: string | null;
+  facts: { label: string; value: string }[];
+}
+
 export type AssistantCard =
   | { type: "TRACKING"; data: AssistantParcel }
-  | { type: "PARCEL_LIST"; data: { parcels: AssistantParcel[] } }
+  /** `total` and `filters` come with an admin's search (more may match than the 10 shown). */
+  | { type: "PARCEL_LIST"; data: { parcels: AssistantParcel[]; total?: number; filters?: string } }
+  | { type: "FACTS"; data: AssistantFacts }
   | { type: "PRICE"; data: AssistantPrice }
   | { type: "REPORT"; data: AssistantReport };
 

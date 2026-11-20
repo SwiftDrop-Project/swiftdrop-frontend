@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TextLink } from "@/components/ui/text-link";
 import { formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
-import type { AssistantCard, AssistantParcel, AssistantPrice } from "../types";
+import type { AssistantCard, AssistantFacts, AssistantParcel, AssistantPrice } from "../types";
 import { ReportCard } from "./report-card";
 
 function Route({ from, to }: { from: string | null; to: string | null }) {
@@ -62,6 +62,25 @@ function PriceCard({ price }: { price: AssistantPrice }) {
   );
 }
 
+function FactsCard({ facts }: { facts: AssistantFacts }) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-body-sm font-medium text-grey-900">{facts.title}</p>
+        {facts.subtitle ? <p className="text-caption text-grey-600">{facts.subtitle}</p> : null}
+      </div>
+      <dl className="space-y-1 border-t border-grey-100 pt-2 text-body-sm">
+        {facts.facts.map((fact) => (
+          <div key={fact.label} className="flex justify-between gap-2">
+            <dt className="text-grey-600">{fact.label}</dt>
+            <dd className="tabular-nums text-grey-900">{fact.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 /** What a tool found, shown under the assistant's answer. */
 export function AssistantCardView({ card }: { card: AssistantCard }) {
   return (
@@ -69,6 +88,15 @@ export function AssistantCardView({ card }: { card: AssistantCard }) {
       {card.type === "TRACKING" ? <ParcelSummary parcel={card.data} /> : null}
       {card.type === "PRICE" ? <PriceCard price={card.data} /> : null}
       {card.type === "REPORT" ? <ReportCard report={card.data} /> : null}
+      {card.type === "FACTS" ? <FactsCard facts={card.data} /> : null}
+      {card.type === "PARCEL_LIST" && card.data.total !== undefined ? (
+        <p className="mb-2 text-caption text-grey-600">
+          {card.data.total > card.data.parcels.length
+            ? `Newest ${card.data.parcels.length} of ${card.data.total}`
+            : `${card.data.total} found`}
+          {card.data.filters ? `: ${card.data.filters}` : null}
+        </p>
+      ) : null}
       {card.type === "PARCEL_LIST" ? (
         <ul className="divide-y divide-grey-100">
           {card.data.parcels.map((parcel) => (
