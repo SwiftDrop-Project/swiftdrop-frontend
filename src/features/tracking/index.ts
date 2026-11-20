@@ -8,3 +8,4 @@ export { LiveBoard } from "./components/live-board";
 export { PublicTrackingResult, PublicTrackingSearch } from "./components/public-tracking";
 export { TrackParcelCard } from "./components/track-parcel-card";
 export { TrackingResult } from "./components/tracking-result";
+export { TrackingSearchForm } from "./components/tracking-search-form";

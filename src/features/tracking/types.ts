@@ -51,6 +51,11 @@ export interface TrackingUpdate {
   version: number;
 }
 
+/** A private message on /user/queue/parcels: one of the logged-in customer's or merchant's own parcels changed. */
+export interface OwnParcelUpdate extends TrackingUpdate {
+  parcelId: string;
+}
+
 /** A message on /topic/live, and an item of GET /tracking/live/recent (dispatchers and admins). */
 export interface LiveEvent {
   eventId: string;
