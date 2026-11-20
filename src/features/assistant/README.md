@@ -2,7 +2,8 @@
 
 The AI delivery assistant: a chat that answers "Where is my parcel?" and "How much to send 2 kg to Kandy?" from
 SwiftDrop's own APIs (tracking and pricing). The backend gets the data and builds the answer from it; Google Gemini
-only rewrites that answer clearly (when an AI key is set). The key never reaches the browser.
+only rewrites that answer clearly (when an AI key is set). The key never reaches the browser. The same data tools
+are also an MCP server at `/api/v1/mcp` for other AI clients.
 
 |                |                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------- |
