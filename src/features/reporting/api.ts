@@ -7,6 +7,8 @@ import type {
   ParcelFilters,
   ParcelStats,
   ParcelTrackingEntry,
+  ReportRange,
+  ReportSummary,
 } from "./types";
 
 /** The query string for the parcel filters. `status` is repeated once per status, as the backend expects. */
@@ -53,4 +55,18 @@ export const reportingApi = {
   parcelExportUrl(filters: ParcelFilters) {
     return apiUrl(`/admin/parcels/export${parcelQuery(filters)}`);
   },
+
+  /** Reports & Analytics: totals, the previous period, parcels per day and parcels by status for a range of days. */
+  summary(range: ReportRange, signal?: AbortSignal) {
+    return apiFetch<ReportSummary>(`/admin/reports/summary${rangeQuery(range)}`, { signal });
+  },
+
+  /** A link that downloads the range's parcels per day as CSV. */
+  summaryExportUrl(range: ReportRange) {
+    return apiUrl(`/admin/reports/summary/export${rangeQuery(range)}`);
+  },
 };
+
+function rangeQuery(range: ReportRange): string {
+  return `?${new URLSearchParams({ from: range.from, to: range.to }).toString()}`;
+}

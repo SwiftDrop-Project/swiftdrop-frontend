@@ -5,5 +5,6 @@
 export { AdminOverviewStats } from "./components/admin-overview-stats";
 export { ParcelDirectory } from "./components/parcel-directory";
 export { ParcelDetailView } from "./components/parcel-detail-view";
+export { ReportsAnalytics } from "./components/reports-analytics";
 export { reportingApi } from "./api";
 export type * from "./types";
