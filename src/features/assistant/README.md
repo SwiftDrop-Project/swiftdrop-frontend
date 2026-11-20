@@ -1,8 +1,8 @@
 # Assistant
 
 The AI delivery assistant: a chat that answers "Where is my parcel?" and "How much to send 2 kg to Kandy?" from
-SwiftDrop's own APIs (tracking and pricing). The backend chooses the tools with Google Gemini, or with built-in rules
-when no AI key is set; the key never reaches the browser. The same tools are an MCP server at `/api/v1/mcp`.
+SwiftDrop's own APIs (tracking and pricing). The backend gets the data and builds the answer from it; Google Gemini
+only rewrites that answer clearly (when an AI key is set). The key never reaches the browser.
 
 |                |                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------- |
@@ -18,6 +18,6 @@ when no AI key is set; the key never reaches the browser. The same tools are an 
 | Public pages (`/track`, `/rates`) and the landing site | `AssistantLauncher`              | "Ask SwiftDrop" button, bottom right; public chat (`POST /assistant/chat`)          |
 | Customer and merchant areas                            | `<AssistantLauncher signedIn />` | Same, through `POST /assistant/chat/me`, so it can also list the user's own parcels |
 
-The panel shows the answer, plus cards for what the tools found: a parcel with its status, a list of the user's
+The panel shows the answer, plus cards with the data the answer came from: a parcel with its status, a list of the user's
 parcels, or a price with its parts. The conversation is kept for the browser tab (sessionStorage, newest 20 messages)
 and sent with each question; "Clear the chat" removes it. Messages are at most 500 characters, 20 per minute.
