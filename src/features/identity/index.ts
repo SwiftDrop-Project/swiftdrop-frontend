@@ -20,10 +20,12 @@ export { CourierManagement } from "./components/courier-management";
 export { CourierDetailView } from "./components/courier-detail-view";
 export { DispatcherManagement } from "./components/dispatcher-management";
 export { DispatcherDetailView } from "./components/dispatcher-detail-view";
+export { UserManagement } from "./components/user-management";
+export { UserDetailView } from "./components/user-detail-view";
 
 // The logged-in user, for the app shell and any page inside it
 export { CurrentUserProvider, useCurrentUser, useCurrentUserState } from "./components/current-user";
 export { RequireCurrentUser } from "./components/require-current-user";
 
-export { authApi, staffApi } from "./api";
+export { authApi, staffApi, userAdminApi } from "./api";
 export type * from "./types";

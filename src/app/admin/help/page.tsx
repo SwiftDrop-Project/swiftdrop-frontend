@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { RequireCurrentUser } from "@/features/identity";
+import { HelpCenterSkeleton, InAppHelpView } from "@/features/info";
 
 export const metadata: Metadata = { title: "Help and support" };
 
 export default function Page() {
-  return <ComingSoon href="/admin/help" />;
+  return (
+    <RequireCurrentUser fallback={<HelpCenterSkeleton />}>
+      <InAppHelpView />
+    </RequireCurrentUser>
+  );
 }

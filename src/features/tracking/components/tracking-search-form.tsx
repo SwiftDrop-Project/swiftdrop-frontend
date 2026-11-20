@@ -48,7 +48,7 @@ export function TrackingSearchForm({
       <FormField
         id={id}
         label="Tracking number"
-        helper="Find it in the SMS or on the parcel label."
+        helper="Find it in your booking confirmation email or on the parcel label."
         error={errors.trackingNumber?.message}
       >
         {(a11y) => (
