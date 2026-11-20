@@ -4,5 +4,7 @@
  */
 export { MerchantApprovals } from "./components/merchant-approvals";
 export { ApiKeysManager } from "./components/api-keys-manager";
-export { merchantsApi, merchantApiKeysApi } from "./api";
+export { MerchantOrdersList } from "./components/merchant-orders-list";
+export { CreateOrderForm } from "./components/create-order-form";
+export { merchantsApi, merchantApiKeysApi, merchantOrdersApi } from "./api";
 export type * from "./types";
