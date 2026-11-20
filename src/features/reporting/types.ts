@@ -164,3 +164,37 @@ export interface ParcelFilters {
   payment?: ParcelPaymentFilter;
   sort?: ParcelSort;
 }
+
+/* Reports & Analytics (API.md "Reports (admin, WP4)", GET /admin/reports/summary). */
+
+/** A range of Sri Lanka days, both included, as "2026-11-01". */
+export interface ReportRange {
+  from: string;
+  to: string;
+}
+
+/** Totals for a range of days. */
+export interface PeriodTotals {
+  from: string;
+  to: string;
+  /** Parcels booked in the range. */
+  created: number;
+  /** Parcels that reached DELIVERED in the range. */
+  delivered: number;
+  /** Parcels that reached FAILED in the range. */
+  failed: number;
+  /** delivered / (delivered + failed) × 100, one decimal; 0 when nothing finished. */
+  successRate: number;
+}
+
+/** GET /admin/reports/summary?from=&to= */
+export interface ReportSummary {
+  /** The range asked for. */
+  totals: PeriodTotals;
+  /** The same number of days just before it, to compare with. */
+  previous: PeriodTotals;
+  /** Every day of the range, oldest first, also days with nothing. */
+  perDay: DayCount[];
+  /** How many parcels are in each status right now (not limited to the range). */
+  byStatus: Record<ParcelStatus, number>;
+}

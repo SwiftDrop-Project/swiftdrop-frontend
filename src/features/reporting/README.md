@@ -18,6 +18,10 @@ Figures and reports for the admin portal: the admin overview (`/admin`) and, lat
   payment, pickup and delivery district, booking dates, sort), the parcel table and the CSV export link.
 - `ParcelDetailView` (`/admin/parcels/[id]`, `GET /admin/parcels/{id}`): sender and receiver, parcel details, proof of
   delivery, the account that booked it and the tracking history. Read only: admins don't assign couriers.
+- `ReportsAnalytics` (`/admin/reports`, `GET /admin/reports/summary?from=&to=` and `/summary/export`): a period
+  (last 7/30/90 days, this or last month, or a custom range of up to 366 Sri Lanka days), four figures compared with
+  the previous period, parcels per day as two column charts (booked; delivered and failed) with a table view, parcels
+  by status now, and a CSV download.
 
 ## Layout
 
