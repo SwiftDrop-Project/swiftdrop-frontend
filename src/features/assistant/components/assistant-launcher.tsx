@@ -8,10 +8,11 @@ import { AssistantPanel } from "./assistant-panel";
 
 /**
  * "Ask SwiftDrop": a button fixed to the bottom right that opens the assistant chat from the side.
- * Put it once in a layout. `signedIn` (customer and merchant areas) lets the assistant list the user's own parcels.
+ * Put it once in a layout. `signedIn` (customer and merchant areas) lets the assistant list the user's own parcels;
+ * `admin` (admin area) offers the service reports, which the backend gives only to admins.
  */
-export function AssistantLauncher({ signedIn = false }: { signedIn?: boolean }) {
-  const chat = useAssistantChat(signedIn);
+export function AssistantLauncher({ signedIn = false, admin = false }: { signedIn?: boolean; admin?: boolean }) {
+  const chat = useAssistantChat(signedIn || admin);
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -23,7 +24,7 @@ export function AssistantLauncher({ signedIn = false }: { signedIn?: boolean }) 
       </SheetTrigger>
       {/* Full width on phones, 28rem from sm up (the Sheet's own width is the sidebar's). */}
       <SheetContent side="right" className="w-full! max-w-full sm:w-md!">
-        <AssistantPanel chat={chat} signedIn={signedIn} />
+        <AssistantPanel chat={chat} signedIn={signedIn || admin} admin={admin} />
       </SheetContent>
     </Sheet>
   );

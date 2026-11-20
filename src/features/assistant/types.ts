@@ -36,10 +36,70 @@ export interface AssistantPrice {
   note: string;
 }
 
+export type ReportPeriod = "DAILY" | "WEEKLY" | "MONTHLY";
+
+export interface ReportChange {
+  difference: number;
+  /** Null when the period before had none. */
+  percent: number | null;
+}
+
+export interface ReportDay {
+  date: string;
+  /** "Mon 16 Nov" */
+  dateText: string;
+  booked: number;
+  delivered: number;
+  failed: number;
+}
+
+/** An admin's service report (API.md "Assistant", the REPORT card). Counts are numbers, dates yyyy-MM-dd. */
+export interface AssistantReport {
+  period: ReportPeriod;
+  title: string;
+  from: string;
+  to: string;
+  /** The last day counted: today when the period hasn't ended. */
+  countedTo: string;
+  partial: boolean;
+  rangeText: string;
+  booked: number;
+  delivered: number;
+  failed: number;
+  /** delivered / (delivered + failed) in %, null when nothing was finished. */
+  successRate: number | null;
+  previous: {
+    from: string;
+    to: string;
+    text: string;
+    booked: number;
+    delivered: number;
+    failed: number;
+    successRate: number | null;
+  };
+  changes: { booked: ReportChange; delivered: ReportChange; failed: ReportChange };
+  /** Weekly and monthly reports only. */
+  perDay?: ReportDay[];
+  busiestDay?: { date: string; dateText: string; booked: number };
+  topPickupDistricts: { district: string; count: number }[];
+  topDropOffDistricts: { district: string; count: number }[];
+  failureReasons: { reason: string; count: number }[];
+  statusNow: { status: ParcelStatus; label: string; count: number }[];
+  accountsNow: {
+    total: number;
+    customers: number;
+    merchants: number;
+    couriers: number;
+    dispatchers: number;
+    pendingMerchants: number;
+  };
+}
+
 export type AssistantCard =
   | { type: "TRACKING"; data: AssistantParcel }
   | { type: "PARCEL_LIST"; data: { parcels: AssistantParcel[] } }
-  | { type: "PRICE"; data: AssistantPrice };
+  | { type: "PRICE"; data: AssistantPrice }
+  | { type: "REPORT"; data: AssistantReport };
 
 export interface ChatMessage {
   role: ChatRole;

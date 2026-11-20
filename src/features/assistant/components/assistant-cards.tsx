@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { TextLink } from "@/components/ui/text-link";
 import { formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
 import type { AssistantCard, AssistantParcel, AssistantPrice } from "../types";
+import { ReportCard } from "./report-card";
 
 function Route({ from, to }: { from: string | null; to: string | null }) {
   if (!from && !to) return null;
@@ -67,6 +68,7 @@ export function AssistantCardView({ card }: { card: AssistantCard }) {
     <div className="rounded-md border border-grey-200 bg-white p-3">
       {card.type === "TRACKING" ? <ParcelSummary parcel={card.data} /> : null}
       {card.type === "PRICE" ? <PriceCard price={card.data} /> : null}
+      {card.type === "REPORT" ? <ReportCard report={card.data} /> : null}
       {card.type === "PARCEL_LIST" ? (
         <ul className="divide-y divide-grey-100">
           {card.data.parcels.map((parcel) => (

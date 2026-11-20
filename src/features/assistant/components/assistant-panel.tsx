@@ -13,19 +13,20 @@ import type { AssistantChat } from "../hooks/use-assistant-chat";
 import { AssistantCardView } from "./assistant-cards";
 
 const SUGGESTIONS = ["Where is my parcel?", "How much to send 2 kg to Kandy?", "Which districts do you deliver to?"];
+const ADMIN_SUGGESTIONS = ["Today's report", "This week's report", "This month's report"];
 
 /**
  * The chat inside the assistant sheet: the conversation, suggestions for a first question, and the message box.
- * `signedIn` also offers "Show my parcels" (customers and merchants). The chat state lives in the launcher, so closing
- * the sheet doesn't cancel a question.
+ * `signedIn` also offers "Show my parcels" (customers and merchants); `admin` offers the daily, weekly and monthly
+ * service reports instead. The chat state lives in the launcher, so closing the sheet doesn't cancel a question.
  */
-export function AssistantPanel({ chat, signedIn }: { chat: AssistantChat; signedIn: boolean }) {
+export function AssistantPanel({ chat, signedIn, admin }: { chat: AssistantChat; signedIn: boolean; admin: boolean }) {
   const { messages, pending, error, send, retry, clear } = chat;
   // An unanswered question (the request failed, or the page was left while waiting) can be asked again.
   const unanswered = !pending && messages.at(-1)?.role === "user";
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
-  const suggestions = signedIn ? ["Show my parcels", ...SUGGESTIONS.slice(1)] : SUGGESTIONS;
+  const suggestions = admin ? ADMIN_SUGGESTIONS : signedIn ? ["Show my parcels", ...SUGGESTIONS.slice(1)] : SUGGESTIONS;
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -42,7 +43,8 @@ export function AssistantPanel({ chat, signedIn }: { chat: AssistantChat; signed
       <div className="border-b border-grey-200 px-4 py-3 pr-14">
         <SheetTitle>Ask SwiftDrop</SheetTitle>
         <SheetDescription className="text-body-sm text-grey-600">
-          Track a parcel or check a price. Answers come from SwiftDrop&apos;s own records.
+          {admin ? "Service reports, parcels and prices." : "Track a parcel or check a price."} Answers come from
+          SwiftDrop&apos;s own records.
         </SheetDescription>
       </div>
 
@@ -50,7 +52,9 @@ export function AssistantPanel({ chat, signedIn }: { chat: AssistantChat; signed
         {messages.length === 0 ? (
           <div className="space-y-3">
             <p className="text-body-sm text-grey-700">
-              Hi! I can tell you where a parcel is, estimate a delivery fee, or list the districts we deliver to.
+              {admin
+                ? "Hi! I can make a daily, weekly or monthly service report, and you can download it as a CSV file."
+                : "Hi! I can tell you where a parcel is, estimate a delivery fee, or list the districts we deliver to."}
             </p>
             <div className="flex flex-wrap gap-2">
               {suggestions.map((suggestion) => (
@@ -119,7 +123,7 @@ export function AssistantPanel({ chat, signedIn }: { chat: AssistantChat; signed
           className="min-h-0"
           value={draft}
           maxLength={MAX_MESSAGE_LENGTH}
-          placeholder="Ask about a parcel or a price"
+          placeholder={admin ? "Ask for a report, a parcel or a price" : "Ask about a parcel or a price"}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
