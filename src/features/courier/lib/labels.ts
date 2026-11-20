@@ -74,6 +74,28 @@ export const OUTCOME_ACTION_LABEL: Record<RecordableOutcome, string> = {
   FAILED: "Mark as failed",
 };
 
+/**
+ * Button words for a step in a task of this type. A delivery's LOADED is "out for delivery" (the parcel becomes
+ * OUT_FOR_DELIVERY), so its words say that; everything else uses OUTCOME_ACTION_LABEL.
+ */
+export function outcomeActionLabel(type: AssignmentType, outcome: RecordableOutcome): string {
+  if (type === "DELIVERY" && outcome === "LOADED") return "Mark out for delivery";
+  if (type === "DELIVERY" && outcome === "NOT_LOADED") return "Couldn't take out";
+  return OUTCOME_ACTION_LABEL[outcome];
+}
+
+/** Courier work is pickups and deliveries. A TRANSFER (branch to branch) is shown read only, never as courier work. */
+export type CourierTaskType = Extract<AssignmentType, "PICKUP" | "DELIVERY">;
+
+export function isCourierTaskType(type: AssignmentType): type is CourierTaskType {
+  return type === "PICKUP" || type === "DELIVERY";
+}
+
+/** The task's name in titles: "Pickup task", "Delivery task", and "Branch transfer" for an unexpected TRANSFER. */
+export function taskTitle(type: AssignmentType): string {
+  return type === "TRANSFER" ? "Branch transfer" : `${ASSIGNMENT_TYPE_LABEL[type]} task`;
+}
+
 /** The handover button: parcels go to the destination branch, or failed deliveries back to the origin branch. */
 export const HANDOVER_ACTION_LABEL: Record<AssignmentType, string> = {
   PICKUP: "Hand over at branch",

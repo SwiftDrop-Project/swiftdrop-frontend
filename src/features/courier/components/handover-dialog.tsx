@@ -8,7 +8,7 @@ import { FieldError, FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTrackingNumber } from "@/lib/format";
-import { ITEM_OUTCOME_LABEL } from "../lib/labels";
+import { courierParcelStatus } from "../lib/parcel-status";
 import type { OutcomeFailure } from "../lib/outcome-flow";
 import { handoverCandidates, handoverText, submitHandover } from "../lib/task-actions";
 import { handoverRequest, handoverSchema, NOTE_MAX_LENGTH, type HandoverValues } from "../schemas";
@@ -156,7 +156,7 @@ function HandoverForm({
                     {item.sequence}. {formatTrackingNumber(item.trackingNumber)}
                   </span>
                   <span className="break-words text-grey-600">
-                    {ITEM_OUTCOME_LABEL[item.outcome]} · {item.from.city} → {item.to.city}
+                    {courierParcelStatus(task.type, item.outcome).label} · {item.from.city} → {item.to.city}
                   </span>
                 </label>
               </li>

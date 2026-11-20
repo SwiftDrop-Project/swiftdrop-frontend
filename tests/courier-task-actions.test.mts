@@ -334,8 +334,13 @@ test("the page enables the handover from readyForHandover and Complete only from
   assert.match(page, /const readyCount = handoverCandidates\(task\)\.length;/);
   assert.match(page, /disabled=\{readyCount === 0 \|\| busy\}/, "handover waits for ready parcels and running actions");
   assert.match(page, /disabled=\{!task\.canComplete \|\| busy\}/, "Complete task only when the API says canComplete");
-  assert.match(page, /const actions = closed \? undefined :/, "no actions on a completed or cancelled task");
-  assert.match(page, /\{closed \? null : \(\s*<>\s*<HandoverDialog/, "no handover or complete dialogs on a closed task");
+  assert.match(page, /const actions = closed \|\| !courierWork \? null :/, "no actions on a completed or cancelled task, or a transfer");
+  assert.match(
+    page,
+    /\{closed \|\| !courierWork \? null : \(\s*<>\s*<HandoverDialog/,
+    "no handover or complete dialogs on a closed task, or a transfer",
+  );
+  assert.match(page, /const courierWork = isCourierTaskType\(task\.type\);/, "only pickups and deliveries are worked");
   assert.match(page, /const busy = refreshing \|\| saving \|\| target !== null \|\| dialog !== null;/);
   assert.match(page, /function completed[\s\S]*?onReload\(\);/, "after completing, the task is loaded again to show it closed");
 

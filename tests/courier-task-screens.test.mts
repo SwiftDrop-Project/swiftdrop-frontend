@@ -54,6 +54,8 @@ function loadTsModule<T>(specifier: string, fromDir = SRC_ROOT): T {
 type TaskViewModule = typeof import("../src/features/courier/lib/task-view");
 type SummaryRowModule = typeof import("../src/features/courier/components/task-summary-row");
 type ItemRowModule = typeof import("../src/features/courier/components/task-item-row");
+type TaskCardModule = typeof import("../src/features/courier/components/task-card");
+type ParcelStatusModule = typeof import("../src/features/courier/lib/parcel-status");
 type Summary = import("../src/features/courier/types").CourierTaskSummary;
 type Item = import("../src/features/courier/types").CourierTaskItem;
 
@@ -62,6 +64,8 @@ const { renderToStaticMarkup } = nodeRequire("react-dom/server") as typeof impor
 const view = loadTsModule<TaskViewModule>("@/features/courier/lib/task-view");
 const { TaskSummaryRow } = loadTsModule<SummaryRowModule>("@/features/courier/components/task-summary-row");
 const { TaskItemRow } = loadTsModule<ItemRowModule>("@/features/courier/components/task-item-row");
+const { TaskCard } = loadTsModule<TaskCardModule>("@/features/courier/components/task-card");
+const parcelStatus = loadTsModule<ParcelStatusModule>("@/features/courier/lib/parcel-status");
 
 const districtName = (code: string) => code.charAt(0) + code.slice(1).toLowerCase();
 const TODAY = "2026-11-09";
@@ -105,6 +109,8 @@ const item = (overrides: Partial<Item> = {}): Item => ({
 });
 
 const html = (element: React.ReactElement) => renderToStaticMarkup(element);
+const badges = (markup: string) =>
+  [...markup.matchAll(/<span data-slot="badge"[^>]*>(.*?)<\/span>(?=<|$)/g)].map((match) => match[1].replace(/<[^>]+>/g, ""));
 const buttons = (markup: string) =>
   [...markup.matchAll(/<button[^>]*?(disabled="")?[^>]*>(.*?)<\/button>/g)].map((match) => ({
     text: match[2].replace(/<[^>]+>/g, ""),
@@ -128,8 +134,10 @@ test("today's tasks are grouped by the API's status, keeping the API's order", (
 });
 
 test("progress, later days and routes in words", () => {
-  assert.equal(view.progressText({ total: 3, open: 1, closed: 2, problems: 0 }), "2 of 3 parcels done");
-  assert.equal(view.progressText({ total: 1, open: 0, closed: 1, problems: 1 }), "1 of 1 parcel done · 1 problem");
+  assert.equal(view.progressText({ total: 3, open: 1, closed: 2, problems: 0 }), "2 of 3 parcels updated");
+  assert.equal(view.progressText({ total: 1, open: 0, closed: 1, problems: 1 }), "1 of 1 parcel updated · 1 problem");
+  assert.equal(view.progressPercent({ total: 3, open: 1, closed: 2, problems: 0 }), 67);
+  assert.equal(view.progressPercent({ total: 0, open: 0, closed: 0, problems: 0 }), 0);
   assert.equal(view.isLaterDay("2026-11-12", TODAY), true);
   assert.equal(view.isLaterDay(TODAY, TODAY), false);
   assert.equal(view.taskRouteText(summary(), districtName), "Collect from senders, hand over at Gampaha branch");
@@ -143,7 +151,77 @@ test("progress, later days and routes in words", () => {
   );
 });
 
-// ---- Task row (dashboard) ----
+test("courier work is pickups and deliveries: a transfer is set apart, never shown as one of them", () => {
+  const tasks = [
+    summary({ assignmentId: "a1" }),
+    summary({ assignmentId: "a2", type: "TRANSFER", originBranch: "GAMPAHA", destinationBranch: "MATARA" }),
+    summary({ assignmentId: "a3", type: "DELIVERY", originBranch: "MATARA", destinationBranch: null }),
+  ];
+  const split = view.splitCourierTasks(tasks);
+  assert.deepEqual(split.courier.map((t) => t.assignmentId), ["a1", "a3"]);
+  assert.deepEqual(split.other.map((t) => t.assignmentId), ["a2"]);
+});
+
+test("where a task starts and ends: senders to the branch, or the branch to recipients", () => {
+  assert.deepEqual(view.taskLocations(summary(), districtName), {
+    fromLabel: "Collect from",
+    from: "3 sender addresses",
+    toLabel: "Hand over at",
+    to: "Gampaha branch",
+  });
+  assert.deepEqual(
+    view.taskLocations(
+      summary({ type: "DELIVERY", originBranch: "MATARA", destinationBranch: null, counts: { total: 1, open: 1, closed: 0, problems: 0 } }),
+      districtName,
+    ),
+    { fromLabel: "Collect from", from: "Matara branch", toLabel: "Deliver to", to: "Recipient's address" },
+  );
+});
+
+// ---- Task card (dashboard) ----
+
+test("a task card links to the task and shows its type, status, day, locations, progress and note", () => {
+  const markup = html(React.createElement(TaskCard, { task: summary({ note: "Call before you go" }), today: TODAY, districtName }));
+  assert.match(markup, /href="\/courier\/tasks\/c6dd7fdd-ecf6-48b7-8eb5-253117887001"/);
+  assert.match(markup, /Pickup task/);
+  assert.match(markup, /Not started/);
+  assert.match(markup, /Today, 9 Nov 2026/);
+  assert.match(markup, /Collect from<\/dt><dd[^>]*>3 sender addresses/);
+  assert.match(markup, /Hand over at<\/dt><dd[^>]*>Gampaha branch/);
+  assert.match(markup, /0 of 3 parcels updated/);
+  assert.match(markup, /role="progressbar"[^>]*aria-valuemax="3"[^>]*aria-valuenow="0"/);
+  assert.match(markup, /Note: Call before you go/);
+  assert.match(markup, />View task</);
+  assert.match(markup, /aria-label="View task: pickup task, Collect from senders, hand over at Gampaha branch, 9 Nov 2026"/);
+  assert.doesNotMatch(markup, /Planned for/);
+});
+
+test("a task card: a later day shows its date, in progress says Continue, a completed task shows the time", () => {
+  assert.match(html(React.createElement(TaskCard, { task: summary({ scheduledFor: "2026-11-12" }), today: TODAY, districtName })), /Planned for 12 Nov 2026/);
+  const started = html(
+    React.createElement(TaskCard, {
+      task: summary({ type: "DELIVERY", status: "IN_PROGRESS", originBranch: "MATARA", destinationBranch: null }),
+      today: TODAY,
+      districtName,
+    }),
+  );
+  assert.match(started, /Delivery task/);
+  assert.match(started, /Collect from<\/dt><dd[^>]*>Matara branch/);
+  assert.match(started, /Deliver to<\/dt><dd[^>]*>3 recipient addresses/);
+  assert.match(started, />Continue task</);
+  const done = html(
+    React.createElement(TaskCard, {
+      task: summary({ status: "COMPLETED", completedAt: "2026-11-09T08:00:00Z", note: "Old note", counts: { total: 3, open: 0, closed: 3, problems: 0 } }),
+      today: TODAY,
+      districtName,
+    }),
+  );
+  assert.match(done, /Completed at 1:30 PM/);
+  assert.match(done, />View details</);
+  assert.doesNotMatch(done, /Old note/, "no dispatcher note once closed");
+});
+
+// ---- Task row (history) ----
 
 test("a task row links to the task and shows its type, status, route and progress", () => {
   const markup = html(React.createElement(TaskSummaryRow, { task: summary({ note: "Call before you go" }), today: TODAY, districtName }));
@@ -151,7 +229,7 @@ test("a task row links to the task and shows its type, status, route and progres
   assert.match(markup, /Pickup task/);
   assert.match(markup, /Not started/);
   assert.match(markup, /Collect from senders, hand over at Gampaha branch/);
-  assert.match(markup, /0 of 3 parcels done/);
+  assert.match(markup, /0 of 3 parcels updated/);
   assert.match(markup, /Note: Call before you go/);
   assert.doesNotMatch(markup, /Planned for/);
 });
@@ -161,14 +239,75 @@ test("a task planned for a later day shows its date", () => {
   assert.match(markup, /Planned for 12 Nov 2026/);
 });
 
+// ---- One courier status per parcel ----
+
+test("each parcel gets one courier status, from its outcome in THIS task (not from AT_BRANCH alone)", () => {
+  const label = (type: "PICKUP" | "DELIVERY" | "TRANSFER", outcome: Item["outcome"]) => parcelStatus.courierParcelStatus(type, outcome).label;
+  assert.equal(label("PICKUP", "PENDING"), "Pending pickup");
+  assert.equal(label("PICKUP", "COLLECTED"), "Collected");
+  assert.equal(label("PICKUP", "HANDED_OVER"), "Handed over");
+  assert.equal(label("PICKUP", "NOT_COLLECTED"), "Not collected");
+  assert.equal(label("DELIVERY", "PENDING"), "Ready for delivery");
+  assert.equal(label("DELIVERY", "LOADED"), "Out for delivery");
+  assert.equal(label("DELIVERY", "DELIVERED"), "Delivered");
+  assert.equal(label("DELIVERY", "FAILED"), "Delivery failed");
+  assert.equal(label("DELIVERY", "RETURNED"), "Returned to branch");
+  assert.equal(label("DELIVERY", "NOT_LOADED"), "Not taken out");
+  // A transfer isn't courier work: plain outcome words, never a pickup or delivery status.
+  assert.equal(label("TRANSFER", "LOADED"), "Loaded");
+  assert.equal(parcelStatus.courierParcelStatus("DELIVERY", "DELIVERED").tone, "success");
+  assert.equal(parcelStatus.courierParcelStatus("DELIVERY", "FAILED").tone, "error");
+
+  // The same AT_BRANCH parcel reads differently by context: waiting for delivery, handed over, returned.
+  const atBranch = item({ parcelStatus: "AT_BRANCH", allowedOutcomes: [], contact: null });
+  const words = (type: "PICKUP" | "DELIVERY", outcome: Item["outcome"]) =>
+    badges(html(React.createElement(TaskItemRow, { item: { ...atBranch, outcome }, taskType: type, districtName })));
+  assert.deepEqual(words("DELIVERY", "PENDING"), ["Ready for delivery"]);
+  assert.deepEqual(words("PICKUP", "HANDED_OVER"), ["Handed over"]);
+  assert.deepEqual(words("DELIVERY", "RETURNED"), ["Returned to branch"]);
+});
+
+test("the next step in words comes from what the API sent", () => {
+  const next = parcelStatus.itemNextStep;
+  assert.equal(next("PICKUP", item()), "Collect this parcel from the sender.");
+  assert.equal(next("PICKUP", item({ outcome: "COLLECTED", allowedOutcomes: [], readyForHandover: true })), "Ready to hand over at the branch.");
+  assert.equal(next("DELIVERY", item({ allowedOutcomes: ["LOADED", "NOT_LOADED"] })), "Take this parcel from the branch when you leave for delivery.");
+  assert.equal(next("DELIVERY", item({ outcome: "LOADED", allowedOutcomes: ["DELIVERED", "FAILED"] })), "Deliver to the recipient, then mark it delivered or failed.");
+  assert.equal(next("DELIVERY", item({ outcome: "FAILED", allowedOutcomes: [], readyForHandover: true })), "Return this parcel to the branch.");
+  assert.equal(next("DELIVERY", item({ outcome: "DELIVERED", allowedOutcomes: [] })), null);
+  assert.equal(next("TRANSFER", item({ allowedOutcomes: ["LOADED"] })), null);
+});
+
+test("the task page's next step: collect, hand over, deliver, return, complete; nothing for a transfer", () => {
+  const detail = (overrides: Partial<Summary> & { items?: Item[] } = {}) => ({ ...summary(), items: [item()], ...overrides });
+  assert.equal(view.taskNextStep(detail(), districtName).title, "Collect the parcels");
+  assert.equal(
+    view.taskNextStep(detail({ status: "IN_PROGRESS", items: [item({ outcome: "COLLECTED", allowedOutcomes: [], readyForHandover: true })] }), districtName).title,
+    "Hand over at Gampaha branch",
+  );
+  const delivery = { type: "DELIVERY" as const, originBranch: "MATARA" as const, destinationBranch: null };
+  assert.equal(view.taskNextStep(detail({ ...delivery, items: [item({ allowedOutcomes: ["LOADED", "NOT_LOADED"] })] }), districtName).title, "Deliver the parcels");
+  assert.equal(
+    view.taskNextStep(detail({ ...delivery, items: [item({ outcome: "FAILED", allowedOutcomes: [], readyForHandover: true })] }), districtName).title,
+    "Return to Matara branch",
+  );
+  assert.equal(view.taskNextStep(detail({ canComplete: true, items: [] }), districtName).title, "Every parcel is updated");
+  assert.equal(view.taskNextStep(detail({ status: "COMPLETED" }), districtName).title, "Task completed");
+  assert.equal(
+    view.taskNextStep(detail({ type: "TRANSFER", originBranch: "GAMPAHA", destinationBranch: "MATARA" }), districtName).title,
+    "Branch transfers aren't courier work",
+  );
+});
+
 // ---- Parcel row (task detail) ----
 
 test("a parcel row shows the steps the API allows (disabled without a handler) and links to the parcel", () => {
-  const markup = html(React.createElement(TaskItemRow, { item: item(), districtName }));
+  const markup = html(React.createElement(TaskItemRow, { item: item(), taskType: "PICKUP", districtName }));
   assert.match(markup, /href="\/courier\/parcels\/ab598d39-d554-42f5-b609-6fa90f3a5357"/);
   assert.match(markup, /1\. SD 2611 0600 01/);
-  assert.match(markup, /Waiting/);
-  assert.match(markup, /Pending pickup/);
+  assert.deepEqual(badges(markup), ["Pending pickup"], "one status per parcel");
+  assert.match(markup, /Collect from \(sender\)/);
+  assert.match(markup, /Collect this parcel from the sender\./);
   assert.match(markup, /Delgoda Spice Traders/);
   assert.match(markup, /href="tel:\+94760000101"/);
   assert.deepEqual(buttons(markup), [
@@ -182,11 +321,13 @@ test("a parcel row shows only what the API sends: no steps, handover readiness, 
   const collected = html(
     React.createElement(TaskItemRow, {
       item: item({ outcome: "COLLECTED", parcelStatus: "PICKED_UP", allowedOutcomes: [], readyForHandover: true, note: "From the front desk" }),
+      taskType: "PICKUP",
       districtName,
     }),
   );
   assert.deepEqual(buttons(collected), []);
-  assert.match(collected, /Ready to hand over/);
+  assert.deepEqual(badges(collected), ["Collected"]);
+  assert.match(collected, /Ready to hand over at the branch\./);
   assert.match(collected, /Your note: From the front desk/);
 
   const failed = html(
@@ -199,15 +340,35 @@ test("a parcel row shows only what the API sends: no steps, handover readiness, 
         codAmount: 2500,
         failureReason: "RECIPIENT_UNAVAILABLE",
       }),
+      taskType: "DELIVERY",
       districtName,
     }),
   );
   assert.match(failed, /Collect Rs\.\s?2,500(\.00)? in cash/);
   assert.match(failed, /Recipient not available/);
+  assert.deepEqual(badges(failed), ["Delivery failed"]);
+  assert.match(failed, /Return this parcel to the branch\./);
+  assert.match(failed, /Deliver to \(recipient\)/);
 
-  const transfer = html(React.createElement(TaskItemRow, { item: item({ contact: null, allowedOutcomes: ["LOADED", "NOT_LOADED"] }), districtName }));
+  const waiting = html(
+    React.createElement(TaskItemRow, { item: item({ parcelStatus: "AT_BRANCH", allowedOutcomes: ["LOADED", "NOT_LOADED"] }), taskType: "DELIVERY", districtName }),
+  );
+  assert.deepEqual(badges(waiting), ["Ready for delivery"]);
+  assert.deepEqual(buttons(waiting).map((b) => b.text), ["Mark out for delivery", "Couldn&#x27;t take out"]);
+
+  // A transfer the API sent anyway: no buttons, no pickup or delivery words, no contact.
+  const transfer = html(
+    React.createElement(TaskItemRow, {
+      item: item({ contact: null, allowedOutcomes: ["LOADED", "NOT_LOADED"] }),
+      taskType: "TRANSFER",
+      districtName,
+      readOnly: true,
+    }),
+  );
   assert.doesNotMatch(transfer, /Delgoda Spice Traders/);
-  assert.deepEqual(buttons(transfer).map((b) => b.text), ["Mark as loaded", "Couldn&#x27;t load"]);
+  assert.deepEqual(buttons(transfer), []);
+  assert.deepEqual(badges(transfer), ["Waiting"]);
+  assert.match(transfer, /Delgoda, Gampaha → Deniyaya, Matara/);
 });
 
 // ---- Route pages ----

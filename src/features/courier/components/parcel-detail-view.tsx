@@ -11,11 +11,11 @@ import { formatTrackingNumber } from "@/lib/format";
 import { courierApi } from "../api";
 import { useCourierLoad } from "../hooks/use-courier-load";
 import { useDistrictName } from "../hooks/use-district-name";
-import { ASSIGNMENT_TYPE_LABEL, courierRoutes, failureReasonLabel } from "../lib/labels";
+import { courierRoutes, failureReasonLabel, taskTitle } from "../lib/labels";
 import type { CourierParcelDetail } from "../types";
 import { ContactDetails } from "./contact-details";
 import { CourierLoadError } from "./courier-load-error";
-import { OutcomeBadge } from "./task-badges";
+import { ParcelStatusBadge } from "./task-badges";
 
 /** /courier/parcels/[parcelId]: a parcel from one of the courier's tasks, with its history and their own items. */
 export function CourierParcelView({ parcelId: idProp }: { parcelId?: string }) {
@@ -96,7 +96,11 @@ function ParcelReady({ parcel }: { parcel: CourierParcelDetail }) {
     >
       <div className="flex flex-col gap-6">
         <Card aria-labelledby="parcel-where-heading">
-          <CardHeader title="Where it is" titleId="parcel-where-heading" />
+          <CardHeader
+            title="Where it is"
+            titleId="parcel-where-heading"
+            description="The parcel's journey status, wherever it is now"
+          />
           <CardContent>
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-body-sm">
               <dt className="text-grey-600">Status</dt>
@@ -126,7 +130,11 @@ function ParcelReady({ parcel }: { parcel: CourierParcelDetail }) {
         ) : null}
 
         <Card aria-labelledby="parcel-tasks-heading">
-          <CardHeader title="Your tasks for this parcel" titleId="parcel-tasks-heading" description="Newest first" />
+          <CardHeader
+            title="Your tasks for this parcel"
+            titleId="parcel-tasks-heading"
+            description="Newest first, with the parcel's status in each task"
+          />
           <ul className="divide-y divide-grey-100">
             {parcel.myItems.map((item) => (
               <li
@@ -137,9 +145,9 @@ function ParcelReady({ parcel }: { parcel: CourierParcelDetail }) {
                   href={courierRoutes.task(item.assignmentId)}
                   className="text-label font-semibold text-grey-900 underline-offset-4 hover:underline"
                 >
-                  {ASSIGNMENT_TYPE_LABEL[item.type]} task
+                  {taskTitle(item.type)}
                 </Link>
-                <OutcomeBadge outcome={item.outcome} />
+                <ParcelStatusBadge type={item.type} outcome={item.outcome} />
               </li>
             ))}
           </ul>

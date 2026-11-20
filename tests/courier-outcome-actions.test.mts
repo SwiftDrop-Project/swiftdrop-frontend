@@ -160,6 +160,15 @@ test("the dialog names the parcel and who the courier meets", () => {
     /delivery to Kamala Silva/,
   );
   assert.equal(flow.outcomeDialogText("FAILED", item(), "DELIVERY").submit, "Mark as failed");
+
+  // A delivery's LOADED is "out for delivery", and NOT_LOADED "couldn't take out".
+  const out = flow.outcomeDialogText("LOADED", item(), "DELIVERY");
+  assert.equal(out.title, "Out for delivery: SD 2611 0600 01?");
+  assert.equal(out.submit, "Mark out for delivery");
+  assert.equal(out.success, "SD 2611 0600 01 is out for delivery");
+  assert.equal(flow.outcomeDialogText("NOT_LOADED", item(), "DELIVERY").title, "Couldn't take out SD 2611 0600 01");
+  assert.equal(labels.outcomeActionLabel("DELIVERY", "LOADED"), "Mark out for delivery");
+  assert.equal(labels.outcomeActionLabel("PICKUP", "COLLECTED"), "Mark as collected");
 });
 
 // ---- Form values → request body (the F1 schemas and builders the dialogs use) ----
@@ -266,22 +275,22 @@ test("the row offers exactly the API's allowedOutcomes, enabled; they wait while
   const districtName = (code: string) => code;
   const onStep = () => undefined;
 
-  assert.deepEqual(buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item(), districtName, onStep }))), [
+  assert.deepEqual(buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item(), taskType: "PICKUP", districtName, onStep }))), [
     { text: "Mark as collected", disabled: false },
     { text: "Couldn't collect", disabled: false },
   ]);
   assert.deepEqual(
-    buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item(), districtName, onStep, busy: true }))).map((b) => b.disabled),
+    buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item(), taskType: "PICKUP", districtName, onStep, busy: true }))).map((b) => b.disabled),
     [true, true],
   );
   const delivery = item({ parcelStatus: "OUT_FOR_DELIVERY", outcome: "LOADED", allowedOutcomes: ["DELIVERED", "FAILED"] });
   assert.deepEqual(
-    buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: delivery, districtName, onStep }))).map((b) => b.text),
+    buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: delivery, taskType: "DELIVERY", districtName, onStep }))).map((b) => b.text),
     ["Mark as delivered", "Mark as failed"],
   );
   // HANDED_OVER / RETURNED are never outcome buttons, even if listed; a closed item has none.
-  assert.deepEqual(buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item({ allowedOutcomes: ["HANDED_OVER"] }), districtName, onStep }))), []);
-  assert.deepEqual(buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item({ allowedOutcomes: [] }), districtName, onStep }))), []);
+  assert.deepEqual(buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item({ allowedOutcomes: ["HANDED_OVER"] }), taskType: "PICKUP", districtName, onStep }))), []);
+  assert.deepEqual(buttons(renderToStaticMarkup(React.createElement(TaskItemRow, { item: item({ allowedOutcomes: [] }), taskType: "PICKUP", districtName, onStep }))), []);
 });
 
 test("the dialog can't be sent twice or closed while saving, and the task page reloads after each answer", () => {

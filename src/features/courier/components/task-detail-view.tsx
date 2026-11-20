@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Building2, CircleCheck, Undo2 } from "lucide-react";
 import * as React from "react";
 import { DetailPage } from "@/components/layout/detail-page";
 import { Button } from "@/components/ui/button";
@@ -12,16 +13,16 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { courierApi } from "../api";
 import { useCourierLoad } from "../hooks/use-courier-load";
 import { useDistrictName } from "../hooks/use-district-name";
-import { ASSIGNMENT_TYPE_LABEL, courierRoutes, HANDOVER_ACTION_LABEL } from "../lib/labels";
+import { courierRoutes, HANDOVER_ACTION_LABEL, isCourierTaskType, taskTitle } from "../lib/labels";
 import type { OutcomeFailure } from "../lib/outcome-flow";
 import { handoverCandidates } from "../lib/task-actions";
-import { parcelsText, progressText, taskRouteText } from "../lib/task-view";
+import { parcelsText, progressText, taskLocations, taskNextStep, taskRouteText } from "../lib/task-view";
 import type { CourierTaskDetail, CourierTaskSummary } from "../types";
 import { CompleteTaskDialog } from "./complete-task-dialog";
 import { CourierLoadError } from "./courier-load-error";
 import { HandoverDialog } from "./handover-dialog";
 import { OutcomeDialog, type OutcomeTarget } from "./outcome-dialog";
-import { TaskStatusBadge } from "./task-badges";
+import { TaskProgressBar, TaskStatusBadge, TaskTypeIcon } from "./task-badges";
 import { TaskItemRow } from "./task-item-row";
 
 type Back = { backHref: string; backLabel: string };
@@ -106,6 +107,8 @@ function TaskReady({
   const [dialog, setDialog] = React.useState<"handover" | "complete" | null>(null);
   const [saving, setSaving] = React.useState(false);
   const closed = task.status === "COMPLETED" || task.status === "CANCELLED";
+  // Couriers work pickups and deliveries. A branch transfer is shown read only, never as courier work.
+  const courierWork = isCourierTaskType(task.type);
   // The API decides: readyForHandover per parcel, canComplete for the task.
   const readyCount = handoverCandidates(task).length;
   // While anything is open, saving or reloading, every other action waits.
@@ -133,17 +136,35 @@ function TaskReady({
     onReload();
   }
 
-  // No actions on a completed or cancelled task.
-  const actions = closed ? undefined : (
-    <>
-      <Button variant="secondary" disabled={readyCount === 0 || busy} onClick={() => setDialog("handover")}>
+  const where = taskLocations(task, districtName);
+  const next = taskNextStep(task, districtName);
+  const progress = progressText(task.counts);
+  // Completing is the main action once the API allows it; until then, handing over is.
+  const completeIsMain = task.canComplete;
+
+  // Large buttons in the "Next step" card; none on a closed task or on a task that isn't courier work.
+  const actions = closed || !courierWork ? null : (
+    <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+      <Button
+        variant={completeIsMain || readyCount === 0 ? "secondary" : "primary"}
+        className="h-11 w-full sm:w-auto"
+        disabled={readyCount === 0 || busy}
+        onClick={() => setDialog("handover")}
+      >
+        {task.type === "DELIVERY" ? <Undo2 aria-hidden="true" /> : <Building2 aria-hidden="true" />}
         {HANDOVER_ACTION_LABEL[task.type]}
         {readyCount > 0 ? ` (${readyCount})` : ""}
       </Button>
-      <Button disabled={!task.canComplete || busy} onClick={() => setDialog("complete")}>
+      <Button
+        variant={completeIsMain ? "primary" : "secondary"}
+        className="h-11 w-full sm:w-auto"
+        disabled={!task.canComplete || busy}
+        onClick={() => setDialog("complete")}
+      >
+        <CircleCheck aria-hidden="true" />
         Complete task
       </Button>
-    </>
+    </div>
   );
 
   const aside = (
@@ -151,21 +172,11 @@ function TaskReady({
       <CardHeader title="Task details" titleId="task-summary-heading" />
       <CardContent>
         <dl className="flex flex-col gap-4 text-body-sm">
-          <Detail label="Route">{taskRouteText(task, districtName)}</Detail>
+          <Detail label={where.fromLabel}>{where.from}</Detail>
+          <Detail label={where.toLabel}>{where.to}</Detail>
           <Detail label="Planned for">{formatDate(task.scheduledFor)}</Detail>
           <Detail label="Assigned">{formatDateTime(task.assignedAt)}</Detail>
           {task.completedAt ? <Detail label="Completed">{formatDateTime(task.completedAt)}</Detail> : null}
-          <Detail label="Progress">{progressText(task.counts)}</Detail>
-          {closed ? null : (
-            <>
-              <Detail label="Ready to hand over">{readyCount === 0 ? "None yet" : parcelsText(readyCount)}</Detail>
-              <Detail label="Can be completed">
-                {task.canComplete
-                  ? "Yes, every parcel is updated"
-                  : `Not yet: ${parcelsText(task.counts.open)} still open`}
-              </Detail>
-            </>
-          )}
           {task.note ? <Detail label="Note from the dispatcher">{task.note}</Detail> : null}
         </dl>
       </CardContent>
@@ -174,34 +185,51 @@ function TaskReady({
 
   return (
     <DetailPage
-      title={`${ASSIGNMENT_TYPE_LABEL[task.type]} task`}
+      title={taskTitle(task.type)}
       description={taskRouteText(task, districtName)}
       status={<TaskStatusBadge status={task.status} />}
-      actions={actions}
       aside={aside}
       {...back}
     >
       <div className="flex flex-col gap-6">
-        {closed ? (
-          <InlineNotice title={task.status === "COMPLETED" ? "This task is completed" : "This task was cancelled"}>
-            Nothing more to do here. The parcels go on in other tasks.
+        {courierWork ? null : (
+          <InlineNotice tone="error" title="This isn't a pickup or delivery task">
+            Branch transfers aren&apos;t courier work, so this task can&apos;t be worked here. Its parcels are shown for
+            information only. Ask your dispatcher about it.
           </InlineNotice>
-        ) : task.canComplete ? (
-          <InlineNotice title="Every parcel is updated">
-            Complete the task when you&apos;re done. Completing it doesn&apos;t change where the parcels are.
-          </InlineNotice>
-        ) : null}
+        )}
+
+        <Card aria-labelledby="task-next-heading">
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <TaskTypeIcon type={task.type} />
+              <div className="flex min-w-0 flex-col gap-1">
+                <h2 id="task-next-heading" className="text-h3 text-grey-900">
+                  {next.title}
+                </h2>
+                <p className="text-body-sm text-grey-600">{next.message}</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <p className="text-label text-grey-900 tabular-nums" aria-live="polite">
+                {refreshing ? "Updating…" : progress}
+              </p>
+              <TaskProgressBar counts={task.counts} label={progress} />
+            </div>
+            {actions}
+          </CardContent>
+        </Card>
 
         <Card aria-labelledby="task-parcels-heading" aria-busy={refreshing}>
           <CardHeader
             title="Parcels"
             titleId="task-parcels-heading"
             description={
-              <span aria-live="polite">
-                {refreshing
-                  ? "Updating…"
-                  : `${task.counts.open} of ${parcelsText(task.counts.total)} still open`}
-              </span>
+              closed
+                ? parcelsText(task.counts.total)
+                : task.counts.open === 0
+                  ? "Every parcel is updated"
+                  : `${parcelsText(task.counts.open)} still to update`
             }
           />
           <ul className="divide-y divide-grey-100">
@@ -209,8 +237,10 @@ function TaskReady({
               <TaskItemRow
                 key={item.parcelId}
                 item={item}
+                taskType={task.type}
                 districtName={districtName}
                 busy={busy}
+                readOnly={!courierWork}
                 onStep={(outcome) => setTarget({ item, outcome })}
               />
             ))}
@@ -226,7 +256,7 @@ function TaskReady({
         onSaved={saved}
         onFailure={failed}
       />
-      {closed ? null : (
+      {closed || !courierWork ? null : (
         <>
           <HandoverDialog
             task={task}

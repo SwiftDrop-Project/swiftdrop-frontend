@@ -1,6 +1,8 @@
 import type { z } from "zod";
 import { apiFetch } from "@/lib/api";
 import { CourierResponseError } from "./lib/errors";
+import { COURIER_PREVIEW } from "./preview/flag";
+import { courierPreviewFetch } from "./preview/preview-api";
 import {
   courierParcelDetailSchema,
   courierTaskDetailSchema,
@@ -18,6 +20,13 @@ import type {
   ItemOutcomeRequest,
   TaskHistoryQuery,
 } from "./types";
+
+/*
+ * Who answers the courier calls: the backend (apiFetch), or, only in development preview mode
+ * (NEXT_PUBLIC_COURIER_PREVIEW=true, see preview/flag.ts), the in-memory sample data, which never calls fetch.
+ * Preview answers go through the same schemas below.
+ */
+const request: typeof apiFetch = COURIER_PREVIEW ? courierPreviewFetch : apiFetch;
 
 const TASKS = "/courier/assignments";
 const task = (assignmentId: string) => `${TASKS}/${encodeURIComponent(assignmentId)}`;
@@ -42,7 +51,7 @@ export const courierApi = {
   /** GET /courier/assignments/today: every open task (any scheduled day), plus the ones closed today. */
   async today(signal?: AbortSignal): Promise<CourierTasksToday> {
     const endpoint = `${TASKS}/today`;
-    return checked(courierTasksTodaySchema, endpoint, await apiFetch<unknown>(endpoint, { signal }));
+    return checked(courierTasksTodaySchema, endpoint, await request<unknown>(endpoint, { signal }));
   },
 
   /** GET /courier/assignments/history: completed and cancelled tasks, newest first. */
@@ -52,14 +61,14 @@ export const courierApi = {
   ): Promise<CourierTaskPage> {
     const endpoint = `${TASKS}/history`;
     const tracking = trackingNumber?.trim() || undefined;
-    const data = await apiFetch<unknown>(endpoint, { query: { page, size, trackingNumber: tracking }, signal });
+    const data = await request<unknown>(endpoint, { query: { page, size, trackingNumber: tracking }, signal });
     return checked(courierTaskPageSchema, endpoint, data);
   },
 
   /** GET /courier/assignments/{id}: one task with its parcels. 404 when it isn't yours. */
   async task(assignmentId: string, signal?: AbortSignal): Promise<CourierTaskDetail> {
     const endpoint = task(assignmentId);
-    return checked(courierTaskDetailSchema, endpoint, await apiFetch<unknown>(endpoint, { signal }));
+    return checked(courierTaskDetailSchema, endpoint, await request<unknown>(endpoint, { signal }));
   },
 
   /**
@@ -69,24 +78,24 @@ export const courierApi = {
    */
   async recordOutcome(assignmentId: string, parcelId: string, body: ItemOutcomeRequest): Promise<CourierTaskDetail> {
     const endpoint = `${task(assignmentId)}/items/${encodeURIComponent(parcelId)}/outcome`;
-    return checked(courierTaskDetailSchema, endpoint, await apiFetch<unknown>(endpoint, { method: "POST", body }));
+    return checked(courierTaskDetailSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
   },
 
   /** POST /courier/assignments/{id}/handover: hands the parcels over at the branch, all or nothing. */
   async handover(assignmentId: string, body: HandoverRequest): Promise<CourierTaskDetail> {
     const endpoint = `${task(assignmentId)}/handover`;
-    return checked(courierTaskDetailSchema, endpoint, await apiFetch<unknown>(endpoint, { method: "POST", body }));
+    return checked(courierTaskDetailSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
   },
 
   /** POST /courier/assignments/{id}/complete (no body): once every item is closed. Changes no parcel status. */
   async complete(assignmentId: string): Promise<CourierTaskSummary> {
     const endpoint = `${task(assignmentId)}/complete`;
-    return checked(courierTaskSummarySchema, endpoint, await apiFetch<unknown>(endpoint, { method: "POST" }));
+    return checked(courierTaskSummarySchema, endpoint, await request<unknown>(endpoint, { method: "POST" }));
   },
 
   /** GET /courier/parcels/{parcelId}: a parcel from one of your tasks, with its history and your items for it. */
   async parcel(parcelId: string, signal?: AbortSignal): Promise<CourierParcelDetail> {
     const endpoint = `/courier/parcels/${encodeURIComponent(parcelId)}`;
-    return checked(courierParcelDetailSchema, endpoint, await apiFetch<unknown>(endpoint, { signal }));
+    return checked(courierParcelDetailSchema, endpoint, await request<unknown>(endpoint, { signal }));
   },
 };

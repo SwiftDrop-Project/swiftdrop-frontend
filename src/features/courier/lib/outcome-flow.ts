@@ -45,16 +45,30 @@ export function outcomeDialogText(
         success: `${tracking} marked as not collected`,
       };
     case "LOADED":
+      // A delivery's LOADED makes the parcel OUT_FOR_DELIVERY: say so.
+      if (taskType === "DELIVERY") {
+        return {
+          title: `Out for delivery: ${tracking}?`,
+          description: `Do this when the parcel is in your vehicle and you're leaving for delivery${who ? ` to ${who}` : ""}. You can't undo it.`,
+          submit: "Mark out for delivery",
+          success: `${tracking} is out for delivery`,
+        };
+      }
       return {
         title: `Loaded ${tracking}?`,
-        description:
-          taskType === "DELIVERY"
-            ? `Do this when the parcel is in your vehicle for delivery${who ? ` to ${who}` : ""}. You can't undo it.`
-            : "Do this when the parcel is in your vehicle for the trip to the next branch. You can't undo it.",
+        description: "Do this when the parcel is in your vehicle for the trip to the next branch. You can't undo it.",
         submit: "Mark as loaded",
         success: `${tracking} marked as loaded`,
       };
     case "NOT_LOADED":
+      if (taskType === "DELIVERY") {
+        return {
+          title: `Couldn't take out ${tracking}`,
+          description: "Tell the dispatcher why. The parcel stays at the branch.",
+          submit: "Save",
+          success: `${tracking} marked as not taken out`,
+        };
+      }
       return {
         title: `Couldn't load ${tracking}`,
         description: "Tell the dispatcher why. The parcel stays at the branch.",

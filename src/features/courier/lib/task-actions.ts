@@ -6,7 +6,7 @@ import type {
   HandoverRequest,
   ItemOutcome,
 } from "../types";
-import { ITEM_OUTCOME_LABEL } from "./labels";
+import { courierParcelStatus } from "./parcel-status";
 import { outcomeFailure, type OutcomeFailure } from "./outcome-flow";
 
 /*
@@ -48,11 +48,20 @@ export function handoverText(
       };
 }
 
-/** What happened to the task's parcels, for the completion summary: "Handed over: 2", "Not collected: 1". */
-export function outcomeSummary(task: Pick<CourierTaskDetail, "items">): { outcome: ItemOutcome; label: string; count: number }[] {
+/**
+ * What happened to the task's parcels, for the completion summary, in the courier's status words: "Handed over: 2",
+ * "Not collected: 1"; "Delivered: 3", "Returned to branch: 1".
+ */
+export function outcomeSummary(
+  task: Pick<CourierTaskDetail, "type" | "items">,
+): { outcome: ItemOutcome; label: string; count: number }[] {
   const counts = new Map<ItemOutcome, number>();
   for (const item of task.items) counts.set(item.outcome, (counts.get(item.outcome) ?? 0) + 1);
-  return [...counts.entries()].map(([outcome, count]) => ({ outcome, label: ITEM_OUTCOME_LABEL[outcome], count }));
+  return [...counts.entries()].map(([outcome, count]) => ({
+    outcome,
+    label: courierParcelStatus(task.type, outcome).label,
+    count,
+  }));
 }
 
 export type HandoverResult = { ok: true; task: CourierTaskDetail } | { ok: false; failure: OutcomeFailure };

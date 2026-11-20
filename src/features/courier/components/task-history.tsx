@@ -8,6 +8,7 @@ import { ListPage } from "@/components/layout/list-page";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,11 +17,12 @@ import { useCourierLoad } from "../hooks/use-courier-load";
 import { useDistrictName } from "../hooks/use-district-name";
 import { HISTORY_PAGE_SIZE, historyHref, historyParams, taskHrefFromHistory } from "../lib/history";
 import { courierRoutes } from "../lib/labels";
+import { splitCourierTasks } from "../lib/task-view";
 import type { CourierTaskPage } from "../types";
 import { CourierLoadError } from "./courier-load-error";
 import { TaskSummaryRow } from "./task-summary-row";
 
-const DESCRIPTION = "Your completed and cancelled tasks, newest first.";
+const DESCRIPTION = "Your completed and cancelled pickup and delivery tasks, newest first.";
 
 /**
  * /courier/history: the courier's completed and cancelled tasks (GET /courier/assignments/history), newest first, 20
@@ -155,10 +157,19 @@ export function HistoryList({
     );
   }
 
+  // Pickups and deliveries only. A branch transfer isn't courier work: it is counted, never shown as a task. The page
+  // numbers stay the backend's.
+  const { courier, other } = splitCourierTasks(history.content);
+
   return (
     <Card aria-label={trackingNumber ? `Tasks that held ${trackingNumber}` : "Completed and cancelled tasks"} aria-busy={refreshing}>
+      {other.length > 0 ? (
+        <InlineNotice className="m-4 sm:mx-6" title={`${other.length} branch ${other.length === 1 ? "transfer" : "transfers"} on this page not shown`}>
+          Branch transfers aren&apos;t courier work, so they aren&apos;t listed here.
+        </InlineNotice>
+      ) : null}
       <ul className="divide-y divide-grey-100">
-        {history.content.map((task) => (
+        {courier.map((task) => (
           <TaskSummaryRow
             key={task.assignmentId}
             task={task}

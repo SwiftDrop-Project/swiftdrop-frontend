@@ -154,6 +154,46 @@ test("each task shows type, status, route, day, progress and completion, and ope
         summary(),
         summary({
           assignmentId: A2,
+          type: "DELIVERY",
+          status: "CANCELLED",
+          originBranch: "MATARA",
+          destinationBranch: null,
+          scheduledFor: "2026-11-12",
+          completedAt: null,
+          counts: { total: 1, open: 0, closed: 1, problems: 0 },
+        }),
+      ]),
+      trackingNumber: "",
+      refreshing: false,
+    }),
+  );
+  assert.match(markup, /Pickup task/);
+  assert.match(markup, /Collect from senders, hand over at Gampaha branch/);
+  assert.match(markup, /9 Nov 2026 · 3 of 3 parcels updated · 1 problem/);
+  assert.match(markup, /Completed 9 Nov 2026, 1:30 PM/);
+  assert.match(markup, /Delivery task/);
+  assert.match(markup, /Cancelled by the dispatcher/);
+  assert.match(markup, /Deliver to recipients from Matara branch/);
+  assert.doesNotMatch(markup, /Planned for/, "the history never marks later days");
+  const links = hrefs(markup);
+  assert.ok(links.includes(`/courier/tasks/${A1}?from=history`));
+  assert.ok(links.includes(`/courier/tasks/${A2}?from=history`));
+
+  // Accessible names tell the rows apart.
+  const labels = [...markup.matchAll(/aria-label="(Open [^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(labels, [
+    "Open pickup task: Collect from senders, hand over at Gampaha branch, 9 Nov 2026",
+    "Open delivery task: Deliver to recipients from Matara branch, 12 Nov 2026",
+  ]);
+});
+
+test("a branch transfer the API sends anyway is counted, never listed as a courier task; paging stays the backend's", () => {
+  const markup = render(
+    React.createElement(HistoryList, {
+      history: page([
+        summary(),
+        summary({
+          assignmentId: A2,
           type: "TRANSFER",
           status: "CANCELLED",
           originBranch: "GAMPAHA",
@@ -168,23 +208,12 @@ test("each task shows type, status, route, day, progress and completion, and ope
     }),
   );
   assert.match(markup, /Pickup task/);
-  assert.match(markup, /Completed/);
-  assert.match(markup, /Collect from senders, hand over at Gampaha branch/);
-  assert.match(markup, /9 Nov 2026 · 3 of 3 parcels done · 1 problem · Completed 9 Nov 2026, 1:30 PM/);
-  assert.match(markup, /Transfer task/);
-  assert.match(markup, /Cancelled/);
-  assert.match(markup, /Gampaha branch to Matara branch/);
-  assert.doesNotMatch(markup, /Planned for/, "the history never marks later days");
+  assert.doesNotMatch(markup, /Transfer task|Gampaha branch to Matara branch/);
+  assert.match(markup, /1 branch transfer on this page not shown/);
   const links = hrefs(markup);
   assert.ok(links.includes(`/courier/tasks/${A1}?from=history`));
-  assert.ok(links.includes(`/courier/tasks/${A2}?from=history`));
-
-  // Accessible names tell the rows apart.
-  const labels = [...markup.matchAll(/aria-label="(Open [^"]+)"/g)].map((match) => match[1]);
-  assert.deepEqual(labels, [
-    "Open pickup task: Collect from senders, hand over at Gampaha branch, 9 Nov 2026",
-    "Open transfer task: Gampaha branch to Matara branch, 12 Nov 2026",
-  ]);
+  assert.ok(!links.includes(`/courier/tasks/${A2}?from=history`), "no link to the transfer");
+  assert.match(markup, /Showing 1–2 of 2 tasks/, "the backend's count");
 });
 
 test("pagination uses the backend's page numbers and keeps the search in its links", () => {
