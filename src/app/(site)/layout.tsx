@@ -1,3 +1,4 @@
+import { AssistantLauncher } from "@/features/assistant";
 import { LandingFooter, LandingHeader } from "@/features/landing";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
@@ -8,7 +9,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         {children}
       </main>
       <LandingFooter />
+      <AssistantLauncher />
     </div>
   );
 }
-
