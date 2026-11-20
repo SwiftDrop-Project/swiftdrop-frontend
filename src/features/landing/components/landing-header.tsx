@@ -4,17 +4,16 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
-import { SiteContainer } from "@/components/layout/site-container";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Logo } from "@/components/ui/logo";
 import { HomeLink } from "./home-link";
+import { LandingContainer } from "./landing-container";
 import { NavLink } from "./nav-link";
 
 const NAV_LINKS = [
   { href: "/track", label: "Track a parcel" },
   { href: "/help", label: "Help" },
-  { href: "/login", label: "Log in" },
 ];
 
 export function LandingHeader() {
@@ -82,7 +81,7 @@ export function LandingHeader() {
         Skip to content
       </a>
 
-      <SiteContainer className="flex h-topbar items-center justify-between gap-4">
+      <LandingContainer className="flex h-topbar items-center justify-between gap-4">
         <HomeLink onNavigate={closeMobileMenu}>
           <Logo priority className="h-8" />
         </HomeLink>
@@ -94,7 +93,11 @@ export function LandingHeader() {
               {item.label}
             </NavLink>
           ))}
-          <Button asChild className="ml-2">
+          <span aria-hidden="true" className="mx-1 h-6 w-px bg-grey-200" />
+          <Button asChild variant="secondary">
+            <Link href="/login">Log in</Link>
+          </Button>
+          <Button asChild>
             <Link href="/register">Create account</Link>
           </Button>
         </nav>
@@ -113,7 +116,7 @@ export function LandingHeader() {
             {mobileMenuOpen ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
           </IconButton>
         </div>
-      </SiteContainer>
+      </LandingContainer>
 
       {/* Mobile navigation menu */}
       {mobileMenuOpen ? (
@@ -127,10 +130,15 @@ export function LandingHeader() {
               {item.label}
             </NavLink>
           ))}
-          <div className="pt-2">
+          <div className="flex flex-col gap-2 border-t border-grey-200 pt-3 mt-2">
             <Button asChild size="lg" className="w-full">
               <Link href="/register" onClick={closeMobileMenu}>
                 Create account
+              </Link>
+            </Button>
+            <Button asChild variant="secondary" size="lg" className="w-full">
+              <Link href="/login" onClick={closeMobileMenu}>
+                Log in
               </Link>
             </Button>
           </div>
