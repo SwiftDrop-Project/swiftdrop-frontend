@@ -110,9 +110,9 @@ export function AdminWebhookLogs() {
 
         <CardContent className="border-t border-grey-200">
           <p className="text-body-sm text-grey-600">
-            When a merchant&apos;s server doesn&apos;t receive a message, we try again right away, then after 1 min,
-            5 min, 15 min, 1 h and 6 h. After {MAX_ATTEMPTS} tries, or if the server clearly refuses the message,
-            it&apos;s marked Failed. Retry sends it again with a new set of attempts.
+            When a merchant&apos;s server doesn&apos;t receive a message, we try again after 1 min, 5 min, 15 min,
+            1 h and 6 h. After {MAX_ATTEMPTS} tries, or if the server clearly refuses the message, it&apos;s marked
+            Failed. Retry sends it again with a new set of attempts. A test message is tried once.
           </p>
         </CardContent>
       </Card>

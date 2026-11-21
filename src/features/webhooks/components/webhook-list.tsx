@@ -69,7 +69,7 @@ export function WebhookList() {
   async function switchToExistingWebhook(match: Webhook, eventTypes: WebhookEventType[]): Promise<boolean> {
     let target = match;
     if (!match.active) {
-      const updated = await turnOnWebhook(match);
+      const updated = await turnOnWebhook(match, webhooks.refresh);
       if (!updated) return false;
       webhooks.upsert(updated);
       target = updated;
@@ -147,6 +147,7 @@ export function WebhookList() {
                     <WebhookActions
                       webhook={webhook}
                       onChange={webhooks.upsert}
+                      onStale={webhooks.refresh}
                       existing={list}
                       deliveriesHref={webhookHref(webhook.id)}
                     />
@@ -204,6 +205,7 @@ export function WebhookList() {
                           <WebhookActions
                       webhook={webhook}
                       onChange={webhooks.upsert}
+                      onStale={webhooks.refresh}
                       existing={list}
                       deliveriesHref={webhookHref(webhook.id)}
                     />
@@ -237,6 +239,7 @@ export function WebhookList() {
           webhook={editRequest.webhook}
           initialEventTypes={editRequest.eventTypes}
           existing={list}
+          onStale={webhooks.refresh}
           onUpdated={(updated) => {
             webhooks.upsert(updated);
             toast({ tone: "success", title: "Webhook saved" });
@@ -350,7 +353,7 @@ function HowItWorks() {
     {
       icon: RotateCw,
       title: "Missed messages are sent again",
-      text: "Right away, then after 1 min, 5 min, 15 min, 1 h and 6 h. A message can arrive twice, so your system should ignore repeats.",
+      text: "If the first try fails, again after 1 min, 5 min, 15 min, 1 h and 6 h. A message can arrive twice, so your system should ignore repeats.",
     },
   ];
 

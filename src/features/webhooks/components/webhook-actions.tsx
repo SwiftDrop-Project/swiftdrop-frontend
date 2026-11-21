@@ -24,8 +24,9 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { toast } from "@/components/ui/toast";
-import { isApiError } from "@/lib/api";
+import { isApiError, retryMessage } from "@/lib/api";
 import { webhooksApi } from "../api";
+import { TEST_COOLDOWN_SECONDS, startCooldown, useCooldown } from "../hooks/use-cooldown";
 import type { Webhook } from "../types";
 import { SecretDialog } from "./secret-dialog";
 import { WebhookFormDialog } from "./webhook-form-dialog";
@@ -47,10 +48,24 @@ export function hostOf(url: string): string {
 
 type OpenDialog = "edit" | "rotate" | "turnOff" | null;
 
-/** Queues a test ping and says so in a toast. Returns whether it was queued. */
+/** 409 WEBHOOK_CHANGED: someone changed this webhook at the same moment (e.g. another tab); nothing was saved. */
+export function isWebhookChanged(error: unknown): boolean {
+  return isApiError(error) && error.code === "WEBHOOK_CHANGED";
+}
+
+/** The key of a webhook's "Send test" wait (see use-cooldown). */
+export function testCooldownKey(webhookId: string): string {
+  return `test:${webhookId}`;
+}
+
+/**
+ * Queues a test ping and says so in a toast. Returns whether it was queued. Starts the 10-second wait before the
+ * next test; a 429 (tested too soon, or too many tests and retries this minute) starts the wait the API asked for.
+ */
 export async function sendTestPing(webhook: Webhook): Promise<boolean> {
   try {
     await webhooksApi.sendTest(webhook.id);
+    startCooldown(testCooldownKey(webhook.id), TEST_COOLDOWN_SECONDS);
     toast({
       tone: "success",
       title: "Test sent",
@@ -58,6 +73,11 @@ export async function sendTestPing(webhook: Webhook): Promise<boolean> {
     });
     return true;
   } catch (error) {
+    if (isApiError(error) && error.code === "TOO_MANY_REQUESTS") {
+      startCooldown(testCooldownKey(webhook.id), error.retryAfterSeconds ?? TEST_COOLDOWN_SECONDS);
+      toast({ tone: "error", title: "Please wait a moment", description: retryMessage(error) });
+      return false;
+    }
     toast({ tone: "error", title: "We couldn't send the test", description: errorMessage(error) });
     return false;
   }
@@ -65,9 +85,10 @@ export async function sendTestPing(webhook: Webhook): Promise<boolean> {
 
 /**
  * Turns a webhook back on and says so in a toast. Returns the updated webhook, or null when the backend refused
- * (e.g. 409 WEBHOOK_LIMIT_REACHED or WEBHOOK_URL_IN_USE; its message is shown).
+ * (e.g. 409 WEBHOOK_LIMIT_REACHED or WEBHOOK_URL_IN_USE; its message is shown). On 409 WEBHOOK_CHANGED `onStale`
+ * runs, so the caller loads the webhooks again.
  */
-export async function turnOnWebhook(webhook: Webhook): Promise<Webhook | null> {
+export async function turnOnWebhook(webhook: Webhook, onStale?: () => void): Promise<Webhook | null> {
   try {
     const updated = await webhooksApi.update(webhook.id, { active: true });
     toast({
@@ -78,6 +99,7 @@ export async function turnOnWebhook(webhook: Webhook): Promise<Webhook | null> {
     return updated;
   } catch (error) {
     toast({ tone: "error", title: "We couldn't turn it on", description: errorMessage(error) });
+    if (isWebhookChanged(error)) onStale?.();
     return null;
   }
 }
@@ -85,18 +107,21 @@ export async function turnOnWebhook(webhook: Webhook): Promise<Webhook | null> {
 /**
  * The ⋯ menu of one webhook and the dialogs behind it. Every change is passed up with `onChange`;
  * `onTestSent` runs after a test ping was queued (the detail page reloads its history). `existing` (the merchant's
- * other webhooks) lets the edit dialog warn about an address that's already in use.
+ * other webhooks) lets the edit dialog warn about an address that's already in use. `onStale` runs when the backend
+ * says someone else changed this webhook at the same moment (409 WEBHOOK_CHANGED), so the page loads the latest.
  */
 export function WebhookActions({
   webhook,
   onChange,
   onTestSent,
+  onStale,
   existing,
   deliveriesHref,
 }: {
   webhook: Webhook;
   onChange: (webhook: Webhook) => void;
   onTestSent?: () => void;
+  onStale?: () => void;
   existing?: readonly Webhook[];
   /** The webhook's own page (delivery history, search, setup guide); left out on that page itself. */
   deliveriesHref?: string;
@@ -105,6 +130,7 @@ export function WebhookActions({
   const [secret, setSecret] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const testWait = useCooldown(testCooldownKey(webhook.id));
   const host = hostOf(webhook.url);
 
   function closeDialog() {
@@ -117,7 +143,7 @@ export function WebhookActions({
   }
 
   async function turnOn() {
-    const updated = await turnOnWebhook(webhook);
+    const updated = await turnOnWebhook(webhook, onStale);
     if (updated) onChange(updated);
   }
 
@@ -131,6 +157,7 @@ export function WebhookActions({
       toast({ tone: "success", title: "Webhook turned off" });
     } catch (error) {
       setNotice(errorMessage(error));
+      if (isWebhookChanged(error)) onStale?.();
     } finally {
       setBusy(false);
     }
@@ -146,7 +173,9 @@ export function WebhookActions({
       closeDialog();
       setSecret(newSecret);
     } catch (error) {
+      // WEBHOOK_CHANGED: another rotation won the race; its secret is the one stored, and none is shown here
       setNotice(errorMessage(error));
+      if (isWebhookChanged(error)) onStale?.();
     } finally {
       setBusy(false);
     }
@@ -172,9 +201,9 @@ export function WebhookActions({
               <DropdownMenuSeparator />
             </>
           ) : null}
-          <DropdownMenuItem onSelect={sendTest}>
+          <DropdownMenuItem onSelect={sendTest} disabled={testWait > 0}>
             <Send />
-            Send test
+            {testWait > 0 ? `Send test (${testWait} s)` : "Send test"}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog("edit")}>
             <Pencil />
@@ -204,6 +233,7 @@ export function WebhookActions({
         onOpenChange={(open) => (open ? setDialog("edit") : closeDialog())}
         webhook={webhook}
         existing={existing}
+        onStale={onStale}
         onUpdated={(updated) => {
           onChange(updated);
           toast({ tone: "success", title: "Webhook saved" });

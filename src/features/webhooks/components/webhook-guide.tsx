@@ -46,7 +46,8 @@ const STEPS: { title: string; text: string }[] = [
 
 const GOOD_TO_KNOW: string[] = [
   `You can have up to ${MAX_ACTIVE_WEBHOOKS} active webhooks, one per address. Add more only for different systems, like billing or a test server.`,
-  "Failed requests are retried right away, then after 1 min, 5 min, 15 min, 1 h and 6 h. After that the delivery is marked Failed and you can retry it from the webhook's history.",
+  "Failed requests are tried again after 1 min, 5 min, 15 min, 1 h and 6 h. After that the delivery is marked Failed and you can retry it from the webhook's history. A test message is tried once.",
+  "You can send a test or retry a delivery every 10 seconds, and up to 30 times a minute in all.",
   "Turn a webhook off to pause it. Its history is kept, and you can turn it on again later.",
 ];
 

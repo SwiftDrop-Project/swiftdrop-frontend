@@ -21,6 +21,11 @@ Merchant webhook subscriptions and the log of parcel events sent to merchant URL
   `/admin/merchant/webhooks` and `/admin/merchant/webhook-logs` placeholders redirect here.
 - Shared by both delivery lists: `DeliveryFilters`, `DeliveryList` (`delivery-parts.tsx`), `useDeliveryFilters`, and
   `useDeliveries`, which takes a load function so it works for one webhook or for the admin list.
+- Limits (API.md "Webhooks", "Limits"): after "Send test" the button counts down 10 s ("Send test (8 s)"), on the
+  detail page and in the ⋯ menu alike; a 429 on Send test or Retry shows "Try again in N seconds" and counts down its
+  `Retry-After` (`use-cooldown.ts`). Only a convenience: the backend enforces the limits.
+- 409 `WEBHOOK_CHANGED` (someone changed the webhook at the same moment): the message is shown and the list reloads
+  without flashing (`useWebhooks().refresh`), so the merchant sees the latest version.
 - `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry) and
   `adminWebhooksApi` (deliveries, retry).
 

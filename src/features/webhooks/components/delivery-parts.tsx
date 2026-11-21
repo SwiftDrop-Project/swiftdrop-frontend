@@ -17,8 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toast";
-import { isApiError } from "@/lib/api";
+import { isApiError, retryMessage } from "@/lib/api";
 import { formatDateTime, formatTrackingNumber } from "@/lib/format";
+import { startCooldown, useCooldown } from "../hooks/use-cooldown";
 import type { DeliveriesState } from "../hooks/use-deliveries";
 import {
   DELIVERY_STATUS_LABEL,
@@ -34,6 +35,8 @@ import type { DeliveryFilterValues, DeliveryStatus, WebhookDelivery } from "../t
 /* Pieces shared by the merchant's delivery history and the admin's Webhook Logs. */
 
 const UNKNOWN_ERROR = "Something went wrong. Try again in a moment.";
+/** If a 429 comes without Retry-After: the backend's wait after a delivery's last attempt. */
+const RETRY_WAIT_FALLBACK_SECONDS = 10;
 
 /** A column added before the others, e.g. the merchant on the admin list. */
 export interface LeadingColumn<T> {
@@ -260,33 +263,46 @@ function RetryButton({
   onRetried: () => void;
 }) {
   const [busy, setBusy] = React.useState(false);
+  const cooldownKey = `retry:${deliveryId}`;
+  const wait = useCooldown(cooldownKey);
 
   async function retry() {
     setBusy(true);
     try {
       await onRetry(deliveryId);
       toast({ tone: "success", title: "Delivery queued again", description: "It will be sent within a few seconds." });
+      onRetried();
     } catch (error) {
+      if (isApiError(error) && error.code === "TOO_MANY_REQUESTS") {
+        // it just failed, or too many tests and retries this minute: the button counts down the wait
+        startCooldown(cooldownKey, error.retryAfterSeconds ?? RETRY_WAIT_FALLBACK_SECONDS);
+        toast({ tone: "error", title: "Please wait a moment", description: retryMessage(error) });
+        return;
+      }
       toast({
         tone: "error",
         title: "We couldn't retry it",
         description: isApiError(error) ? error.message : UNKNOWN_ERROR,
       });
+      onRetried(); // the row may have changed (409: it isn't FAILED any more)
     } finally {
       setBusy(false);
-      onRetried(); // in both cases the row may have changed (409: it isn't FAILED any more)
     }
   }
 
   return (
-    <Button variant="secondary" onClick={retry} loading={busy}>
+    <Button variant="secondary" onClick={retry} loading={busy} disabled={wait > 0}>
       <RotateCw aria-hidden="true" />
-      Retry
+      {wait > 0 ? `Retry (${wait} s)` : "Retry"}
     </Button>
   );
 }
 
+/** "2 of 6"; a test ping is tried once, so just "1 attempt". */
 function attemptsText(delivery: WebhookDelivery): string {
+  if (delivery.eventType === "webhook.ping") {
+    return delivery.attempts === 1 ? "1 attempt" : `${delivery.attempts} attempts`;
+  }
   return `${delivery.attempts} of ${MAX_ATTEMPTS}`;
 }
 
