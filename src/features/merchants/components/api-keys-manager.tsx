@@ -57,7 +57,7 @@ import type { ApiKey, CreateApiKeyResult } from "../types";
 type DialogState =
   | { kind: "none" }
   | { kind: "create" }
-  | { kind: "reveal"; keyName: string; rawKey: string }
+  | { kind: "reveal"; keyName: string; rawKey: string; reason: "created" | "rotated" }
   | { kind: "revoke"; keyId: string; keyName: string }
   | { kind: "rotate"; keyId: string; keyName: string };
 
@@ -89,7 +89,7 @@ export function ApiKeysManager() {
     return () => controller.abort();
   }, [attempt]);
 
-  function addKey(result: CreateApiKeyResult) {
+  function addKey(result: CreateApiKeyResult, reason: "created" | "rotated" = "created") {
     setList((prev) =>
       prev.status === "ready"
         ? {
@@ -101,15 +101,7 @@ export function ApiKeysManager() {
           }
         : prev,
     );
-    setDialog({ kind: "reveal", keyName: result.name, rawKey: result.rawKey });
-  }
-
-  function removeKey(id: string) {
-    setList((prev) =>
-      prev.status === "ready"
-        ? { ...prev, items: prev.items.filter((k) => k.id !== id) }
-        : prev,
-    );
+    setDialog({ kind: "reveal", keyName: result.name, rawKey: result.rawKey, reason });
   }
 
   function markRevoked(id: string) {
@@ -176,16 +168,37 @@ export function ApiKeysManager() {
                     </Button>
                   }
                 />
-              ) : (
-                list.items.map((key) => (
-                  <KeyRow
-                    key={key.id}
-                    apiKey={key}
-                    onRevoke={() => setDialog({ kind: "revoke", keyId: key.id, keyName: key.name })}
-                    onRotate={() => setDialog({ kind: "rotate", keyId: key.id, keyName: key.name })}
-                  />
-                ))
-              )}
+              ) : (() => {
+                const active = list.items.filter((k) => k.revokedAt === null);
+                const revoked = list.items.filter((k) => k.revokedAt !== null);
+                return (
+                  <>
+                    {active.map((key) => (
+                      <KeyRow
+                        key={key.id}
+                        apiKey={key}
+                        onRevoke={() => setDialog({ kind: "revoke", keyId: key.id, keyName: key.name })}
+                        onRotate={() => setDialog({ kind: "rotate", keyId: key.id, keyName: key.name })}
+                      />
+                    ))}
+                    {revoked.length > 0 && active.length > 0 && (
+                      <TableRow>
+                        <TableCell colSpan={COLUMNS} className="bg-grey-50 py-2 text-caption text-grey-500">
+                          Revoked keys
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {revoked.map((key) => (
+                      <KeyRow
+                        key={key.id}
+                        apiKey={key}
+                        onRevoke={() => setDialog({ kind: "revoke", keyId: key.id, keyName: key.name })}
+                        onRotate={() => setDialog({ kind: "rotate", keyId: key.id, keyName: key.name })}
+                      />
+                    ))}
+                  </>
+                );
+              })()}
             </TableBody>
           </Table>
         </Card>
@@ -203,6 +216,7 @@ export function ApiKeysManager() {
         open={dialog.kind === "reveal"}
         keyName={dialog.kind === "reveal" ? dialog.keyName : ""}
         rawKey={dialog.kind === "reveal" ? dialog.rawKey : ""}
+        reason={dialog.kind === "reveal" ? dialog.reason : "created"}
         onClose={() => setDialog({ kind: "none" })}
       />
 
@@ -225,8 +239,8 @@ export function ApiKeysManager() {
           keyId={dialog.keyId}
           keyName={dialog.keyName}
           onRotated={(result) => {
-            removeKey(dialog.keyId);
-            addKey(result);
+            markRevoked(dialog.keyId);
+            addKey(result, "rotated");
           }}
           onClose={() => setDialog({ kind: "none" })}
         />
@@ -385,11 +399,13 @@ function RevealKeyDialog({
   open,
   keyName,
   rawKey,
+  reason,
   onClose,
 }: {
   open: boolean;
   keyName: string;
   rawKey: string;
+  reason: "created" | "rotated";
   onClose: () => void;
 }) {
   const [copied, setCopied] = React.useState(false);
@@ -413,9 +429,11 @@ function RevealKeyDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{keyName} created</DialogTitle>
+          <DialogTitle>{keyName} {reason === "rotated" ? "rotated" : "created"}</DialogTitle>
           <DialogDescription>
-            Copy this key now — it won&apos;t be shown again.
+            {reason === "rotated"
+              ? "Your old key is now revoked. Copy the new key — it won’t be shown again."
+              : "Copy this key now — it won’t be shown again."}
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="mt-6">
