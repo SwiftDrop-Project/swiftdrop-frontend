@@ -1,5 +1,5 @@
 import type { ApprovalStatus } from "@/features/identity";
-import type { DeliveryContact } from "@/features/delivery";
+import type { DeliveryContact, PaymentMethod } from "@/features/delivery";
 import type { DistrictCode, ParcelsPerMonth, ParcelStatus } from "@/types";
 
 /** Row of GET /admin/merchants. */
@@ -36,6 +36,8 @@ export interface MerchantOrder {
   currency: string;
   createdAt: string;
   updatedAt: string;
+  /** How the delivery fee is paid; null for orders made before payment methods. */
+  paymentMethod: PaymentMethod | null;
 }
 
 /** Body of POST /merchant/orders. */
@@ -50,6 +52,8 @@ export interface CreateMerchantOrderRequest {
   widthCm: number;
   heightCm: number;
   keepUpright?: boolean;
+  /** Required: how the delivery fee is paid. */
+  paymentMethod: PaymentMethod;
 }
 
 /* ---- API keys (GET/POST /merchant/api-keys, DELETE/POST /merchant/api-keys/{id}/rotate) ---- */

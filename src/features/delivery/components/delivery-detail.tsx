@@ -15,7 +15,7 @@ import { VEHICLE_LABEL } from "@/features/pricing";
 import { useDistricts } from "@/hooks/use-districts";
 import { formatDateTime, formatPhone, formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
 import { useDelivery } from "../hooks/use-deliveries";
-import { FAILURE_REASON_LABEL, sizeText } from "../labels";
+import { FAILURE_REASON_LABEL, PAYMENT_METHOD_LABEL, sizeText } from "../labels";
 import { MY_DELIVERIES_HREF } from "../routes";
 import type { Delivery, DeliveryContact, DeliveryHistoryEntry } from "../types";
 import { SummaryCard, type SummaryRow } from "./summary-card";
@@ -98,7 +98,10 @@ export function DeliveryDetail({ id }: { id: string }) {
   );
 }
 
-/** The parcel and its fee. Size, billable weight and vehicle only for parcels booked with a size. */
+/**
+ * The parcel, its fee and how the fee is paid. Size, billable weight and vehicle only for parcels booked with a size;
+ * the payment only for parcels booked with a payment method.
+ */
 function parcelRows(delivery: Delivery): SummaryRow[] {
   return [
     { label: "Weight", value: `${delivery.weightKg} kg`, tabular: true },
@@ -109,6 +112,7 @@ function parcelRows(delivery: Delivery): SummaryRow[] {
       tabular: delivery.codAmount !== null,
     },
     { label: "Delivery fee", value: formatRs(delivery.feeAmount), tabular: true },
+    ...(delivery.paymentMethod ? [{ label: "Payment", value: PAYMENT_METHOD_LABEL[delivery.paymentMethod] }] : []),
     ...(delivery.billableWeightKg
       ? [{ label: "Charged for", value: `${delivery.billableWeightKg} kg`, tabular: true }]
       : []),
