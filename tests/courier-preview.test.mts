@@ -8,17 +8,18 @@ import vm from "node:vm";
 import ts from "typescript";
 
 /*
- * Courier preview mode (src/features/courier/preview): off by default and never in production; when on, courierApi
- * answers from in-memory sample data without calling fetch, every answer passes the response schemas, and the
- * sample tasks follow the backend's step rules (dispatch.ItemOutcome, courier ParcelMoves).
+ * Courier preview mode (development only, NEXT_PUBLIC_COURIER_PREVIEW=true): off by default and in production, never
+ * calls fetch, answers /courier/deliveries/* in the shape the schemas check, and follows the backend's parcel rules
+ * (one parcel at a time, completion per parcel, the task completing by itself, Unable to Collect, privacy, 409s).
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SRC_ROOT = path.join(path.resolve(__dirname, ".."), "src");
+const FRONTEND_ROOT = path.resolve(__dirname, "..");
+const SRC_ROOT = path.join(FRONTEND_ROOT, "src");
 const nodeRequire = createRequire(import.meta.url);
 const moduleCache = new Map<string, { exports: Record<string, unknown> }>();
 
-/** Loads a src/ TypeScript module (same approach as courier-data-layer.test.mts). */
+/** Loads a src/ TypeScript module, transpiled to CommonJS; one instance per file for the whole test run. */
 function loadTsModule<T>(specifier: string, fromDir = SRC_ROOT): T {
   let base: string | null = null;
   if (specifier.startsWith("@/")) base = path.join(SRC_ROOT, specifier.slice(2));
@@ -51,356 +52,361 @@ function loadTsModule<T>(specifier: string, fromDir = SRC_ROOT): T {
   return mod.exports as T;
 }
 
-type FlagModule = typeof import("../src/features/courier/preview/flag");
-type PreviewModule = typeof import("../src/features/courier/preview/preview-api");
-type RulesModule = typeof import("../src/features/courier/preview/rules");
-type ApiModule = typeof import("../src/features/courier/api");
-type SchemasModule = typeof import("../src/features/courier/schemas");
-type ClientModule = typeof import("../src/lib/api/client");
-type CourierTaskDetail = import("../src/features/courier/types").CourierTaskDetail;
-type CourierTaskItem = import("../src/features/courier/types").CourierTaskItem;
-
-// The modules load in preview mode (the flag is read once, at load), with fetch made to fail: any network call fails
-// the test.
-const savedFlag = process.env.NEXT_PUBLIC_COURIER_PREVIEW;
-process.env.NEXT_PUBLIC_COURIER_PREVIEW = "true";
-let fetchCalls = 0;
-globalThis.fetch = (async () => {
-  fetchCalls += 1;
-  throw new Error("preview mode must not call fetch");
-}) as typeof fetch;
-
-const { isCourierPreviewEnabled, COURIER_PREVIEW } = loadTsModule<FlagModule>("@/features/courier/preview/flag");
-const { courierApi } = loadTsModule<ApiModule>("@/features/courier/api");
-const { resetCourierPreview } = loadTsModule<PreviewModule>("@/features/courier/preview/preview-api");
-const rules = loadTsModule<RulesModule>("@/features/courier/preview/rules");
-const schemas = loadTsModule<SchemasModule>("@/features/courier/schemas");
-const { ApiError } = loadTsModule<ClientModule>("@/lib/api/client");
-process.env.NEXT_PUBLIC_COURIER_PREVIEW = savedFlag;
-
-const fresh = () => resetCourierPreview(new Date(), { delayMs: 0 });
-
-async function taskOfType(type: "PICKUP" | "DELIVERY", status: "ASSIGNED" | "IN_PROGRESS") {
-  const today = await courierApi.today();
-  // The first open task of this type for today that still has work (not the one ready to complete).
-  const found = today.assignments.find(
-    (task) => task.type === type && task.status === status && task.scheduledFor === today.date && !task.canComplete,
-  );
-  assert.ok(found, `a ${status} ${type} task for today`);
-  return courierApi.task(found.assignmentId);
+function readSource(relative: string): string {
+  return fs.readFileSync(path.join(SRC_ROOT, relative), "utf8");
 }
 
-const byOutcome = (task: CourierTaskDetail, outcome: string) =>
-  task.items.filter((entry: CourierTaskItem) => entry.outcome === outcome);
+type FlagModule = typeof import("../src/features/courier/preview/flag");
+type PreviewModule = typeof import("../src/features/courier/preview/preview-api");
+type SchemasModule = typeof import("../src/features/courier/schemas");
+type ClientModule = typeof import("../src/lib/api/client");
+type Today = import("../src/features/courier/types").CourierToday;
+type Page = import("../src/features/courier/types").CourierDeliveryPage;
 
-async function rejects(promise: Promise<unknown>, code: string, status: number) {
+const flag = loadTsModule<FlagModule>("@/features/courier/preview/flag");
+const preview = loadTsModule<PreviewModule>("@/features/courier/preview/preview-api");
+const schemas = loadTsModule<SchemasModule>("@/features/courier/schemas");
+const { ApiError } = loadTsModule<ClientModule>("@/lib/api/client");
+
+/** Sample parcel ids (preview/data.ts): 7e570000-0000-4000-8000-0000000000NN. */
+const P = (n: number) => `7e570000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const NOW = new Date("2026-11-05T06:30:00Z"); // 12:00 in Colombo
+
+function reset() {
+  preview.resetCourierPreview(NOW, { delayMs: 0 });
+  globalThis.fetch = (async () => {
+    throw new Error("preview mode must never call fetch");
+  }) as typeof fetch;
+}
+
+const get = <T,>(path: string, query?: Record<string, string | number | undefined>) =>
+  preview.courierPreviewFetch<T>(path, { query });
+const post = <T,>(path: string, body: unknown) => preview.courierPreviewFetch<T>(path, { method: "POST", body });
+const today = async () => schemas.courierTodaySchema.parse(await get<Today>("/courier/deliveries/today"));
+const parcel = async (n: number) => schemas.courierDeliveryDetailSchema.parse(await get(`/courier/deliveries/${P(n)}`));
+const status = async (n: number, body: unknown) =>
+  schemas.courierDeliveryDetailSchema.parse(await post(`/courier/deliveries/${P(n)}/status`, body));
+const unable = async (n: number, body: unknown) =>
+  schemas.courierDeliveryDetailSchema.parse(await post(`/courier/deliveries/${P(n)}/unable-to-collect`, body));
+
+/** A small JPEG-looking photo of the signed slip, as the browser would send it. */
+const slip = (name = "slip.jpg", type = "image/jpeg", size = 3) =>
+  new File([new Uint8Array(size).fill(0xff)], name, { type });
+const upload = async (n: number, file: Blob = slip()) => {
+  const body = new FormData();
+  body.append("file", file);
+  return schemas.proofUploadSchema.parse(await post(`/courier/deliveries/${P(n)}/proof`, body));
+};
+
+async function rejectsWith(promise: Promise<unknown>, code: string, field?: string) {
   await assert.rejects(promise, (error: unknown) => {
-    assert.ok(error instanceof ApiError);
+    assert.ok(error instanceof ApiError, "an ApiError, like apiFetch throws");
     assert.equal(error.code, code);
-    assert.equal(error.status, status);
+    if (field) assert.ok(field in (error.fieldErrors ?? {}), `field error on ${field}`);
     return true;
   });
 }
 
-// ---- The switch ----
+// ---- The flag ----
 
-test("preview is off by default, needs exactly \"true\", and is never on in production", () => {
-  assert.equal(isCourierPreviewEnabled(undefined, "development"), false);
-  assert.equal(isCourierPreviewEnabled("", "development"), false);
-  assert.equal(isCourierPreviewEnabled("false", "development"), false);
-  assert.equal(isCourierPreviewEnabled("1", "development"), false);
-  assert.equal(isCourierPreviewEnabled("TRUE", "development"), false);
-  assert.equal(isCourierPreviewEnabled("true", "development"), true);
-  assert.equal(isCourierPreviewEnabled("true", "test"), true);
-  assert.equal(isCourierPreviewEnabled("true", "production"), false);
-  assert.equal(COURIER_PREVIEW, true, "this test file loads the modules with the flag on");
-});
-
-test("api.ts only uses the preview behind the flag, and calls apiFetch otherwise", () => {
-  const source = fs.readFileSync(path.join(SRC_ROOT, "features/courier/api.ts"), "utf8");
-  assert.match(source, /const request: typeof apiFetch = COURIER_PREVIEW \? courierPreviewFetch : apiFetch;/);
-  assert.equal((source.match(/await request<unknown>\(/g) ?? []).length, 7);
-  assert.doesNotMatch(source, /fetch\(/);
-  const flag = fs.readFileSync(path.join(SRC_ROOT, "features/courier/preview/flag.ts"), "utf8");
-  assert.match(flag, /process\.env\.NODE_ENV !== "production" && process\.env\.NEXT_PUBLIC_COURIER_PREVIEW === "true"/);
-});
-
-test("the preview code never calls fetch or apiFetch", () => {
-  for (const file of ["preview-api.ts", "data.ts", "rules.ts", "flag.ts"]) {
-    const source = fs.readFileSync(path.join(SRC_ROOT, "features/courier/preview", file), "utf8");
-    assert.doesNotMatch(source, /\bfetch\(/, file);
-    assert.doesNotMatch(source, /apiFetch\(/, file);
+test("proof in preview never reaches the backend or Cloudinary: upload and image both go through the preview switch", () => {
+  const api = readSource("features/courier/api.ts");
+  // The upload is sent with `request` (courierPreviewFetch when preview is on), never apiFetch directly.
+  assert.match(api, /async uploadProof[\s\S]*?await request<unknown>\(endpoint, \{ method: "POST", body \}\)/);
+  assert.match(api, /proofImageUrl\(parcelId: string\): string \| null \{\s*return COURIER_PREVIEW \? previewProofImageUrl\(parcelId\) : apiUrl/);
+  const previewApi = readSource("features/courier/preview/preview-api.ts");
+  assert.doesNotMatch(previewApi, /\bfetch\(|apiFetch\(|apiUrl\(/, "preview answers from memory only");
+  // No Cloudinary anywhere in the frontend: storage is the backend's business.
+  const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
+  for (const file of walk(SRC_ROOT).filter((name) => /\.(ts|tsx)$/.test(name))) {
+    assert.doesNotMatch(fs.readFileSync(file, "utf8"), /cloudinary/i, `${file} mentions Cloudinary`);
   }
 });
 
-test("the courier layout shows the preview banner, which renders nothing when preview is off", () => {
-  const layout = fs.readFileSync(path.join(SRC_ROOT, "app/courier/layout.tsx"), "utf8");
-  assert.match(layout, /<CourierPreviewBanner \/>/);
-  const banner = fs.readFileSync(path.join(SRC_ROOT, "features/courier/components/preview-banner.tsx"), "utf8");
-  assert.match(banner, /if \(!COURIER_PREVIEW\) return null;/);
-  assert.match(banner, /nothing is sent to the server/);
+test("preview is off by default, needs exactly \"true\", and never runs in production", () => {
+  assert.equal(flag.isCourierPreviewEnabled(undefined, "development"), false);
+  assert.equal(flag.isCourierPreviewEnabled("1", "development"), false);
+  assert.equal(flag.isCourierPreviewEnabled("true", "development"), true);
+  assert.equal(flag.isCourierPreviewEnabled("true", "production"), false);
+  assert.equal(flag.COURIER_PREVIEW, false, "off in the test run (no NEXT_PUBLIC_COURIER_PREVIEW)");
+  const api = readSource("features/courier/api.ts");
+  assert.match(api, /const request: typeof apiFetch = COURIER_PREVIEW \? courierPreviewFetch : apiFetch;/);
+  const previewSource = readSource("features/courier/preview/preview-api.ts");
+  assert.doesNotMatch(previewSource, /\bfetch\(/, "the preview never calls fetch");
 });
 
-// ---- Sample data ----
+// ---- Today ----
 
-test("today's tasks: pickups and deliveries only, a later day, two done today; in the backend's order", async () => {
-  fresh();
-  const today = await courierApi.today();
-  const types = new Set(today.assignments.map((task) => task.type));
-  assert.deepEqual([...types].sort(), ["DELIVERY", "PICKUP"], "no branch transfers: they aren't courier work");
-  assert.ok(today.assignments.some((task) => task.scheduledFor > today.date), "a task for a later day");
-  assert.equal(today.completedToday, 2);
-  assert.equal(today.open, today.assignments.filter((task) => task.status !== "COMPLETED").length);
-  assert.ok(today.assignments.some((task) => task.canComplete), "a task ready to complete");
-
-  const groups = today.assignments.map((task) =>
-    task.status === "IN_PROGRESS" ? 0 : task.status === "ASSIGNED" ? 1 : 2,
-  );
-  assert.deepEqual(groups, [...groups].sort((a, b) => a - b));
-  assert.equal(fetchCalls, 0);
+test("today: one entry per parcel, active and completed, in the backend's order; cancelled work left out", async () => {
+  reset();
+  const data = await today();
+  assert.equal(data.date, "2026-11-05");
+  const ids = data.items.map((item) => item.parcelId);
+  assert.equal(new Set(ids).size, ids.length, "each parcel once");
+  assert.ok(!ids.includes(P(14)), "the cancelled pickup isn't shown");
+  assert.ok(!ids.includes(P(15)), "parcels completed on earlier days aren't shown");
+  const active = data.items.filter((item) => !item.completed);
+  const completed = data.items.filter((item) => item.completed);
+  assert.equal(data.toDo, active.length);
+  assert.equal(data.done, completed.length);
+  // Order: open pickups, then the other active parcels, then completed ones (newest first).
+  const firstDelivery = data.items.findIndex((item) => !item.completed && item.stop === "DELIVERY");
+  const lastPickup = data.items.map((item) => !item.completed && item.stop === "PICKUP").lastIndexOf(true);
+  assert.ok(lastPickup < firstDelivery);
+  assert.ok(data.items.findIndex((item) => item.completed) > data.items.map((item) => !item.completed).lastIndexOf(true));
 });
 
-test("every task, item and parcel answer passes the courier response schemas", async () => {
-  fresh();
-  const today = await courierApi.today();
-  const first = await courierApi.history({ page: 0, size: 100 });
-  const ids = new Set([...today.assignments, ...first.content].map((task) => task.assignmentId));
-  const parcelIds = new Set<string>();
-
-  for (const id of ids) {
-    const task = await courierApi.task(id);
-    assert.ok(schemas.courierTaskDetailSchema.safeParse(task).success, id);
-    for (const entry of task.items) parcelIds.add(entry.parcelId);
-  }
-  for (const parcelId of parcelIds) {
-    const parcel = await courierApi.parcel(parcelId);
-    assert.ok(schemas.courierParcelDetailSchema.safeParse(parcel).success, parcelId);
-    assert.ok(parcel.history.length > 0);
-    assert.equal(parcel.history[0].status, parcel.status, "history is newest first and ends at the status");
-  }
-  assert.ok(parcelIds.size >= 30, `${parcelIds.size} parcels`);
-  assert.equal(fetchCalls, 0);
+test("siblings in one task: one handed over (completed) while the others stay active", async () => {
+  reset();
+  const data = await today();
+  const task = data.items.find((item) => item.parcelId === P(3))!.task.assignmentId;
+  const siblings = data.items.filter((item) => item.task.assignmentId === task);
+  assert.equal(siblings.length, 3, "the three parcels of the same task are three cards");
+  assert.deepEqual(siblings.map((item) => item.completed).sort(), [false, false, true]);
+  assert.equal(siblings[0].task.status, "IN_PROGRESS");
 });
 
-test("the sample has no branch transfer anywhere: today, history or the parcels' tasks", async () => {
-  fresh();
-  const today = await courierApi.today();
-  const history = await courierApi.history({ page: 0, size: 100 });
-  const tasks = [...today.assignments, ...history.content];
-  assert.ok(tasks.length > 0);
-  assert.ok(tasks.every((task) => task.type === "PICKUP" || task.type === "DELIVERY"));
-  for (const task of tasks) {
-    const detail = await courierApi.task(task.assignmentId);
-    for (const entry of detail.items) {
-      const parcel = await courierApi.parcel(entry.parcelId);
-      assert.ok(parcel.myItems.every((mine) => mine.type !== "TRANSFER"), parcel.trackingNumber);
-    }
-  }
-  assert.equal(rules.nextOutcomes("TRANSFER", "PENDING").length, 0, "no transfer steps in the preview");
-  assert.equal(fetchCalls, 0);
+test("pickups and deliveries only: no transfer today or in history", async () => {
+  reset();
+  const data = await today();
+  assert.ok(data.items.length > 0);
+  assert.ok(data.items.every((item) => item.task.type === "PICKUP" || item.task.type === "DELIVERY"));
+  assert.ok(data.items.every((item) => !item.nextStatuses.includes("IN_TRANSIT")), "no transfer step offered");
+  const all = await get<Page>("/courier/deliveries/history", { page: 0, size: 100 });
+  assert.ok(all.content.every((item) => item.task.type === "PICKUP" || item.task.type === "DELIVERY"));
+  assert.equal(readSource("features/courier/preview/data.ts").match(/"TRANSFER"/g), null, "no transfer in the sample");
 });
 
-test("the sample covers each step: waiting, collected, out for delivery, delivered, failed, not taken, handed over, returned", async () => {
-  fresh();
-  const delivery = await taskOfType("DELIVERY", "IN_PROGRESS");
-  assert.deepEqual(byOutcome(delivery, "PENDING")[0].allowedOutcomes, ["LOADED", "NOT_LOADED"]);
-  assert.deepEqual(byOutcome(delivery, "LOADED")[0].allowedOutcomes, ["DELIVERED", "FAILED"]);
-  assert.ok(byOutcome(delivery, "LOADED")[0].codAmount, "cash to collect");
-  assert.equal(byOutcome(delivery, "DELIVERED")[0].contact, null, "no contact once delivered");
-  const failed = byOutcome(delivery, "FAILED")[0];
-  assert.equal(failed.parcelStatus, "FAILED");
-  assert.equal(failed.readyForHandover, true, "a failed delivery can be returned");
-
-  const pickup = await taskOfType("PICKUP", "IN_PROGRESS");
-  const collected = byOutcome(pickup, "COLLECTED")[0];
-  assert.equal(collected.parcelStatus, "PICKED_UP");
-  assert.equal(collected.readyForHandover, true, "a collected parcel can be handed over");
-  assert.deepEqual(byOutcome(pickup, "PENDING")[0].allowedOutcomes, ["COLLECTED", "NOT_COLLECTED"]);
-  assert.ok(byOutcome(pickup, "PENDING")[0].contact, "the sender while the parcel is open");
-  assert.equal(byOutcome(pickup, "NOT_COLLECTED")[0].problem, "SENDER_UNAVAILABLE");
-  assert.ok(pickup.items.every((entry) => entry.codAmount === null), "no cash on a pickup");
-
-  const today = await courierApi.today();
-  const doneToday = today.assignments.filter((task) => task.status === "COMPLETED");
-  assert.deepEqual(doneToday.map((task) => task.type).sort(), ["DELIVERY", "PICKUP"]);
-  const finished = await Promise.all(doneToday.map((task) => courierApi.task(task.assignmentId)));
-  const outcomes = finished.flatMap((task) => task.items.map((entry) => entry.outcome)).sort();
-  assert.deepEqual(outcomes, ["DELIVERED", "HANDED_OVER", "NOT_COLLECTED", "RETURNED"]);
+test("privacy: contacts only in an open step; none once completed", async () => {
+  reset();
+  const data = await today();
+  const byId = new Map(data.items.map((item) => [item.parcelId, item]));
+  assert.ok(byId.get(P(1))!.pickup, "an open pickup has the sender");
+  assert.equal(byId.get(P(1))!.recipient, null);
+  assert.ok(byId.get(P(6))!.recipient, "an open delivery has the recipient");
+  assert.equal(byId.get(P(6))!.pickup, null);
+  assert.equal(byId.get(P(3))!.pickup, null, "completed: no contact");
+  assert.equal(byId.get(P(9))!.recipient, null, "completed delivery: no contact");
+  assert.ok(byId.get(P(3))!.from && byId.get(P(3))!.to, "from/to are always there");
+  const detail = await parcel(9);
+  assert.ok(!JSON.stringify(detail.history).includes("note"), "history has no notes");
 });
 
-// ---- Walking through the tasks ----
-
-test("pickup: collect, couldn't collect, hand over at the branch, then complete", async () => {
-  fresh();
-  const pickup = await taskOfType("PICKUP", "ASSIGNED");
-  const [first, second, third] = pickup.items;
-
-  await rejects(courierApi.complete(pickup.assignmentId), "ASSIGNMENT_NOT_FINISHED", 409);
-  await rejects(
-    courierApi.handover(pickup.assignmentId, { parcelIds: [first.parcelId], receivedBy: "Chamari" }),
-    "TASK_STEP_NOT_ALLOWED",
-    409,
-  );
-
-  let task = await courierApi.recordOutcome(pickup.assignmentId, first.parcelId, { outcome: "COLLECTED" });
-  assert.equal(task.status, "IN_PROGRESS", "the first step starts the task");
-  assert.equal(task.items[0].parcelStatus, "PICKED_UP");
-  assert.equal(task.items[0].readyForHandover, true);
-  task = await courierApi.recordOutcome(pickup.assignmentId, second.parcelId, { outcome: "COLLECTED" });
-  task = await courierApi.recordOutcome(pickup.assignmentId, third.parcelId, {
-    outcome: "NOT_COLLECTED",
-    problem: "SENDER_UNAVAILABLE",
-  });
-  assert.equal(task.counts.problems, 1);
-
-  task = await courierApi.handover(pickup.assignmentId, {
-    parcelIds: [first.parcelId, second.parcelId],
-    receivedBy: "Chamari",
-  });
-  assert.deepEqual(task.items.map((entry) => entry.outcome), ["HANDED_OVER", "HANDED_OVER", "NOT_COLLECTED"]);
-  assert.equal(task.canComplete, true);
-
-  const parcel = await courierApi.parcel(first.parcelId);
-  assert.equal(parcel.status, "AT_BRANCH");
-  assert.equal(parcel.currentBranch, "COLOMBO");
-
-  const done = await courierApi.complete(pickup.assignmentId);
-  assert.equal(done.status, "COMPLETED");
-  await rejects(
-    courierApi.recordOutcome(pickup.assignmentId, third.parcelId, { outcome: "COLLECTED" }),
-    "ASSIGNMENT_CLOSED",
-    409,
-  );
-  const today = await courierApi.today();
-  assert.equal(today.completedToday, 3);
-  assert.equal(fetchCalls, 0);
+test("a parcel not at the task's origin branch can't be taken out, only marked Unable to Collect", async () => {
+  reset();
+  const waiting = (await today()).items.find((item) => item.parcelId === P(10))!;
+  assert.deepEqual(waiting.nextStatuses, []);
+  assert.equal(waiting.canMarkUnableToCollect, true);
+  // The step allows it, but the parcel isn't at the task's origin branch: the backend's INVALID_STATUS_TRANSITION.
+  await rejectsWith(status(10, { status: "OUT_FOR_DELIVERY" }), "INVALID_STATUS_TRANSITION");
 });
 
-test("pickup in progress: collect the waiting parcel, hand over some now and the rest later, then complete", async () => {
-  fresh();
-  const pickup = await taskOfType("PICKUP", "IN_PROGRESS");
-  const waiting = byOutcome(pickup, "PENDING")[0];
-  const collected = byOutcome(pickup, "COLLECTED")[0];
-  let task = await courierApi.recordOutcome(pickup.assignmentId, waiting.parcelId, { outcome: "COLLECTED" });
-  assert.equal(task.items.find((entry) => entry.parcelId === waiting.parcelId)?.parcelStatus, "PICKED_UP");
-  assert.equal(task.items.filter((entry) => entry.readyForHandover).length, 2);
+// ---- Workflows ----
 
-  // Leave one out of the first handover: it stays ready, and the task can't be completed yet.
-  task = await courierApi.handover(pickup.assignmentId, { parcelIds: [collected.parcelId], receivedBy: "Colombo branch desk" });
-  assert.equal(task.canComplete, false);
-  await rejects(courierApi.complete(pickup.assignmentId), "ASSIGNMENT_NOT_FINISHED", 409);
-  task = await courierApi.handover(pickup.assignmentId, { parcelIds: [waiting.parcelId], receivedBy: "Colombo branch desk" });
-  assert.equal(task.canComplete, true);
-  const parcel = await courierApi.parcel(waiting.parcelId);
-  assert.equal(parcel.status, "AT_BRANCH");
-  assert.equal(parcel.currentBranch, pickup.destinationBranch);
-  assert.equal((await courierApi.complete(pickup.assignmentId)).status, "COMPLETED");
+test("pickup: PICKED_UP keeps it active; AT_BRANCH needs receivedBy and completes it; the task completes after its last parcel", async () => {
+  reset();
+  let after = await status(1, { status: "PICKED_UP" });
+  assert.equal(after.completed, false, "picked up is not completed");
+  assert.deepEqual(after.nextStatuses, ["AT_BRANCH"]);
+
+  await rejectsWith(status(1, { status: "AT_BRANCH" }), "VALIDATION_FAILED", "receivedBy");
+  await rejectsWith(status(1, { status: "AT_BRANCH", receivedBy: " A " }), "VALIDATION_FAILED", "receivedBy");
+  after = await status(1, { status: "AT_BRANCH", receivedBy: "  S. Silva " });
+  assert.equal(after.completed, true);
+  assert.equal(after.task.receivedBy, "S. Silva", "trimmed");
+  assert.equal(after.task.outcome, "HANDED_OVER");
+  assert.equal(after.task.status, "IN_PROGRESS", "a sibling (picked up) is still active");
+  assert.equal(after.pickup, null, "no contact once completed");
+
+  after = await status(2, { status: "AT_BRANCH", receivedBy: "S. Silva" });
+  assert.equal(after.task.status, "COMPLETED", "the backend rule: the last parcel completes the task");
+  await rejectsWith(status(2, { status: "AT_BRANCH", receivedBy: "S. Silva" }), "ASSIGNMENT_CLOSED");
 });
 
-test("delivery: deliver, fail, return the failed parcels to the branch, then complete", async () => {
-  fresh();
-  const delivery = await taskOfType("DELIVERY", "IN_PROGRESS");
-  const waiting = byOutcome(delivery, "PENDING")[0];
-  const out = byOutcome(delivery, "LOADED")[0];
+test("delivery: out for delivery, delivered with recipientName; FAILED stays active until the AT_BRANCH return", async () => {
+  reset();
+  let after = await status(6, { status: "OUT_FOR_DELIVERY" });
+  assert.equal(after.completed, false);
+  assert.deepEqual(after.nextStatuses, ["DELIVERED", "FAILED"]);
+  await rejectsWith(status(6, { status: "DELIVERED" }), "VALIDATION_FAILED", "recipientName");
+  await rejectsWith(status(6, { status: "DELIVERED", recipientName: "Ayesha" }), "VALIDATION_FAILED", "proofPhotoId");
+  const photo = await upload(6);
+  after = await status(6, { status: "DELIVERED", recipientName: "Ayesha", proofPhotoId: photo.proofPhotoId });
+  assert.equal(after.completed, true);
+  assert.deepEqual(after.proof, { recipientName: "Ayesha", hasPhoto: true });
+  assert.ok(preview.previewProofImageUrl(P(6)), "the picked photo is shown from memory");
 
-  await rejects(
-    courierApi.recordOutcome(delivery.assignmentId, waiting.parcelId, { outcome: "DELIVERED", recipientName: "A B" }),
-    "TASK_STEP_NOT_ALLOWED",
-    409,
-  );
-  await rejects(
-    courierApi.recordOutcome(delivery.assignmentId, out.parcelId, { outcome: "FAILED", failureReason: "OTHER" }),
-    "VALIDATION_FAILED",
-    400,
-  );
-
-  await courierApi.recordOutcome(delivery.assignmentId, waiting.parcelId, { outcome: "LOADED" });
-  await courierApi.recordOutcome(delivery.assignmentId, waiting.parcelId, {
-    outcome: "DELIVERED",
-    recipientName: "Fathima Nazeer",
-  });
-  let task = await courierApi.recordOutcome(delivery.assignmentId, out.parcelId, {
-    outcome: "FAILED",
-    failureReason: "WRONG_ADDRESS",
-  });
-  assert.equal(task.canComplete, false, "failed parcels are still with the courier");
-
-  const toReturn = task.items.filter((entry) => entry.readyForHandover).map((entry) => entry.parcelId);
-  assert.equal(toReturn.length, 2);
-  task = await courierApi.handover(delivery.assignmentId, { parcelIds: toReturn, receivedBy: "Colombo branch desk" });
-  assert.equal(byOutcome(task, "RETURNED").length, 2);
-  assert.ok(byOutcome(task, "RETURNED").every((entry) => entry.failureReason !== null), "keeps the failure reason");
-  assert.equal(task.canComplete, true);
-
-  const parcel = await courierApi.parcel(out.parcelId);
-  assert.equal(parcel.status, "AT_BRANCH");
-  assert.equal(parcel.currentBranch, "COLOMBO");
-  assert.deepEqual(parcel.history.slice(0, 2).map((entry) => entry.status), ["AT_BRANCH", "FAILED"]);
-  assert.equal((await courierApi.complete(delivery.assignmentId)).status, "COMPLETED");
+  await rejectsWith(status(7, { status: "FAILED" }), "VALIDATION_FAILED", "failureReason");
+  await rejectsWith(status(7, { status: "FAILED", failureReason: "OTHER", note: "no" }), "VALIDATION_FAILED", "note");
+  after = await status(7, { status: "FAILED", failureReason: "WRONG_ADDRESS" });
+  assert.equal(after.completed, false, "FAILED alone is not completed");
+  assert.deepEqual(after.nextStatuses, ["AT_BRANCH"]);
+  assert.equal(after.failureReason, "WRONG_ADDRESS");
+  after = await status(7, { status: "AT_BRANCH", receivedBy: "M. Perera" });
+  assert.equal(after.completed, true);
+  assert.equal(after.task.outcome, "RETURNED");
+  assert.equal(after.status, "AT_BRANCH");
 });
 
-test("unknown tasks and parcels answer 404, like another courier's", async () => {
-  fresh();
-  const unknown = "7e570000-0000-4000-8000-999999999999";
-  await rejects(courierApi.task(unknown), "NOT_FOUND", 404);
-  await rejects(courierApi.parcel(unknown), "NOT_FOUND", 404);
-  await rejects(courierApi.complete(unknown), "NOT_FOUND", 404);
+test("Unable to Collect: one action for pickups and deliveries; the backend picks the outcome; the status stays", async () => {
+  reset();
+  await rejectsWith(unable(4, { problem: "OTHER" }), "VALIDATION_FAILED", "note");
+  await rejectsWith(unable(4, {}), "VALIDATION_FAILED", "problem");
+  let after = await unable(4, { problem: "SENDER_UNAVAILABLE" });
+  assert.equal(after.task.outcome, "NOT_COLLECTED");
+  assert.equal(after.task.problem, "SENDER_UNAVAILABLE");
+  assert.equal(after.status, "CREATED", "the parcel never moved");
+  assert.equal(after.completed, true);
+
+  after = await unable(10, { problem: "OTHER", note: "Not at the branch yet" });
+  assert.equal(after.task.outcome, "NOT_LOADED");
+  assert.equal(after.task.status, "COMPLETED", "its only parcel: the task completes");
+
+  await rejectsWith(unable(2, { problem: "PARCEL_MISSING" }), "TASK_STEP_NOT_ALLOWED");
+});
+
+test("the button pressed twice, a skipped step, a cancelled task: the backend's 409s", async () => {
+  reset();
+  await status(1, { status: "PICKED_UP" });
+  await rejectsWith(status(1, { status: "PICKED_UP" }), "TASK_STEP_NOT_ALLOWED");
+  await rejectsWith(status(4, { status: "AT_BRANCH", receivedBy: "S. Silva" }), "TASK_STEP_NOT_ALLOWED");
+  await rejectsWith(status(14, { status: "PICKED_UP" }), "ASSIGNMENT_CLOSED");
+  await rejectsWith(get("/courier/deliveries/7e570000-0000-4000-8000-999999999999"), "NOT_FOUND");
+});
+
+test("a cancelled parcel's page: not completed, nothing to do, no contact", async () => {
+  reset();
+  const cancelled = await parcel(14);
+  assert.equal(cancelled.task.status, "CANCELLED");
+  assert.equal(cancelled.completed, false);
+  assert.equal(cancelled.completedAt, null);
+  assert.deepEqual(cancelled.nextStatuses, []);
+  assert.equal(cancelled.canMarkUnableToCollect, false);
+  assert.equal(cancelled.pickup, null);
 });
 
 // ---- History ----
 
-test("history: closed tasks newest first, 2 pages of 20, search by tracking number", async () => {
-  fresh();
-  const first = await courierApi.history({ page: 0, size: 20 });
-  assert.equal(first.content.length, 20);
-  assert.ok(first.totalElements >= 25 && first.totalPages === 2, `${first.totalElements} closed tasks`);
-  assert.ok(first.content.every((task) => task.status === "COMPLETED" || task.status === "CANCELLED"));
-  assert.ok(first.content.some((task) => task.status === "CANCELLED"));
-  const closed = first.content.map((task) => task.completedAt ?? "");
-  assert.ok(closed.filter(Boolean).every((at, index, all) => index === 0 || all[index - 1] >= at));
+test("proof in preview: only for a parcel out for delivery, a valid image, its own parcel; never sent anywhere", async () => {
+  reset();
+  // A pickup and a delivery not taken out yet take no proof.
+  await rejectsWith(upload(1), "TASK_STEP_NOT_ALLOWED");
+  await rejectsWith(upload(6), "TASK_STEP_NOT_ALLOWED");
+  // Out for delivery: checked like the backend.
+  await rejectsWith(upload(7, slip("slip.gif", "image/gif")), "VALIDATION_FAILED", "file");
+  await rejectsWith(upload(7, slip("big.jpg", "image/jpeg", schemas.PROOF_MAX_BYTES + 1)), "VALIDATION_FAILED", "file");
+  await rejectsWith(upload(7, slip("fail-storage.jpg")), "SERVICE_UNAVAILABLE");
+  const sevens = await upload(7);
+  assert.equal(sevens.contentType, "image/jpeg");
 
-  const second = await courierApi.history({ page: 1, size: 20 });
-  assert.equal(second.content.length, first.totalElements - 20);
+  // Another parcel's photo can't be attached; DELIVERED without a photo is refused.
+  await status(6, { status: "OUT_FOR_DELIVERY" });
+  await rejectsWith(status(6, { status: "DELIVERED", recipientName: "Ayesha", proofPhotoId: sevens.proofPhotoId }),
+    "VALIDATION_FAILED", "proofPhotoId");
+  assert.equal((await parcel(6)).status, "OUT_FOR_DELIVERY");
+  await rejectsWith(status(6, { status: "FAILED", failureReason: "WRONG_ADDRESS", proofPhotoId: sevens.proofPhotoId }),
+    "VALIDATION_FAILED", "proofPhotoId");
 
-  // The parcel out for delivery today failed yesterday and this courier returned it to the branch.
-  const delivery = await taskOfType("DELIVERY", "IN_PROGRESS");
-  const out = byOutcome(delivery, "LOADED")[0];
-  const spaced = `${out.trackingNumber.slice(0, 6).toLowerCase()} ${out.trackingNumber.slice(6)}`;
-  const found = await courierApi.history({ trackingNumber: spaced });
-  assert.equal(found.totalElements, 1);
-  assert.equal(found.content[0].type, "DELIVERY");
-  const yesterday = await courierApi.task(found.content[0].assignmentId);
-  assert.equal(yesterday.items[0].outcome, "RETURNED");
-
-  const none = await courierApi.history({ trackingNumber: "SD0000000000" });
-  assert.equal(none.totalElements, 0);
-  assert.equal(fetchCalls, 0);
+  // Its own photo: delivered, and the proof can't be used twice or replaced.
+  const delivered = await status(7, { status: "DELIVERED", recipientName: "Nimal", proofPhotoId: sevens.proofPhotoId });
+  assert.deepEqual(delivered.proof, { recipientName: "Nimal", hasPhoto: true });
+  await rejectsWith(upload(7), "TASK_STEP_NOT_ALLOWED");
 });
 
-// ---- Same rules as the backend ----
+test("sample deliveries have a sample signed slip; history shows the proof flag", async () => {
+  reset();
+  const delivered = await parcel(9);
+  assert.deepEqual(delivered.proof, { recipientName: "Ayesha Fernando", hasPhoto: true });
+  assert.match(preview.previewProofImageUrl(P(9)) ?? "", /^data:image\/svg\+xml/);
+  assert.equal(preview.previewProofImageUrl(P(1)), null, "nothing for a parcel not delivered");
+  const page = await get<Page>("/courier/deliveries/history", { page: 0, size: 100 });
+  const deliveries = page.content.filter((item) => item.task.outcome === "DELIVERED");
+  assert.ok(deliveries.length > 0);
+  assert.ok(deliveries.every((item) => item.proof?.hasPhoto === true));
+  assert.ok(page.content.filter((item) => item.stop === "PICKUP").every((item) => item.proof === null));
+});
 
-test("the preview step rules match dispatch.ItemOutcome and ParcelMoves", () => {
-  const T = { PICKUP: { type: "PICKUP", originBranch: null, destinationBranch: "COLOMBO" } } as const;
-  assert.deepEqual(rules.nextOutcomes("PICKUP", "PENDING"), ["COLLECTED", "NOT_COLLECTED"]);
-  assert.deepEqual(rules.nextOutcomes("PICKUP", "COLLECTED"), ["HANDED_OVER"]);
+test("history: completed parcels only, newest first, paged; a search finds both tasks of a parcel worked twice", async () => {
+  reset();
+  const first = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 20 }));
+  assert.ok(first.totalElements > 20, "more than one page");
+  assert.equal(first.totalPages, Math.ceil(first.totalElements / 20));
+  assert.ok(first.content.every((item) => item.completed && item.nextStatuses.length === 0));
+  assert.ok(first.content.every((item) => item.pickup === null && item.recipient === null), "no contacts");
+  const times = first.content.map((item) => item.completedAt!);
+  assert.deepEqual([...times].sort().reverse(), times, "newest completion first");
+  assert.ok(!first.content.some((item) => item.parcelId === P(14)), "the cancelled parcel is never completed work");
 
-  assert.deepEqual(rules.nextOutcomes("DELIVERY", "PENDING"), ["LOADED", "NOT_LOADED"]);
-  assert.deepEqual(rules.nextOutcomes("DELIVERY", "LOADED"), ["DELIVERED", "FAILED"]);
-  assert.deepEqual(rules.nextOutcomes("DELIVERY", "FAILED"), ["RETURNED"]);
-  assert.deepEqual(rules.nextOutcomes("DELIVERY", "DELIVERED"), []);
+  const tracking = (await parcel(15)).trackingNumber;
+  const search = schemas.courierDeliveryPageSchema.parse(
+    await get<Page>("/courier/deliveries/history", { page: 0, size: 20, trackingNumber: ` ${tracking.toLowerCase().replace(/(\d{4})/, "$1 ")} ` }),
+  );
+  assert.equal(search.totalElements, 2, "returned once, delivered later: one entry per task");
+  assert.deepEqual(search.content.map((item) => item.task.outcome), ["DELIVERED", "RETURNED"]);
 
-  assert.equal(rules.closes("DELIVERY", "FAILED"), false);
-  assert.equal(rules.closes("DELIVERY", "RETURNED"), true);
-  assert.equal(rules.closes("PICKUP", "NOT_COLLECTED"), true);
-  assert.equal(rules.closes("DELIVERY", "NOT_LOADED"), true);
-  assert.equal(rules.closes("PICKUP", "COLLECTED"), false);
+  const none = await get<Page>("/courier/deliveries/history", { page: 0, size: 20, trackingNumber: "SD0000000000" });
+  assert.equal(none.totalElements, 0);
+  await rejectsWith(get("/courier/deliveries/history", { page: -1, size: 20 }), "VALIDATION_FAILED", "page");
+  await rejectsWith(get("/courier/deliveries/history", { page: 0, size: 101 }), "VALIDATION_FAILED", "size");
+});
 
-  assert.deepEqual(rules.allowedOutcomes(T.PICKUP, false, "COLLECTED"), [], "handover is never an outcome button");
-  assert.deepEqual(rules.allowedOutcomes(T.PICKUP, true, "PENDING"), [], "nothing once the task is closed");
-  assert.equal(rules.readyForHandover(T.PICKUP, false, "COLLECTED"), true);
-  assert.equal(rules.readyForHandover(T.PICKUP, true, "COLLECTED"), false);
-  assert.deepEqual(rules.parcelMove({ type: "DELIVERY", originBranch: "COLOMBO", destinationBranch: null }, "RETURNED"), {
-    status: "AT_BRANCH",
-    branch: "COLOMBO",
-  });
+test("a parcel completed today shows up in history at once, while its siblings are still active", async () => {
+  reset();
+  await status(2, { status: "AT_BRANCH", receivedBy: "S. Silva" });
+  const page = await get<Page>("/courier/deliveries/history", { page: 0, size: 5 });
+  assert.equal(page.content[0].parcelId, P(2));
+  assert.equal(page.content[0].task.status, "IN_PROGRESS", "the task is still in progress");
+});
+
+// ---- History entries (GET …/{parcelId}/history/{assignmentId}), as the backend ----
+
+test("history entry: each finished entry opens its own task, read-only, history up to its end, proof only on the delivery", async () => {
+  reset();
+  const page = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 100 }));
+  assert.ok(page.content.length > 0, "the sample has finished entries");
+  for (const item of page.content) {
+    const entry = schemas.courierDeliveryDetailSchema.parse(
+      await get(`/courier/deliveries/${item.parcelId}/history/${item.task.assignmentId}`),
+    );
+    assert.equal(entry.task.assignmentId, item.task.assignmentId, "that entry's own task, never the latest one");
+    assert.equal(entry.task.outcome, item.task.outcome);
+    assert.deepEqual(entry.nextStatuses, [], "read-only");
+    assert.equal(entry.canMarkUnableToCollect, false);
+    assert.equal(entry.pickup, null);
+    assert.equal(entry.recipient, null);
+    if (entry.completedAt) {
+      for (const event of entry.history) assert.ok(event.occurredAt <= entry.completedAt, "nothing after the entry finished");
+    }
+    const delivered = entry.task.type === "DELIVERY" && entry.task.outcome === "DELIVERED";
+    if (!delivered) assert.equal(entry.proof, null, "no delivery proof on a pickup, returned or not-taken entry");
+    if (!delivered) assert.equal(item.proof, null, "nor on its history row");
+  }
+});
+
+test("history entry: an open step, an unknown task or a parcel not in the task is not found", async () => {
+  reset();
+  const now = await today();
+  const open = now.items.find((item) => !item.completed);
+  assert.ok(open, "the sample has active work");
+  await rejectsWith(get(`/courier/deliveries/${open.parcelId}/history/${open.task.assignmentId}`), "NOT_FOUND");
+  await rejectsWith(get(`/courier/deliveries/${open.parcelId}/history/00000000-0000-4000-8000-000000000000`), "NOT_FOUND");
+  const page = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 100 }));
+  const finished = page.content[0];
+  // A parcel that isn't in that task.
+  await rejectsWith(get(`/courier/deliveries/${P(9999)}/history/${finished.task.assignmentId}`), "NOT_FOUND");
+});
+
+test("history filters in preview: type, outcome and completion days, applied before paging, with the backend's errors", async () => {
+  reset();
+  const all = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 100 }));
+  const pickups = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 100, type: "PICKUP" }));
+  assert.ok(pickups.content.every((item) => item.task.type === "PICKUP"));
+  assert.equal(pickups.totalElements, all.content.filter((item) => item.task.type === "PICKUP").length);
+  const delivered = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 100, outcome: "DELIVERED" }));
+  assert.ok(delivered.content.every((item) => item.task.outcome === "DELIVERED"));
+  const none = schemas.courierDeliveryPageSchema.parse(await get<Page>("/courier/deliveries/history", { page: 0, size: 100, completedTo: "2000-01-01" }));
+  assert.equal(none.totalElements, 0);
+  await rejectsWith(get("/courier/deliveries/history", { type: "TRANSFER" }), "VALIDATION_FAILED", "type");
+  await rejectsWith(get("/courier/deliveries/history", { completedFrom: "2026-11-21", completedTo: "2026-11-01" }), "VALIDATION_FAILED", "completedTo");
 });
