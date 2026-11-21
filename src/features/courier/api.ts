@@ -1,24 +1,22 @@
 import type { z } from "zod";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUrl } from "@/lib/api";
 import { CourierResponseError } from "./lib/errors";
 import { COURIER_PREVIEW } from "./preview/flag";
-import { courierPreviewFetch } from "./preview/preview-api";
+import { courierPreviewFetch, previewProofImageUrl } from "./preview/preview-api";
 import {
-  courierParcelDetailSchema,
-  courierTaskDetailSchema,
-  courierTaskPageSchema,
-  courierTasksTodaySchema,
-  courierTaskSummarySchema,
+  courierDeliveryDetailSchema,
+  courierDeliveryPageSchema,
+  courierTodaySchema,
+  proofUploadSchema,
 } from "./schemas";
 import type {
-  CourierParcelDetail,
-  CourierTaskDetail,
-  CourierTaskPage,
-  CourierTasksToday,
-  CourierTaskSummary,
-  HandoverRequest,
-  ItemOutcomeRequest,
-  TaskHistoryQuery,
+  CourierDeliveryDetail,
+  CourierDeliveryPage,
+  CourierToday,
+  DeliveryHistoryQuery,
+  ProofUpload,
+  StatusChangeRequest,
+  UnableToCollectRequest,
 } from "./types";
 
 /*
@@ -28,8 +26,8 @@ import type {
  */
 const request: typeof apiFetch = COURIER_PREVIEW ? courierPreviewFetch : apiFetch;
 
-const TASKS = "/courier/assignments";
-const task = (assignmentId: string) => `${TASKS}/${encodeURIComponent(assignmentId)}`;
+export const DELIVERIES = "/courier/deliveries";
+const delivery = (parcelId: string) => `${DELIVERIES}/${encodeURIComponent(parcelId)}`;
 
 /** The answer, checked against the courier contract; a mismatch throws CourierResponseError. */
 function checked<T>(schema: z.ZodType<T>, endpoint: string, data: unknown): T {
@@ -44,58 +42,82 @@ function checked<T>(schema: z.ZodType<T>, endpoint: string, data: unknown): T {
 }
 
 /*
- * Courier endpoints (API.md "Courier", role COURIER only; other roles get 403, other couriers' tasks and parcels 404).
- * Writes answer the task as it is after the change, so the screen shows that instead of loading it again.
+ * The courier endpoints (API.md "Courier", role COURIER only; other roles get 403, other couriers' parcels 404). This
+ * is the only courier client the courier screens use. Writes answer the parcel as it is after the change (with
+ * `completed` and `task.status` already updated), so a screen shows that at once and then loads again.
  */
 export const courierApi = {
-  /** GET /courier/assignments/today: every open task (any scheduled day), plus the ones closed today. */
-  async today(signal?: AbortSignal): Promise<CourierTasksToday> {
-    const endpoint = `${TASKS}/today`;
-    return checked(courierTasksTodaySchema, endpoint, await request<unknown>(endpoint, { signal }));
+  /** GET /courier/deliveries/today: active parcels (any day), plus the parcels completed today. */
+  async today(signal?: AbortSignal): Promise<CourierToday> {
+    const endpoint = `${DELIVERIES}/today`;
+    return checked(courierTodaySchema, endpoint, await request<unknown>(endpoint, { signal }));
   },
 
-  /** GET /courier/assignments/history: completed and cancelled tasks, newest first. */
+  /** GET /courier/deliveries/history: completed parcels, newest completion first; one entry per completed task. */
   async history(
-    { page = 0, size = 20, trackingNumber }: TaskHistoryQuery = {},
+    { page = 0, size = 20, trackingNumber, type, outcome, completedFrom, completedTo }: DeliveryHistoryQuery = {},
     signal?: AbortSignal,
-  ): Promise<CourierTaskPage> {
-    const endpoint = `${TASKS}/history`;
+  ): Promise<CourierDeliveryPage> {
+    const endpoint = `${DELIVERIES}/history`;
     const tracking = trackingNumber?.trim() || undefined;
-    const data = await request<unknown>(endpoint, { query: { page, size, trackingNumber: tracking }, signal });
-    return checked(courierTaskPageSchema, endpoint, data);
+    // Filters are applied by the backend before paging (never to the loaded page only); unset ones aren't sent.
+    const query = { page, size, trackingNumber: tracking, type, outcome, completedFrom, completedTo };
+    const data = await request<unknown>(endpoint, { query, signal });
+    return checked(courierDeliveryPageSchema, endpoint, data);
   },
 
-  /** GET /courier/assignments/{id}: one task with its parcels. 404 when it isn't yours. */
-  async task(assignmentId: string, signal?: AbortSignal): Promise<CourierTaskDetail> {
-    const endpoint = task(assignmentId);
-    return checked(courierTaskDetailSchema, endpoint, await request<unknown>(endpoint, { signal }));
+  /** GET /courier/deliveries/{parcelId}: one parcel with its history. 404 when it was never in your tasks. */
+  async delivery(parcelId: string, signal?: AbortSignal): Promise<CourierDeliveryDetail> {
+    const endpoint = delivery(parcelId);
+    return checked(courierDeliveryDetailSchema, endpoint, await request<unknown>(endpoint, { signal }));
   },
 
   /**
-   * POST /courier/assignments/{id}/items/{parcelId}/outcome: what happened to one parcel (not the handover). Moves the
-   * parcel status in the same step. 409: ASSIGNMENT_CLOSED, TASK_STEP_NOT_ALLOWED, INVALID_STATUS_TRANSITION,
-   * ASSIGNMENT_CHANGED (the dispatcher changed the task at the same moment): reload the task.
+   * GET /courier/deliveries/{parcelId}/history/{assignmentId}: one finished entry of the history exactly as it was
+   * (that task's step, read-only, history up to when it finished). 404 for an unknown or foreign task, a parcel not
+   * in it, or a step still open. Never falls back to the parcel's latest step.
    */
-  async recordOutcome(assignmentId: string, parcelId: string, body: ItemOutcomeRequest): Promise<CourierTaskDetail> {
-    const endpoint = `${task(assignmentId)}/items/${encodeURIComponent(parcelId)}/outcome`;
-    return checked(courierTaskDetailSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
+  async historyEntry(parcelId: string, assignmentId: string, signal?: AbortSignal): Promise<CourierDeliveryDetail> {
+    const endpoint = `${delivery(parcelId)}/history/${encodeURIComponent(assignmentId)}`;
+    return checked(courierDeliveryDetailSchema, endpoint, await request<unknown>(endpoint, { signal }));
   },
 
-  /** POST /courier/assignments/{id}/handover: hands the parcels over at the branch, all or nothing. */
-  async handover(assignmentId: string, body: HandoverRequest): Promise<CourierTaskDetail> {
-    const endpoint = `${task(assignmentId)}/handover`;
-    return checked(courierTaskDetailSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
+  /**
+   * POST /courier/deliveries/{parcelId}/status: the parcel's next status (one of its `nextStatuses`). 409:
+   * ASSIGNMENT_CLOSED, TASK_STEP_NOT_ALLOWED, INVALID_STATUS_TRANSITION, ASSIGNMENT_CHANGED: reload the parcel.
+   */
+  async changeStatus(parcelId: string, body: StatusChangeRequest): Promise<CourierDeliveryDetail> {
+    const endpoint = `${delivery(parcelId)}/status`;
+    return checked(courierDeliveryDetailSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
   },
 
-  /** POST /courier/assignments/{id}/complete (no body): once every item is closed. Changes no parcel status. */
-  async complete(assignmentId: string): Promise<CourierTaskSummary> {
-    const endpoint = `${task(assignmentId)}/complete`;
-    return checked(courierTaskSummarySchema, endpoint, await request<unknown>(endpoint, { method: "POST" }));
+  /**
+   * POST /courier/deliveries/{parcelId}/unable-to-collect: the courier couldn't take the parcel (only while
+   * `canMarkUnableToCollect`). The backend records NOT_COLLECTED or NOT_LOADED from the task; the parcel is completed.
+   */
+  async unableToCollect(parcelId: string, body: UnableToCollectRequest): Promise<CourierDeliveryDetail> {
+    const endpoint = `${delivery(parcelId)}/unable-to-collect`;
+    return checked(courierDeliveryDetailSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
   },
 
-  /** GET /courier/parcels/{parcelId}: a parcel from one of your tasks, with its history and your items for it. */
-  async parcel(parcelId: string, signal?: AbortSignal): Promise<CourierParcelDetail> {
-    const endpoint = `/courier/parcels/${encodeURIComponent(parcelId)}`;
-    return checked(courierParcelDetailSchema, endpoint, await request<unknown>(endpoint, { signal }));
+  /**
+   * POST /courier/deliveries/{parcelId}/proof (multipart, field "file"): the photo of the delivery slip the recipient
+   * signed, for a parcel out for delivery. Answers its `proofPhotoId`, to send with DELIVERED; it is attached only
+   * then. 400 `fieldErrors.file` for a wrong or unreadable image, 409 as for status changes, 503 when the image
+   * storage is down (nothing is kept).
+   */
+  async uploadProof(parcelId: string, photo: Blob, fileName = "delivery-slip.jpg"): Promise<ProofUpload> {
+    const endpoint = `${delivery(parcelId)}/proof`;
+    const body = new FormData();
+    body.append("file", photo, fileName);
+    return checked(proofUploadSchema, endpoint, await request<unknown>(endpoint, { method: "POST", body }));
+  },
+
+  /**
+   * Where the browser loads the proof photo of a parcel this courier delivered (GET .../{parcelId}/proof). The
+   * browser sends the login cookie itself; the image is never public. In preview mode, the sample photo in memory.
+   */
+  proofImageUrl(parcelId: string): string | null {
+    return COURIER_PREVIEW ? previewProofImageUrl(parcelId) : apiUrl(`${delivery(parcelId)}/proof`);
   },
 };

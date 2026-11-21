@@ -1,12 +1,5 @@
 import type { BadgeTone } from "@/components/ui/badge";
-import type {
-  AssignmentStatus,
-  AssignmentType,
-  FailureReason,
-  ItemOutcome,
-  RecordableOutcome,
-  TaskProblem,
-} from "../types";
+import type { AssignmentStatus, AssignmentType, FailureReason, ItemOutcome, TaskProblem } from "../types";
 
 /*
  * Words for the courier screens. The words for dispatch values are the same as in features/dispatch (labels.ts), so
@@ -21,6 +14,13 @@ export const ASSIGNMENT_TYPE_LABEL: Record<AssignmentType, string> = {
 };
 
 export const ASSIGNMENT_TYPES = Object.keys(ASSIGNMENT_TYPE_LABEL) as AssignmentType[];
+
+/** Courier work is pickups and deliveries only. A TRANSFER the API sends anyway is never shown or worked as one. */
+export type CourierTaskType = Extract<AssignmentType, "PICKUP" | "DELIVERY">;
+
+export function isCourierTaskType(type: AssignmentType): type is CourierTaskType {
+  return type === "PICKUP" || type === "DELIVERY";
+}
 
 export const ASSIGNMENT_STATUS_LABEL: Record<AssignmentStatus, string> = {
   ASSIGNED: "Not started",
@@ -64,46 +64,10 @@ export const ITEM_OUTCOME_TONE: Record<ItemOutcome, BadgeTone> = {
 
 export const ITEM_OUTCOMES = Object.keys(ITEM_OUTCOME_LABEL) as ItemOutcome[];
 
-/** Button words for the outcomes a courier records (the ones in an item's allowedOutcomes). */
-export const OUTCOME_ACTION_LABEL: Record<RecordableOutcome, string> = {
-  COLLECTED: "Mark as collected",
-  NOT_COLLECTED: "Couldn't collect",
-  LOADED: "Mark as loaded",
-  NOT_LOADED: "Couldn't load",
-  DELIVERED: "Mark as delivered",
-  FAILED: "Mark as failed",
-};
+/** The one action for every "couldn't take this parcel" situation (pickup or delivery). */
+export const UNABLE_TO_COLLECT_LABEL = "Unable to Collect";
 
-/**
- * Button words for a step in a task of this type. A delivery's LOADED is "out for delivery" (the parcel becomes
- * OUT_FOR_DELIVERY), so its words say that; everything else uses OUTCOME_ACTION_LABEL.
- */
-export function outcomeActionLabel(type: AssignmentType, outcome: RecordableOutcome): string {
-  if (type === "DELIVERY" && outcome === "LOADED") return "Mark out for delivery";
-  if (type === "DELIVERY" && outcome === "NOT_LOADED") return "Couldn't take out";
-  return OUTCOME_ACTION_LABEL[outcome];
-}
-
-/** Courier work is pickups and deliveries. A TRANSFER (branch to branch) is shown read only, never as courier work. */
-export type CourierTaskType = Extract<AssignmentType, "PICKUP" | "DELIVERY">;
-
-export function isCourierTaskType(type: AssignmentType): type is CourierTaskType {
-  return type === "PICKUP" || type === "DELIVERY";
-}
-
-/** The task's name in titles: "Pickup task", "Delivery task", and "Branch transfer" for an unexpected TRANSFER. */
-export function taskTitle(type: AssignmentType): string {
-  return type === "TRANSFER" ? "Branch transfer" : `${ASSIGNMENT_TYPE_LABEL[type]} task`;
-}
-
-/** The handover button: parcels go to the destination branch, or failed deliveries back to the origin branch. */
-export const HANDOVER_ACTION_LABEL: Record<AssignmentType, string> = {
-  PICKUP: "Hand over at branch",
-  TRANSFER: "Hand over at branch",
-  DELIVERY: "Return to branch",
-};
-
-/** Why a parcel couldn't be collected or loaded, in the backend's order. */
+/** Why a parcel couldn't be taken ("Unable to Collect"), in the backend's order. */
 export const TASK_PROBLEM_OPTIONS: { value: TaskProblem; label: string }[] = [
   { value: "SENDER_UNAVAILABLE", label: "Sender not available" },
   { value: "PARCEL_NOT_READY", label: "Parcel not ready" },
@@ -148,10 +112,9 @@ export function formatWeight(weightKg: number): string {
   return `${weightFormat.format(weightKg)} kg`;
 }
 
-/** Courier pages (planned in the WP9 roadmap; the task and parcel pages come with F2). */
+/** Courier pages. Every parcel screen is keyed by the parcel id; the dispatcher's task id is never in a URL. */
 export const courierRoutes = {
   today: "/courier",
   history: "/courier/history",
-  task: (assignmentId: string) => `/courier/tasks/${encodeURIComponent(assignmentId)}`,
   parcel: (parcelId: string) => `/courier/parcels/${encodeURIComponent(parcelId)}`,
 };

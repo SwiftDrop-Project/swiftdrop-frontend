@@ -9,20 +9,19 @@ import {
   TASK_PROBLEM_VALUES,
 } from "./lib/labels";
 import type {
-  CourierParcelDetail,
-  CourierTaskDetail,
-  CourierTaskItem,
-  CourierTaskPage,
-  CourierTasksToday,
-  CourierTaskSummary,
-  HandoverRequest,
-  ItemOutcomeRequest,
+  CourierDelivery,
+  CourierDeliveryDetail,
+  CourierDeliveryPage,
+  CourierToday,
+  ProofUpload,
+  StatusChangeRequest,
+  UnableToCollectRequest,
 } from "./types";
 
 /*
- * Requests: the same rules and messages as the backend (API.md "Validation rules (courier)",
- * ItemOutcomeRequest.java, HandoverRequest.java, CourierAssignmentService.validate). The backend trims the texts, so
- * the forms do too, and an empty note is left out. Change them together.
+ * Requests: the same rules and messages as the backend (API.md "Validation rules (courier)", StatusChangeRequest.java,
+ * UnableToCollectRequest.java, CourierDeliveryService.validate). The backend trims the texts, so the forms do too, and
+ * an empty note is left out. Change them together.
  */
 
 export const COURIER_MESSAGES = {
@@ -31,43 +30,58 @@ export const COURIER_MESSAGES = {
   problem: "Select why you couldn't take the parcel.",
   recipientName: "Enter the name of the person who received the parcel.",
   failureReason: "Select why the delivery failed.",
-  parcelIdsMin: "Select at least one parcel.",
-  parcelIdsMax: "Hand over at most 100 parcels at a time.",
-  parcelIdsUnique: "Select each parcel only once.",
-  receivedBy: "Enter the name of the person at the branch who received the parcels.",
+  receivedBy: "Enter the name of the person at the branch who received the parcel.",
   page: "Use a page number of 0 or more.",
   size: "Use a page size from 1 to 100.",
 } as const;
 
 export const NOTE_MAX_LENGTH = 500;
-export const HANDOVER_MAX_PARCELS = 100;
 export const HISTORY_MAX_PAGE_SIZE = 100;
+
+/*
+ * Proof of delivery photo (POST /courier/deliveries/{parcelId}/proof): a photo of the delivery slip the recipient
+ * signed. Same limits and words as the backend (ProofImages.java); the backend checks the real type from the bytes.
+ */
+export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+export const PROOF_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const PROOF_MESSAGES = {
+  required: "Add a photo of the signed delivery slip.",
+  tooLarge: "Use a photo up to 5 MB.",
+  wrongType: "Use a JPEG, PNG or WebP photo.",
+  unreadable: "This photo can't be read. Take it again.",
+} as const;
+
+/** What's wrong with a chosen proof photo, or null when it can be uploaded. */
+export function proofFileError(file: { type: string; size: number } | null): string | null {
+  if (!file || file.size === 0) return PROOF_MESSAGES.required;
+  if (!(PROOF_TYPES as readonly string[]).includes(file.type)) return PROOF_MESSAGES.wrongType;
+  if (file.size > PROOF_MAX_BYTES) return PROOF_MESSAGES.tooLarge;
+  return null;
+}
 /** A note describing an OTHER problem or failure: 3 characters or more. */
 const NOTE_OTHER_MIN_LENGTH = 3;
 
 const note = z.string().trim().max(NOTE_MAX_LENGTH, COURIER_MESSAGES.note);
 
-/** COLLECTED or LOADED: an optional note. */
-export const outcomeStepSchema = z.object({ note });
+/** PICKED_UP, OUT_FOR_DELIVERY: an optional note. */
+export const confirmStepSchema = z.object({ note });
 
-/** NOT_COLLECTED or NOT_LOADED: why (a plain string while the select is empty), and a note when it is OTHER. */
-export const notTakenSchema = z
-  .object({
-    problem: z.string().pipe(z.enum(TASK_PROBLEM_VALUES, { error: COURIER_MESSAGES.problem })),
-    note,
-  })
-  .refine((values) => values.problem !== "OTHER" || values.note.length >= NOTE_OTHER_MIN_LENGTH, {
-    path: ["note"],
-    message: COURIER_MESSAGES.noteOther,
-  });
+/**
+ * AT_BRANCH (a pickup's handover at the branch, or a failed delivery's return to it): who took it at the branch
+ * (2-100 characters, trimmed).
+ */
+export const handoverSchema = z.object({
+  receivedBy: personName(COURIER_MESSAGES.receivedBy),
+  note,
+});
 
-/** DELIVERED: who received the parcel (2-100 characters). */
+/** DELIVERED: who received the parcel (2-100 characters, trimmed). */
 export const deliveredSchema = z.object({
   recipientName: personName(COURIER_MESSAGES.recipientName),
   note,
 });
 
-/** FAILED: why, and a note when it is OTHER. */
+/** FAILED: why (a plain string while the select is empty), and a note when it is OTHER. */
 export const failedSchema = z
   .object({
     failureReason: z.string().pipe(z.enum(FAILURE_REASON_VALUES, { error: COURIER_MESSAGES.failureReason })),
@@ -78,30 +92,30 @@ export const failedSchema = z
     message: COURIER_MESSAGES.noteOther,
   });
 
-/** Handover: 1-100 different parcels, who took them at the branch (2-100 characters), an optional note. */
-export const handoverSchema = z.object({
-  parcelIds: z
-    .array(z.string())
-    .min(1, COURIER_MESSAGES.parcelIdsMin)
-    .max(HANDOVER_MAX_PARCELS, COURIER_MESSAGES.parcelIdsMax)
-    .refine((ids) => new Set(ids).size === ids.length, COURIER_MESSAGES.parcelIdsUnique),
-  receivedBy: personName(COURIER_MESSAGES.receivedBy),
-  note,
-});
+/** "Unable to Collect": why, and a note when it is OTHER. */
+export const unableToCollectSchema = z
+  .object({
+    problem: z.string().pipe(z.enum(TASK_PROBLEM_VALUES, { error: COURIER_MESSAGES.problem })),
+    note,
+  })
+  .refine((values) => values.problem !== "OTHER" || values.note.length >= NOTE_OTHER_MIN_LENGTH, {
+    path: ["note"],
+    message: COURIER_MESSAGES.noteOther,
+  });
 
 /** History paging: page 0 or more, size 1-100. */
-export const taskHistoryQuerySchema = z.object({
+export const historyQuerySchema = z.object({
   page: z.number().int().min(0, COURIER_MESSAGES.page),
   size: z.number().int().min(1, COURIER_MESSAGES.size).max(HISTORY_MAX_PAGE_SIZE, COURIER_MESSAGES.size),
 });
 
-export type OutcomeStepValues = z.input<typeof outcomeStepSchema>;
-export type NotTakenInput = z.input<typeof notTakenSchema>;
-export type NotTakenValues = z.output<typeof notTakenSchema>;
+export type ConfirmStepValues = z.input<typeof confirmStepSchema>;
+export type HandoverValues = z.input<typeof handoverSchema>;
 export type DeliveredValues = z.input<typeof deliveredSchema>;
 export type FailedInput = z.input<typeof failedSchema>;
 export type FailedValues = z.output<typeof failedSchema>;
-export type HandoverValues = z.input<typeof handoverSchema>;
+export type UnableToCollectInput = z.input<typeof unableToCollectSchema>;
+export type UnableToCollectValues = z.output<typeof unableToCollectSchema>;
 
 /** The API treats an empty note as no note; leave it out of the request. */
 export function optionalNote(value: string): string | undefined {
@@ -109,30 +123,31 @@ export function optionalNote(value: string): string | undefined {
 }
 
 /*
- * Request bodies from parsed (trimmed) form values. Each outcome sends only its own fields.
+ * Request bodies from parsed (trimmed) form values. Each status sends only its own fields.
  */
 
-export function outcomeStepRequest(
-  outcome: "COLLECTED" | "LOADED",
-  values: z.output<typeof outcomeStepSchema>,
-): ItemOutcomeRequest {
-  return { outcome, note: optionalNote(values.note) };
+export function confirmStepRequest(
+  status: "PICKED_UP" | "OUT_FOR_DELIVERY",
+  values: z.output<typeof confirmStepSchema>,
+): StatusChangeRequest {
+  return { status, note: optionalNote(values.note) };
 }
 
-export function notTakenRequest(outcome: "NOT_COLLECTED" | "NOT_LOADED", values: NotTakenValues): ItemOutcomeRequest {
-  return { outcome, problem: values.problem, note: optionalNote(values.note) };
+export function handoverRequest(values: z.output<typeof handoverSchema>): StatusChangeRequest {
+  return { status: "AT_BRANCH", receivedBy: values.receivedBy, note: optionalNote(values.note) };
 }
 
-export function deliveredRequest(values: z.output<typeof deliveredSchema>): ItemOutcomeRequest {
-  return { outcome: "DELIVERED", recipientName: values.recipientName, note: optionalNote(values.note) };
+/** DELIVERED with the recipient's name and the proof photo the backend stored for this parcel. */
+export function deliveredRequest(values: z.output<typeof deliveredSchema>, proofPhotoId: string): StatusChangeRequest {
+  return { status: "DELIVERED", recipientName: values.recipientName, proofPhotoId, note: optionalNote(values.note) };
 }
 
-export function failedRequest(values: FailedValues): ItemOutcomeRequest {
-  return { outcome: "FAILED", failureReason: values.failureReason, note: optionalNote(values.note) };
+export function failedRequest(values: FailedValues): StatusChangeRequest {
+  return { status: "FAILED", failureReason: values.failureReason, note: optionalNote(values.note) };
 }
 
-export function handoverRequest(values: z.output<typeof handoverSchema>): HandoverRequest {
-  return { parcelIds: values.parcelIds, receivedBy: values.receivedBy, note: optionalNote(values.note) };
+export function unableToCollectRequest(values: UnableToCollectValues): UnableToCollectRequest {
+  return { problem: values.problem, note: optionalNote(values.note) };
 }
 
 /*
@@ -153,6 +168,7 @@ const PARCEL_STATUS_SET: Record<ParcelStatus, true> = {
 };
 
 const parcelStatus = z.enum(Object.keys(PARCEL_STATUS_SET) as [ParcelStatus, ...ParcelStatus[]]);
+// All three backend values, TRANSFER included, so an answer holding a transfer still parses (the screens filter it).
 const assignmentType = z.enum(ASSIGNMENT_TYPES as [(typeof ASSIGNMENT_TYPES)[number], ...typeof ASSIGNMENT_TYPES]);
 const assignmentStatus = z.enum(
   ASSIGNMENT_STATUSES as [(typeof ASSIGNMENT_STATUSES)[number], ...typeof ASSIGNMENT_STATUSES],
@@ -177,73 +193,42 @@ const contactSchema = z.object({
 
 const placeSchema = z.object({ city: z.string(), district });
 
-const summaryShape = {
+const taskSchema = z.object({
   assignmentId: id,
   type: assignmentType,
   status: assignmentStatus,
-  originBranch: district.nullable(),
-  destinationBranch: district.nullable(),
-  scheduledFor: day,
-  note: z.string().nullable(),
-  assignedAt: instant,
-  completedAt: instant.nullable(),
-  counts: z.object({ total: count, open: count, closed: count, problems: count }),
-  canComplete: z.boolean(),
-};
-
-export const courierTaskSummarySchema = z.object(summaryShape) satisfies z.ZodType<CourierTaskSummary>;
-
-export const courierTaskItemSchema = z.object({
-  parcelId: id,
-  trackingNumber: z.string(),
-  sequence: z.number().int(),
-  parcelStatus,
   outcome: itemOutcome,
-  allowedOutcomes: z.array(itemOutcome),
-  readyForHandover: z.boolean(),
-  contact: contactSchema.nullable(),
-  from: placeSchema,
-  to: placeSchema,
-  weightKg: z.number(),
-  codAmount: z.number().nullable(),
-  instructions: z.string().nullable(),
+  branch: district.nullable(),
   problem: taskProblem.nullable(),
-  failureReason: failureReason.nullable(),
-  recipientName: z.string().nullable(),
   receivedBy: z.string().nullable(),
-  note: z.string().nullable(),
-  updatedAt: instant,
-}) satisfies z.ZodType<CourierTaskItem>;
+});
 
-export const courierTaskDetailSchema = z.object({
-  ...summaryShape,
-  items: z.array(courierTaskItemSchema),
-}) satisfies z.ZodType<CourierTaskDetail>;
-
-export const courierTasksTodaySchema = z.object({
-  date: day,
-  open: count,
-  completedToday: count,
-  assignments: z.array(courierTaskSummarySchema),
-}) satisfies z.ZodType<CourierTasksToday>;
-
-export const courierTaskPageSchema = z.object({
-  content: z.array(courierTaskSummarySchema),
-  page: count,
-  size: count,
-  totalElements: count,
-  totalPages: count,
-}) satisfies z.ZodType<CourierTaskPage>;
-
-export const courierParcelDetailSchema = z.object({
+const deliveryShape = {
   parcelId: id,
   trackingNumber: z.string(),
   status: parcelStatus,
-  currentBranch: district.nullable(),
-  from: placeSchema,
-  to: placeSchema,
-  myItems: z.array(z.object({ assignmentId: id, type: assignmentType, outcome: itemOutcome })),
-  contact: contactSchema.nullable(),
+  stop: z.enum(["PICKUP", "DELIVERY"]),
+  pickup: contactSchema.nullable(),
+  recipient: contactSchema.nullable(),
+  from: placeSchema.nullable(),
+  to: placeSchema.nullable(),
+  weightKg: z.number(),
+  codAmount: z.number().nullable(),
+  instructions: z.string().nullable(),
+  assignedAt: instant,
+  updatedAt: instant,
+  nextStatuses: z.array(parcelStatus),
+  canMarkUnableToCollect: z.boolean(),
+  completed: z.boolean(),
+  completedAt: instant.nullable(),
+  proof: z.object({ recipientName: z.string().nullable(), hasPhoto: z.boolean() }).nullable(),
+  task: taskSchema,
+};
+
+export const courierDeliverySchema = z.object(deliveryShape) satisfies z.ZodType<CourierDelivery>;
+
+export const courierDeliveryDetailSchema = z.object({
+  ...deliveryShape,
   history: z.array(
     z.object({
       status: parcelStatus,
@@ -252,4 +237,27 @@ export const courierParcelDetailSchema = z.object({
       occurredAt: instant,
     }),
   ),
-}) satisfies z.ZodType<CourierParcelDetail>;
+  failureReason: failureReason.nullable(),
+}) satisfies z.ZodType<CourierDeliveryDetail>;
+
+export const proofUploadSchema = z.object({
+  proofPhotoId: id,
+  contentType: z.enum(PROOF_TYPES),
+  sizeBytes: z.number().int().positive(),
+  uploadedAt: instant,
+}) satisfies z.ZodType<ProofUpload>;
+
+export const courierTodaySchema = z.object({
+  date: day,
+  toDo: count,
+  done: count,
+  items: z.array(courierDeliverySchema),
+}) satisfies z.ZodType<CourierToday>;
+
+export const courierDeliveryPageSchema = z.object({
+  content: z.array(courierDeliverySchema),
+  page: count,
+  size: count,
+  totalElements: count,
+  totalPages: count,
+}) satisfies z.ZodType<CourierDeliveryPage>;

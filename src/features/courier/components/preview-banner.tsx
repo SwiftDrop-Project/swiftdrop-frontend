@@ -8,7 +8,7 @@ export function CourierPreviewBanner() {
   if (!COURIER_PREVIEW) return null;
   return (
     <InlineNotice tone="info" title="Preview mode: sample data, nothing is sent to the server" className="mb-6">
-      These tasks and parcels are made up for checking the courier screens. Your updates change only this
+      These parcels are made up for checking the courier screens. Your updates change only this
       browser&apos;s copy, and reloading the page starts again. To use the real API, remove
       NEXT_PUBLIC_COURIER_PREVIEW from .env.local and restart npm run dev.
     </InlineNotice>

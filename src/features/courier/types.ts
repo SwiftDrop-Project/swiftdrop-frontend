@@ -4,18 +4,24 @@ import type { DistrictCode, PageResponse, ParcelStatus } from "@/types";
  * Types matching the backend courier module's DTOs (../swiftdrop-backend/API.md "Courier",
  * courier/internal/dto/*.java). Change them together, and the response schemas in schemas.ts with them.
  *
- * A courier works TASKS (dispatch assignments). Each task holds one or more parcels ("items"). The task status and the
- * item outcomes belong to dispatch; the parcel status belongs to delivery. What the courier may do next comes from the
- * backend (allowedOutcomes, readyForHandover, canComplete): the frontend never works it out itself.
+ * A courier works PARCELS, one at a time. A dispatcher may group several parcels in one dispatch task (assignment),
+ * but the courier sees and updates each parcel on its own, and a parcel is completed as soon as its own step closes,
+ * whatever its sibling parcels are doing. The task completes by itself when its last parcel is completed: there is
+ * no "complete task" call. What the courier may do next always comes from the backend (`nextStatuses`,
+ * `canMarkUnableToCollect`) and whether they are done from `completed`: the frontend never works these out.
  */
 
-/** What the courier does in the task (backend dispatch.AssignmentType). */
+/**
+ * The kind of dispatch task the parcel is in (backend dispatch.AssignmentType). Courier work is only PICKUP and
+ * DELIVERY. TRANSFER stays in the type so a backend answer that holds one still parses, but the screens never show a
+ * transfer as courier work and offer no action for it (lib/labels isCourierTaskType).
+ */
 export type AssignmentType = "PICKUP" | "TRANSFER" | "DELIVERY";
 
-/** Where the task is (backend dispatch.AssignmentStatus). COMPLETED and CANCELLED are closed. */
+/** The whole task's status (backend dispatch.AssignmentStatus). COMPLETED and CANCELLED are closed. */
 export type AssignmentStatus = "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
-/** What happened to one parcel in one task (backend dispatch.ItemOutcome). Every item starts PENDING. */
+/** What happened to this parcel in this task (backend dispatch.ItemOutcome). Every parcel starts PENDING. */
 export type ItemOutcome =
   | "PENDING"
   | "COLLECTED"
@@ -27,7 +33,7 @@ export type ItemOutcome =
   | "NOT_COLLECTED"
   | "NOT_LOADED";
 
-/** Why the courier couldn't collect or load a parcel (backend dispatch.TaskProblem). OTHER needs a note. */
+/** Why the courier couldn't take a parcel ("Unable to Collect", backend dispatch.TaskProblem). OTHER needs a note. */
 export type TaskProblem =
   | "SENDER_UNAVAILABLE"
   | "PARCEL_NOT_READY"
@@ -45,7 +51,10 @@ export type FailureReason =
   | "PARCEL_DAMAGED"
   | "OTHER";
 
-/** ContactResponse: the sender (PICKUP) or recipient (DELIVERY). `phone` is +947XXXXXXXX. */
+/** What the courier does with the parcel (backend courier Stop): collect it, or deliver it. */
+export type Stop = "PICKUP" | "DELIVERY";
+
+/** ContactResponse: the sender (pickup) or the recipient (delivery). `phone` is +947XXXXXXXX. */
 export interface Contact {
   name: string;
   phone: string;
@@ -60,94 +69,62 @@ export interface Place {
   district: DistrictCode;
 }
 
-/** CountsResponse: the parcels in a task. `problems`: not collected / not loaded, and failed deliveries. */
-export interface TaskCounts {
-  total: number;
-  open: number;
-  closed: number;
-  problems: number;
-}
-
-/** AssignmentSummaryResponse: one task in the lists, and the answer of POST .../complete. */
-export interface CourierTaskSummary {
+/** TaskResponse: the courier's dispatch task for this parcel. */
+export interface CourierTask {
   assignmentId: string;
   type: AssignmentType;
+  /** The WHOLE task's status. It becomes COMPLETED by itself when its last parcel is completed. */
   status: AssignmentStatus;
-  /** TRANSFER and DELIVERY; null for PICKUP. */
-  originBranch: DistrictCode | null;
-  /** PICKUP and TRANSFER; null for DELIVERY. */
-  destinationBranch: DistrictCode | null;
-  /** The Sri Lankan day the dispatcher planned it for, "2026-11-09". Information only: a later day can be worked now. */
-  scheduledFor: string;
-  /** The dispatcher's note. */
-  note: string | null;
-  /** ISO timestamp. */
-  assignedAt: string;
-  /** ISO timestamp; set once COMPLETED (null for a cancelled task). */
-  completedAt: string | null;
-  counts: TaskCounts;
-  /** The task is open and every item is closed. */
-  canComplete: boolean;
+  /** This parcel's step in the task. */
+  outcome: ItemOutcome;
+  /**
+   * Where the parcel is handed over (AT_BRANCH goes here): a pickup's destination branch, a delivery's origin branch
+   * (where a failed delivery is returned, and where it is taken out from).
+   */
+  branch: DistrictCode | null;
+  /** Why it couldn't be collected (NOT_COLLECTED, NOT_LOADED); otherwise null. */
+  problem: TaskProblem | null;
+  /** Who took the parcel at the branch (handover or return); otherwise null. */
+  receivedBy: string | null;
 }
 
-/** AssignmentItemResponse: one parcel in a task detail. */
-export interface CourierTaskItem {
+/**
+ * CourierDeliveryResponse: one parcel in the courier's lists.
+ *
+ * Privacy: `pickup` (the sender) only in an open pickup step, `recipient` only in an open delivery step. Both are null
+ * once the parcel is completed or its task closed. `from` / `to` (city and district) are there
+ * even when the contact is not.
+ */
+export interface CourierDelivery {
   parcelId: string;
   /** Normalised, e.g. "SD2611060001". Show it with formatTrackingNumber. */
   trackingNumber: string;
-  sequence: number;
-  parcelStatus: ParcelStatus;
-  outcome: ItemOutcome;
-  /** What the outcome endpoint accepts now, in life-cycle order. Never HANDED_OVER or RETURNED (handover). */
-  allowedOutcomes: ItemOutcome[];
-  /** Can be selected for the handover now. */
-  readyForHandover: boolean;
-  /** Only while the item and the task are open; never for TRANSFER. */
-  contact: Contact | null;
-  from: Place;
-  to: Place;
+  /** The parcel's own life-cycle status (delivery). "Unable to Collect" doesn't change it. */
+  status: ParcelStatus;
+  stop: Stop;
+  pickup: Contact | null;
+  recipient: Contact | null;
+  from: Place | null;
+  to: Place | null;
   weightKg: number;
-  /** Cash to collect in rupees. DELIVERY only; null otherwise or when nothing is due. */
+  /** Cash to collect in rupees; null when already paid. */
   codAmount: number | null;
-  /** DELIVERY only. */
   instructions: string | null;
-  problem: TaskProblem | null;
-  failureReason: FailureReason | null;
-  recipientName: string | null;
-  /** Who took the parcels at the branch (handover). */
-  receivedBy: string | null;
-  /** The courier's own last note on this item. */
-  note: string | null;
-  /** ISO timestamp. */
+  /** ISO timestamp: when the dispatcher created the task. */
+  assignedAt: string;
+  /** ISO timestamp: when the parcel last changed. */
   updatedAt: string;
-}
-
-/** AssignmentDetailResponse: GET /courier/assignments/{id}, and the answer of every outcome and handover. */
-export interface CourierTaskDetail extends CourierTaskSummary {
-  /** By sequence. */
-  items: CourierTaskItem[];
-}
-
-/** CourierTodayResponse: GET /courier/assignments/today. */
-export interface CourierTasksToday {
-  /** Today in Sri Lankan time. */
-  date: string;
-  /** Tasks not completed or cancelled (whatever day they are scheduled for). */
-  open: number;
-  completedToday: number;
-  /** In progress, then assigned (oldest assignedAt first), then closed today (newest first). */
-  assignments: CourierTaskSummary[];
-}
-
-/** GET /courier/assignments/history: completed and cancelled tasks, newest first. */
-export type CourierTaskPage = PageResponse<CourierTaskSummary>;
-
-/** Query of GET /courier/assignments/history. `page` is 0-based; `size` 1-100. */
-export interface TaskHistoryQuery {
-  page?: number;
-  size?: number;
-  /** Only the tasks that held this parcel. Spaces and case don't matter; unknown → empty page. */
-  trackingNumber?: string;
+  /** The statuses the courier may set now, in life-cycle order. Empty once completed or when the task is closed. */
+  nextStatuses: ParcelStatus[];
+  /** "Unable to Collect" is possible now (the parcel's step is PENDING in an open task). */
+  canMarkUnableToCollect: boolean;
+  /** The courier is done with this parcel in this task, whatever the other parcels of the task are doing. */
+  completed: boolean;
+  /** ISO timestamp; null while active (and for a parcel closed only because its task was cancelled). */
+  completedAt: string | null;
+  /** Once DELIVERED: who received it and whether the signed-slip photo is attached; otherwise null. */
+  proof: DeliveryProof | null;
+  task: CourierTask;
 }
 
 /** HistoryEntryResponse: one status change, newest first, without notes. */
@@ -160,46 +137,85 @@ export interface ParcelHistoryEntry {
   occurredAt: string;
 }
 
-/** MyItemResponse: one of the courier's own items for a parcel. */
-export interface MyTaskItem {
-  assignmentId: string;
-  type: AssignmentType;
-  outcome: ItemOutcome;
+/**
+ * ProofResponse: proof of delivery. `hasPhoto`: the photo of the delivery slip the recipient signed is attached (the
+ * courier who delivered it reads it with GET /courier/deliveries/{parcelId}/proof; there is no public URL).
+ */
+export interface DeliveryProof {
+  recipientName: string | null;
+  hasPhoto: boolean;
 }
-
-/** CourierParcelResponse: GET /courier/parcels/{parcelId}. */
-export interface CourierParcelDetail {
-  parcelId: string;
-  trackingNumber: string;
-  status: ParcelStatus;
-  /** Only for AT_BRANCH. */
-  currentBranch: DistrictCode | null;
-  from: Place;
-  to: Place;
-  /** Newest task first. */
-  myItems: MyTaskItem[];
-  /** Only while the courier has an open item for it; never for TRANSFER. */
-  contact: Contact | null;
-  history: ParcelHistoryEntry[];
-}
-
-/** Outcomes sent to the outcome endpoint. HANDED_OVER and RETURNED go through the handover; PENDING never. */
-export type RecordableOutcome = Exclude<ItemOutcome, "PENDING" | "HANDED_OVER" | "RETURNED">;
 
 /**
- * ItemOutcomeRequest: body of POST /courier/assignments/{id}/items/{parcelId}/outcome. Each outcome carries only its
- * own fields (the backend refuses the others). A note is required (3+ chars) with problem or failureReason OTHER.
+ * CourierDeliveryDetailResponse: GET /courier/deliveries/{parcelId}, and the answer of every status change and
+ * "Unable to Collect" (with `completed` and `task.status` as they are after the step).
  */
-export type ItemOutcomeRequest =
-  | { outcome: "COLLECTED" | "LOADED"; note?: string }
-  | { outcome: "NOT_COLLECTED" | "NOT_LOADED"; problem: TaskProblem; note?: string }
-  | { outcome: "DELIVERED"; recipientName: string; note?: string }
-  | { outcome: "FAILED"; failureReason: FailureReason; note?: string };
+export interface CourierDeliveryDetail extends CourierDelivery {
+  history: ParcelHistoryEntry[];
+  /** Only while FAILED. */
+  failureReason: FailureReason | null;
+}
 
-/** HandoverRequest: body of POST /courier/assignments/{id}/handover. All or nothing. */
-export interface HandoverRequest {
-  parcelIds: string[];
-  /** The person at the branch who took the parcels. */
-  receivedBy: string;
+/** ProofUploadResponse: POST /courier/deliveries/{parcelId}/proof. Send `proofPhotoId` with DELIVERED. */
+export interface ProofUpload {
+  proofPhotoId: string;
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+/** CourierTodayResponse: GET /courier/deliveries/today. */
+export interface CourierToday {
+  /** Today in Sri Lankan time, "2026-11-05". */
+  date: string;
+  /** Active parcels. */
+  toDo: number;
+  /** Parcels completed today. */
+  done: number;
+  /** Open pickups, then the other active parcels (oldest first), then the completed ones (newest first). */
+  items: CourierDelivery[];
+}
+
+/** GET /courier/deliveries/history: completed parcels, newest completion first; one entry per completed task. */
+export type CourierDeliveryPage = PageResponse<CourierDelivery>;
+
+/** Query of GET /courier/deliveries/history. `page` is 0-based; `size` 1-100. */
+export interface DeliveryHistoryQuery {
+  page?: number;
+  size?: number;
+  /** Spaces and case don't matter; an unknown number gives an empty page. */
+  trackingNumber?: string;
+  /** Only pickups or only deliveries. */
+  type?: HistoryType;
+  /** Only entries that ended this way. */
+  outcome?: HistoryOutcome;
+  /** Completion days (yyyy-mm-dd, Sri Lankan time), both included. */
+  completedFrom?: string;
+  completedTo?: string;
+}
+
+/** The courier's two kinds of work, as the History type filter. */
+export type HistoryType = "PICKUP" | "DELIVERY";
+
+/** The outcomes a history entry can have (an entry is listed once its step is completed). */
+export type HistoryOutcome = "HANDED_OVER" | "DELIVERED" | "RETURNED" | "NOT_COLLECTED" | "NOT_LOADED";
+
+/** The statuses a courier may set (never back to CREATED). */
+export type CourierTargetStatus = Exclude<ParcelStatus, "CREATED">;
+
+/**
+ * StatusChangeRequest: body of POST /courier/deliveries/{parcelId}/status. Each status carries only its own fields
+ * (the backend refuses the others): AT_BRANCH needs `receivedBy`, DELIVERED `recipientName` and the uploaded
+ * `proofPhotoId`, FAILED `failureReason` (and a note of 3+ characters for OTHER).
+ */
+export type StatusChangeRequest =
+  | { status: "PICKED_UP" | "OUT_FOR_DELIVERY"; note?: string }
+  | { status: "AT_BRANCH"; receivedBy: string; note?: string }
+  | { status: "DELIVERED"; recipientName: string; proofPhotoId: string; note?: string }
+  | { status: "FAILED"; failureReason: FailureReason; note?: string };
+
+/** UnableToCollectRequest: body of POST /courier/deliveries/{parcelId}/unable-to-collect. OTHER needs a note. */
+export interface UnableToCollectRequest {
+  problem: TaskProblem;
   note?: string;
 }

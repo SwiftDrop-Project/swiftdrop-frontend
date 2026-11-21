@@ -151,16 +151,16 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
     {
       items: [
         {
-          title: "Today's tasks",
+          title: "Today's parcels",
           href: "/courier",
           icon: Truck,
-          description: "Your pickup, transfer and delivery tasks, and the ones you finished today.",
+          description: "Your parcels to pick up and deliver, and the ones you finished today.",
         },
         {
-          title: "Task history",
+          title: "Parcel history",
           href: "/courier/history",
           icon: ListClock,
-          description: "Tasks you completed or that were cancelled. Search by tracking number.",
+          description: "Parcels you finished, pickups and deliveries. Search by tracking number.",
         },
       ],
     },

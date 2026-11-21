@@ -15,8 +15,9 @@ import {
 import { InlineNotice } from "@/components/ui/inline-notice";
 
 /*
- * The dialogs for courier task actions (parcel outcome, handover, complete) share these: a dialog that can't be closed
- * while it is saving, and a form layout with a title, an error notice, the fields and Cancel / submit.
+ * The dialogs for the courier's parcel actions (status steps, handover or return, Unable to Collect) share these: a
+ * dialog that can't be closed while it is saving, and a form layout with a title, an error notice, the fields and
+ * Cancel / submit.
  */
 
 /** A dialog that stays open while `saving` (Cancel, Escape, a click outside and the X are ignored). */
