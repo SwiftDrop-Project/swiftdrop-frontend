@@ -33,7 +33,12 @@ export function RateCardSummary({ card, onShowOlderVersions, olderVersionsShown 
           title="Rate card"
           titleId={titleId}
           description={
-            card ? `Version ${card.version} · active since ${formatDate(card.createdAt)}` : <Skeleton className="mt-1 h-4 w-40" />
+            card ? (
+              `Version ${card.version} · active since ${formatDate(card.createdAt)}`
+            ) : (
+              // A span, not Skeleton (a div): the description is rendered inside a <p>.
+              <span aria-hidden="true" className="mt-1 block h-4 w-40 animate-pulse rounded-md bg-grey-100" />
+            )
           }
         />
         <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-3 p-4 text-body-sm sm:p-6">
