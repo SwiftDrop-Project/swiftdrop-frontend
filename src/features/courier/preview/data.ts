@@ -1,33 +1,59 @@
 import type { DistrictCode, ParcelStatus } from "@/types";
-import type {
-  AssignmentStatus,
-  AssignmentType,
-  Contact,
-  FailureReason,
-  ItemOutcome,
-  ParcelHistoryEntry,
-  TaskProblem,
-} from "../types";
+import type { AssignmentStatus, AssignmentType, Contact, FailureReason, ItemOutcome, TaskProblem } from "../types";
 import { closes } from "./rules";
 
 /*
- * PREVIEW ONLY. Sample tasks and parcels for the courier preview: made-up people, phone numbers and ids (every id
- * starts with 7e570000, every tracking number has a 9 after the month), kept in the browser's memory. A full page
- * reload starts again from this data. Dates are worked out from today in Sri Lankan time.
+ * PREVIEW ONLY. Sample parcels and the dispatch tasks that hold them, for the courier preview: made-up people, phone
+ * numbers and ids (every id starts with 7e570000, every tracking number has a 9 after the month), kept in the
+ * browser's memory. A full page reload starts again from this data. Dates are worked out from today in Sri Lankan
+ * time. Every task belongs to the logged-in courier. Pickups and deliveries only: couriers aren't given branch transfers.
  */
 
-/** A parcel as the preview stores it. `history` is oldest first. */
+/** A parcel status change as delivery keeps it. */
+export interface PreviewHistoryEntry {
+  status: ParcelStatus;
+  branch: DistrictCode | null;
+  failureReason: FailureReason | null;
+  occurredAt: string;
+}
+
+/** A parcel as delivery keeps it. `history` is oldest first. */
 export interface PreviewParcel {
   id: string;
   trackingNumber: string;
   status: ParcelStatus;
+  /** Only while AT_BRANCH. */
   currentBranch: DistrictCode | null;
   sender: Contact;
   recipient: Contact;
   weightKg: number;
   codAmount: number | null;
   instructions: string | null;
-  history: ParcelHistoryEntry[];
+  failureReason: FailureReason | null;
+  proofRecipientName: string | null;
+  /** Once DELIVERED: where the preview shows the proof photo from (a sample image, or the photo the user picked). */
+  proofPhotoUrl: string | null;
+  updatedAt: string;
+  history: PreviewHistoryEntry[];
+}
+
+/**
+ * A made-up "signed delivery slip" for the sample deliveries (an inline SVG: nothing is fetched). Colours are the
+ * DESIGN.md greys, written as plain names so the image has no hex values in source. A function (not a constant), so a
+ * production build drops it with the rest of the preview code.
+ */
+export function sampleProofPhoto(): string {
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">' +
+      '<rect width="480" height="320" fill="whitesmoke"/>' +
+      '<rect x="24" y="24" width="432" height="272" fill="white" stroke="silver"/>' +
+      '<text x="48" y="72" font-family="sans-serif" font-size="22" fill="dimgray">SwiftDrop delivery slip</text>' +
+      '<text x="48" y="112" font-family="sans-serif" font-size="16" fill="gray">Sample proof (preview mode)</text>' +
+      '<path d="M60 220 C 110 170, 150 260, 200 210 S 290 190, 330 230" stroke="black" stroke-width="3" fill="none"/>' +
+      '<line x1="48" y1="250" x2="432" y2="250" stroke="silver"/>' +
+      '<text x="48" y="276" font-family="sans-serif" font-size="14" fill="gray">Recipient signature</text>' +
+      "</svg>",
+  );
 }
 
 /** One parcel in a task, as dispatch keeps it. */
@@ -36,12 +62,10 @@ export interface PreviewItem {
   sequence: number;
   outcome: ItemOutcome;
   problem: TaskProblem | null;
-  failureReason: FailureReason | null;
-  note: string | null;
   receivedBy: string | null;
-  recipientName: string | null;
   updatedAt: string;
-  closed: boolean;
+  /** When the item closed (courier work); null while open. */
+  closedAt: string | null;
 }
 
 export interface PreviewTask {
@@ -50,653 +74,277 @@ export interface PreviewTask {
   status: AssignmentStatus;
   originBranch: DistrictCode | null;
   destinationBranch: DistrictCode | null;
-  scheduledFor: string;
-  note: string | null;
   assignedAt: string;
-  completedAt: string | null;
-  cancelledAt: string | null;
   items: PreviewItem[];
 }
 
 export interface PreviewStore {
+  now: Date;
   parcels: Map<string, PreviewParcel>;
+  /** Newest assignment first. */
   tasks: PreviewTask[];
 }
 
-// ---- Time (Asia/Colombo, UTC+05:30, no daylight saving) ----
+const COLOMBO_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
-const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Colombo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
+/** The Sri Lankan day of `date`, "2026-11-05". */
+export function colomboDay(date: Date): string {
+  return new Date(date.getTime() + COLOMBO_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** The instant today began in Sri Lanka. */
+export function startOfColomboDay(date: Date): Date {
+  return new Date(Date.parse(`${colomboDay(date)}T00:00:00Z`) - COLOMBO_OFFSET_MS);
+}
+
+const parcelId = (n: number) => `7e570000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const taskId = (n: number) => `7e570000-0000-4000-a000-${String(n).padStart(12, "0")}`;
+
+const contact = (name: string, phone: string, address: string, city: string, district: DistrictCode): Contact => ({
+  name,
+  phone,
+  address,
+  city,
+  district,
 });
 
-/** The Sri Lankan day of an instant, "2026-11-14". */
-export function colomboDay(instant: Date): string {
-  return DAY_FORMAT.format(instant);
-}
-
-function addDays(day: string, days: number): string {
-  const [year, month, date] = day.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, date + days)).toISOString().slice(0, 10);
-}
-
-/** An ISO instant for a Sri Lankan day and "HH:MM". */
-function at(day: string, time: string): string {
-  return new Date(`${day}T${time}:00+05:30`).toISOString();
-}
-
-// ---- Sample people and places ----
-
-const COLOMBO_CITIES = [
-  "Colombo 03",
-  "Colombo 05",
-  "Colombo 07",
-  "Dehiwala",
-  "Nugegoda",
-  "Maharagama",
-  "Kotte",
-  "Battaramulla",
-  "Wellawatte",
-  "Borella",
+const SENDERS = [
+  contact("Nugegoda Book Hub", "+94760000101", "112 High Level Road", "Nugegoda", "COLOMBO"),
+  contact("Maharagama Craft Store", "+94760000102", "45 Old Kesbewa Road", "Maharagama", "COLOMBO"),
+  contact("Dehiwala Spice Traders", "+94760000103", "8 Galle Road", "Dehiwala", "COLOMBO"),
+  contact("Kotte Tea Corner", "+94760000104", "21 Parliament Road", "Kotte", "COLOMBO"),
 ];
-const OTHER_PLACES: [string, DistrictCode][] = [
-  ["Gampaha", "GAMPAHA"],
-  ["Kandy", "KANDY"],
-  ["Galle", "GALLE"],
-  ["Kurunegala", "KURUNEGALA"],
-  ["Kalutara", "KALUTARA"],
-  ["Matara", "MATARA"],
-  ["Negombo", "GAMPAHA"],
-  ["Ratnapura", "RATNAPURA"],
+
+const RECIPIENTS = [
+  contact("Nimal Perera", "+94770000201", "45 Peradeniya Road", "Kandy", "KANDY"),
+  contact("Ayesha Fernando", "+94770000202", "17 Temple Road", "Mount Lavinia", "COLOMBO"),
+  contact("Ruwan Jayasinghe", "+94770000203", "3 Lake Drive", "Rajagiriya", "COLOMBO"),
+  contact("Dilini Wickramasinghe", "+94770000204", "90 Station Road", "Gampaha", "GAMPAHA"),
+  contact("Kasun Bandara", "+94770000205", "12 Main Street", "Galle", "GALLE"),
 ];
-const NAMES = [
-  "Nimal Perera",
-  "Ayesha Fernando",
-  "Ruwan Silva",
-  "Kamala Wijesinghe",
-  "Tharindu Bandara",
-  "Shanika de Silva",
-  "Mohamed Rizwan",
-  "Dilani Jayasuriya",
-  "Saman Kumara",
-  "Priya Rajapaksha",
-  "Kasun Herath",
-  "Fathima Nazeer",
-];
-const STREETS = ["Galle Road", "Havelock Road", "Duplication Road", "Kandy Road", "High Level Road", "Temple Road"];
 
-function contact(index: number, city: string, district: DistrictCode): Contact {
-  return {
-    name: NAMES[index % NAMES.length],
-    phone: `+9477000${String(100 + (index % 900)).padStart(4, "0")}`,
-    address: `${10 + ((index * 7) % 180)} ${STREETS[index % STREETS.length]}`,
-    city,
-    district,
-  };
-}
-
-const entry = (
-  status: ParcelStatus,
-  occurredAt: string,
-  branch: DistrictCode | null = null,
-  failureReason: FailureReason | null = null,
-): ParcelHistoryEntry => ({ status, branch, failureReason, occurredAt });
-
-const item = (
-  parcelId: string,
-  sequence: number,
-  outcome: ItemOutcome,
-  type: AssignmentType,
-  updatedAt: string,
-  extra: Partial<Omit<PreviewItem, "parcelId" | "sequence" | "outcome" | "updatedAt" | "closed">> = {},
-): PreviewItem => ({
-  parcelId,
-  sequence,
-  outcome,
-  problem: null,
-  failureReason: null,
-  note: null,
-  receivedBy: null,
-  recipientName: null,
-  updatedAt,
-  closed: closes(type, outcome),
-  ...extra,
-});
-
-/** Builds the whole sample: the open tasks on the Today screen, one finished today, and about 25 closed for History. */
+/**
+ * The sample, worked out from `now`:
+ * - A pickup in progress (3 parcels): one to pick up, one picked up and waiting for the handover, one already handed
+ *   over today (completed while its siblings stay active).
+ * - A pickup not started (2 parcels): pick up or mark Unable to Collect.
+ * - A delivery in progress (4 parcels): one to take out (with cash to collect), one out for delivery, one failed and
+ *   waiting to be returned to the branch, one delivered today.
+ * - A delivery from yesterday whose parcel isn't at the branch yet (only Unable to Collect is possible).
+ * - A pickup completed today (handed over, not collected), and a cancelled pickup that never shows as work.
+ * - About 20 completed parcels on earlier days for History, including one parcel finished twice: a failed delivery
+ *   returned to the branch, then delivered in a later task.
+ */
 export function createSampleStore(now: Date = new Date()): PreviewStore {
-  const today = colomboDay(now);
-  const yymm = today.slice(2, 4) + today.slice(5, 7);
-  const day = (offset: number) => addDays(today, offset);
-  /** Earlier today, but never before midnight: `minutes` before now. */
-  const todayAgo = (minutes: number) => {
-    const startOfToday = new Date(`${today}T00:01:00+05:30`).getTime();
-    return new Date(Math.max(startOfToday, now.getTime() - minutes * 60_000)).toISOString();
-  };
+  const yymm = colomboDay(now).slice(2, 7).replace("-", "");
+  const tracking = (n: number) => `SD${yymm}9${String(n).padStart(5, "0")}`;
+  const startOfToday = startOfColomboDay(now).getTime();
+  /** An instant `hours` after the start of today (negative: before today). */
+  const at = (hours: number) => new Date(startOfToday + hours * 3_600_000).toISOString();
 
-  let parcelCount = 0;
-  let taskCount = 0;
   const parcels = new Map<string, PreviewParcel>();
   const tasks: PreviewTask[] = [];
 
-  const addParcel = (fields: Omit<PreviewParcel, "id" | "trackingNumber">): PreviewParcel => {
-    parcelCount += 1;
-    const parcel: PreviewParcel = {
-      id: `7e570000-0000-4000-9000-${String(parcelCount).padStart(12, "0")}`,
-      trackingNumber: `SD${yymm}9${String(parcelCount).padStart(5, "0")}`,
+  function parcel(
+    n: number,
+    fields: Omit<Partial<PreviewParcel>, "history"> & {
+      status: ParcelStatus;
+      history: [ParcelStatus, number, DistrictCode?, FailureReason?][];
+    },
+  ): string {
+    const id = parcelId(n);
+    const history: PreviewHistoryEntry[] = fields.history.map(([status, hours, branch, failureReason]) => ({
+      status,
+      branch: branch ?? null,
+      failureReason: failureReason ?? null,
+      occurredAt: at(hours),
+    }));
+    parcels.set(id, {
+      id,
+      trackingNumber: tracking(n),
+      currentBranch: null,
+      sender: SENDERS[n % SENDERS.length],
+      recipient: RECIPIENTS[n % RECIPIENTS.length],
+      weightKg: 0.5 + (n % 5) * 0.4,
+      codAmount: null,
+      instructions: null,
+      failureReason: null,
+      proofRecipientName: null,
+      // Every sample parcel that is already delivered has a (sample) signed slip.
+      proofPhotoUrl: fields.status === "DELIVERED" ? sampleProofPhoto() : null,
+      updatedAt: history[history.length - 1].occurredAt,
       ...fields,
-    };
-    parcels.set(parcel.id, parcel);
-    return parcel;
-  };
+      history,
+    });
+    return id;
+  }
 
-  const addTask = (fields: Omit<PreviewTask, "assignmentId">): PreviewTask => {
-    taskCount += 1;
-    const task: PreviewTask = { assignmentId: `7e570000-0000-4000-8000-${String(taskCount).padStart(12, "0")}`, ...fields };
-    tasks.push(task);
-    return task;
-  };
-
-  // ---- Pickup, assigned: three parcels to collect in Colombo, handed over at the Colombo branch ----
-  const p1 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: { name: "Nimal Perera", phone: "+94770000101", address: "12 Galle Road", city: "Colombo 03", district: "COLOMBO" },
-    recipient: contact(3, "Kandy", "KANDY"),
-    weightKg: 1.2,
-    codAmount: null,
-    instructions: null,
-    history: [entry("CREATED", at(day(-1), "16:10"))],
-  });
-  const p2 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: { name: "Ayesha Fernando", phone: "+94770000102", address: "45 Havelock Road", city: "Colombo 05", district: "COLOMBO" },
-    recipient: contact(4, "Gampaha", "GAMPAHA"),
-    weightKg: 0.8,
-    codAmount: 1800,
-    instructions: "Fragile: glass bottles.",
-    history: [entry("CREATED", at(day(-1), "18:25"))],
-  });
-  const p3 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: { name: "Ruwan Silva", phone: "+94770000103", address: "8 Hill Street", city: "Dehiwala", district: "COLOMBO" },
-    recipient: contact(5, "Galle", "GALLE"),
-    weightKg: 3.5,
-    codAmount: null,
-    instructions: null,
-    history: [entry("CREATED", todayAgo(150))],
-  });
-  addTask({
-    type: "PICKUP",
-    status: "ASSIGNED",
-    originBranch: null,
-    destinationBranch: "COLOMBO",
-    scheduledFor: today,
-    note: "Morning pickups in Colombo 03, Colombo 05 and Dehiwala. Hand everything over at the Colombo branch.",
-    assignedAt: todayAgo(120),
-    completedAt: null,
-    cancelledAt: null,
-    items: [p1, p2, p3].map((parcel, index) => item(parcel.id, index + 1, "PENDING", "PICKUP", todayAgo(120))),
-  });
-
-  // ---- Pickup, in progress: one collected (ready to hand over), one waiting, one not collected ----
-  const p4 = addParcel({
-    status: "PICKED_UP",
-    currentBranch: null,
-    sender: { name: "Shanika de Silva", phone: "+94770000104", address: "21 Duplication Road", city: "Colombo 07", district: "COLOMBO" },
-    recipient: { name: "Kasun Herath", phone: "+94770000105", address: "3 Station Road", city: "Gampaha", district: "GAMPAHA" },
-    weightKg: 2.4,
-    codAmount: 2950,
-    instructions: null,
-    history: [entry("CREATED", at(day(-1), "15:00")), entry("PICKED_UP", todayAgo(50))],
-  });
-  const p5 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: { name: "Kamala Wijesinghe", phone: "+94770000114", address: "7 Baseline Road", city: "Borella", district: "COLOMBO" },
-    recipient: contact(7, "Negombo", "GAMPAHA"),
-    weightKg: 5,
-    codAmount: null,
-    instructions: null,
-    history: [entry("CREATED", at(day(-1), "11:20"))],
-  });
-  const p6 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: { name: "Saman Kumara", phone: "+94770000115", address: "33 Pagoda Road", city: "Kotte", district: "COLOMBO" },
-    recipient: contact(9, "Gampaha", "GAMPAHA"),
-    weightKg: 1.1,
-    codAmount: null,
-    instructions: null,
-    history: [entry("CREATED", at(day(-2), "14:45"))],
-  });
-  addTask({
-    type: "PICKUP",
-    status: "IN_PROGRESS",
-    originBranch: null,
-    destinationBranch: "COLOMBO",
-    scheduledFor: today,
-    note: "Afternoon pickups in Colombo 07, Borella and Kotte.",
-    assignedAt: todayAgo(90),
-    completedAt: null,
-    cancelledAt: null,
-    items: [
-      item(p4.id, 1, "COLLECTED", "PICKUP", todayAgo(50), { note: "Collected from the front desk." }),
-      item(p5.id, 2, "PENDING", "PICKUP", todayAgo(90)),
-      item(p6.id, 3, "NOT_COLLECTED", "PICKUP", todayAgo(48), {
-        problem: "SENDER_UNAVAILABLE",
-        note: "Office closed; nobody answered the phone.",
-      }),
-    ],
-  });
-
-  // ---- Delivery, in progress, from the Colombo branch: waiting, out for delivery, delivered, failed ----
-  const p7 = addParcel({
-    status: "AT_BRANCH",
-    currentBranch: "COLOMBO",
-    sender: contact(10, "Kandy", "KANDY"),
-    recipient: { name: "Fathima Nazeer", phone: "+94770000107", address: "17 Marine Drive", city: "Colombo 06", district: "COLOMBO" },
-    weightKg: 0.6,
-    codAmount: 2500,
-    instructions: "Call before coming. Third floor, no lift.",
-    history: [
-      entry("CREATED", at(day(-3), "09:30")),
-      entry("PICKED_UP", at(day(-3), "11:00")),
-      entry("AT_BRANCH", at(day(-3), "14:20"), "KANDY"),
-      entry("IN_TRANSIT", at(day(-2), "08:15")),
-      entry("AT_BRANCH", at(day(-2), "13:05"), "COLOMBO"),
-    ],
-  });
-  const p8 = addParcel({
-    status: "OUT_FOR_DELIVERY",
-    currentBranch: null,
-    sender: contact(11, "Matara", "MATARA"),
-    recipient: { name: "Tharindu Bandara", phone: "+94770000108", address: "5 Lauries Road", city: "Colombo 04", district: "COLOMBO" },
-    weightKg: 1.75,
-    codAmount: 1500,
-    instructions: "Leave with the security desk if nobody answers.",
-    history: [
-      entry("CREATED", at(day(-4), "10:10")),
-      entry("PICKED_UP", at(day(-4), "12:40")),
-      entry("AT_BRANCH", at(day(-4), "16:00"), "MATARA"),
-      entry("IN_TRANSIT", at(day(-3), "07:50")),
-      entry("AT_BRANCH", at(day(-3), "12:15"), "COLOMBO"),
-      // Yesterday's attempt failed and was returned to the branch (see the history task below).
-      entry("OUT_FOR_DELIVERY", at(day(-1), "09:30")),
-      entry("FAILED", at(day(-1), "11:10"), null, "RECIPIENT_UNAVAILABLE"),
-      entry("AT_BRANCH", at(day(-1), "15:20"), "COLOMBO"),
-      entry("OUT_FOR_DELIVERY", todayAgo(45)),
-    ],
-  });
-  const p9 = addParcel({
-    status: "DELIVERED",
-    currentBranch: null,
-    sender: contact(0, "Kurunegala", "KURUNEGALA"),
-    recipient: { name: "Sunil Jayawardena", phone: "+94770000109", address: "88 High Level Road", city: "Nugegoda", district: "COLOMBO" },
-    weightKg: 4.2,
-    codAmount: null,
-    instructions: null,
-    history: [
-      entry("CREATED", at(day(-3), "13:00")),
-      entry("PICKED_UP", at(day(-3), "15:30")),
-      entry("AT_BRANCH", at(day(-3), "17:45"), "KURUNEGALA"),
-      entry("IN_TRANSIT", at(day(-2), "09:00")),
-      entry("AT_BRANCH", at(day(-2), "12:40"), "COLOMBO"),
-      entry("OUT_FOR_DELIVERY", todayAgo(45)),
-      entry("DELIVERED", todayAgo(20)),
-    ],
-  });
-  const p10 = addParcel({
-    status: "FAILED",
-    currentBranch: null,
-    sender: contact(1, "Galle", "GALLE"),
-    recipient: { name: "Priya Rajapaksha", phone: "+94770000110", address: "9 Old Road", city: "Maharagama", district: "COLOMBO" },
-    weightKg: 2,
-    codAmount: 3200,
-    instructions: null,
-    history: [
-      entry("CREATED", at(day(-4), "08:40")),
-      entry("PICKED_UP", at(day(-4), "10:20")),
-      entry("AT_BRANCH", at(day(-4), "13:00"), "GALLE"),
-      entry("IN_TRANSIT", at(day(-3), "08:30")),
-      entry("AT_BRANCH", at(day(-3), "11:50"), "COLOMBO"),
-      entry("OUT_FOR_DELIVERY", todayAgo(45)),
-      entry("FAILED", todayAgo(15), null, "RECIPIENT_UNAVAILABLE"),
-    ],
-  });
-  addTask({
-    type: "DELIVERY",
-    status: "IN_PROGRESS",
-    originBranch: "COLOMBO",
-    destinationBranch: null,
-    scheduledFor: today,
-    note: "Colombo 04, 06, Nugegoda and Maharagama. Collect the cash before handing over.",
-    assignedAt: todayAgo(70),
-    completedAt: null,
-    cancelledAt: null,
-    items: [
-      item(p7.id, 1, "PENDING", "DELIVERY", todayAgo(70)),
-      item(p8.id, 2, "LOADED", "DELIVERY", todayAgo(45)),
-      item(p9.id, 3, "DELIVERED", "DELIVERY", todayAgo(20), { recipientName: "Sunil Jayawardena" }),
-      item(p10.id, 4, "FAILED", "DELIVERY", todayAgo(15), {
-        failureReason: "RECIPIENT_UNAVAILABLE",
-        note: "No answer at the gate or on the phone.",
-      }),
-    ],
-  });
-
-  // ---- Pickup, in progress, every parcel done: ready to complete ----
-  const p11 = addParcel({
-    status: "AT_BRANCH",
-    currentBranch: "COLOMBO",
-    sender: { name: "Mohamed Rizwan", phone: "+94770000111", address: "60 Galle Road", city: "Wellawatte", district: "COLOMBO" },
-    recipient: contact(2, "Jaffna", "JAFFNA"),
-    weightKg: 6.5,
-    codAmount: null,
-    instructions: null,
-    history: [
-      entry("CREATED", at(day(-1), "17:30")),
-      entry("PICKED_UP", todayAgo(100)),
-      entry("AT_BRANCH", todayAgo(30), "COLOMBO"),
-    ],
-  });
-  const p12 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: { name: "Dilani Jayasuriya", phone: "+94770000112", address: "14 Temple Road", city: "Kotte", district: "COLOMBO" },
-    recipient: contact(4, "Kalutara", "KALUTARA"),
-    weightKg: 0.9,
-    codAmount: null,
-    instructions: null,
-    history: [entry("CREATED", at(day(-1), "19:05"))],
-  });
-  addTask({
-    type: "PICKUP",
-    status: "IN_PROGRESS",
-    originBranch: null,
-    destinationBranch: "COLOMBO",
-    scheduledFor: today,
-    note: null,
-    assignedAt: todayAgo(130),
-    completedAt: null,
-    cancelledAt: null,
-    items: [
-      item(p11.id, 1, "HANDED_OVER", "PICKUP", todayAgo(30), { receivedBy: "Chamari (Colombo branch desk)" }),
-      item(p12.id, 2, "NOT_COLLECTED", "PICKUP", todayAgo(80), {
-        problem: "PARCEL_NOT_READY",
-        note: "Sender asked us to come back tomorrow.",
-      }),
-    ],
-  });
-
-  // ---- Delivery planned for tomorrow (information only: it can be worked now) ----
-  const p13 = addParcel({
-    status: "AT_BRANCH",
-    currentBranch: "COLOMBO",
-    sender: contact(5, "Kurunegala", "KURUNEGALA"),
-    recipient: { name: "Saman Kumara", phone: "+94770000113", address: "2 Parliament Road", city: "Battaramulla", district: "COLOMBO" },
-    weightKg: 12,
-    codAmount: null,
-    instructions: "Large box. Deliver to the back entrance.",
-    history: [
-      entry("CREATED", at(day(-2), "10:00")),
-      entry("PICKED_UP", at(day(-2), "13:20")),
-      entry("AT_BRANCH", at(day(-2), "16:40"), "KURUNEGALA"),
-      entry("IN_TRANSIT", at(day(-1), "08:00")),
-      entry("AT_BRANCH", at(day(-1), "11:30"), "COLOMBO"),
-    ],
-  });
-  addTask({
-    type: "DELIVERY",
-    status: "ASSIGNED",
-    originBranch: "COLOMBO",
-    destinationBranch: null,
-    scheduledFor: day(1),
-    note: "Planned for tomorrow. You can start early if you have room.",
-    assignedAt: todayAgo(60),
-    completedAt: null,
-    cancelledAt: null,
-    items: [item(p13.id, 1, "PENDING", "DELIVERY", todayAgo(60))],
-  });
-
-  // ---- Pickup completed earlier today ----
-  const p14 = addParcel({
-    status: "AT_BRANCH",
-    currentBranch: "COLOMBO",
-    sender: contact(7, "Colombo 05", "COLOMBO"),
-    recipient: contact(8, "Kurunegala", "KURUNEGALA"),
-    weightKg: 1.4,
-    codAmount: null,
-    instructions: null,
-    history: [
-      entry("CREATED", at(day(-1), "12:00")),
-      entry("PICKED_UP", todayAgo(200)),
-      entry("AT_BRANCH", todayAgo(170), "COLOMBO"),
-    ],
-  });
-  const p15 = addParcel({
-    status: "CREATED",
-    currentBranch: null,
-    sender: contact(9, "Borella", "COLOMBO"),
-    recipient: contact(10, "Galle", "GALLE"),
-    weightKg: 0.5,
-    codAmount: null,
-    instructions: null,
-    history: [entry("CREATED", at(day(-1), "13:15"))],
-  });
-  addTask({
-    type: "PICKUP",
-    status: "COMPLETED",
-    originBranch: null,
-    destinationBranch: "COLOMBO",
-    scheduledFor: today,
-    note: "Early pickups before the branch opens.",
-    assignedAt: todayAgo(240),
-    completedAt: todayAgo(165),
-    cancelledAt: null,
-    items: [
-      item(p14.id, 1, "HANDED_OVER", "PICKUP", todayAgo(170), { receivedBy: "Chamari (Colombo branch desk)" }),
-      item(p15.id, 2, "NOT_COLLECTED", "PICKUP", todayAgo(190), { problem: "SENDER_UNAVAILABLE" }),
-    ],
-  });
-
-  // ---- Delivery completed earlier today: one delivered, one failed and returned to the branch ----
-  const p16 = addParcel({
-    status: "DELIVERED",
-    currentBranch: null,
-    sender: contact(2, "Kandy", "KANDY"),
-    recipient: { name: "Ayesha Fernando", phone: "+94770000116", address: "19 Park Road", city: "Colombo 05", district: "COLOMBO" },
-    weightKg: 0.7,
-    codAmount: 1200,
-    instructions: null,
-    history: [
-      entry("CREATED", at(day(-3), "10:00")),
-      entry("PICKED_UP", at(day(-3), "12:30")),
-      entry("AT_BRANCH", at(day(-3), "15:00"), "KANDY"),
-      entry("IN_TRANSIT", at(day(-2), "08:00")),
-      entry("AT_BRANCH", at(day(-2), "12:00"), "COLOMBO"),
-      entry("OUT_FOR_DELIVERY", todayAgo(230)),
-      entry("DELIVERED", todayAgo(200)),
-    ],
-  });
-  const p17 = addParcel({
-    status: "AT_BRANCH",
-    currentBranch: "COLOMBO",
-    sender: contact(3, "Galle", "GALLE"),
-    recipient: { name: "Ruwan Silva", phone: "+94770000117", address: "4 Flower Road", city: "Colombo 07", district: "COLOMBO" },
-    weightKg: 3.1,
-    codAmount: null,
-    instructions: null,
-    history: [
-      entry("CREATED", at(day(-3), "09:00")),
-      entry("PICKED_UP", at(day(-3), "11:15")),
-      entry("AT_BRANCH", at(day(-3), "14:00"), "GALLE"),
-      entry("IN_TRANSIT", at(day(-2), "07:45")),
-      entry("AT_BRANCH", at(day(-2), "11:30"), "COLOMBO"),
-      entry("OUT_FOR_DELIVERY", todayAgo(230)),
-      entry("FAILED", todayAgo(210), null, "WRONG_ADDRESS"),
-      entry("AT_BRANCH", todayAgo(185), "COLOMBO"),
-    ],
-  });
-  addTask({
-    type: "DELIVERY",
-    status: "COMPLETED",
-    originBranch: "COLOMBO",
-    destinationBranch: null,
-    scheduledFor: today,
-    note: null,
-    assignedAt: todayAgo(250),
-    completedAt: todayAgo(180),
-    cancelledAt: null,
-    items: [
-      item(p16.id, 1, "DELIVERED", "DELIVERY", todayAgo(200), { recipientName: "Ayesha Fernando" }),
-      item(p17.id, 2, "RETURNED", "DELIVERY", todayAgo(185), {
-        failureReason: "WRONG_ADDRESS",
-        receivedBy: "Chamari (Colombo branch desk)",
-        note: "House number doesn't exist on Flower Road.",
-      }),
-    ],
-  });
-
-  // ---- History: yesterday's delivery of the parcel now out for delivery again (search for it by tracking number) ----
-  addTask({
-    type: "DELIVERY",
-    status: "COMPLETED",
-    originBranch: "COLOMBO",
-    destinationBranch: null,
-    scheduledFor: day(-1),
-    note: null,
-    assignedAt: at(day(-1), "08:30"),
-    completedAt: at(day(-1), "15:30"),
-    cancelledAt: null,
-    items: [
-      item(p8.id, 1, "RETURNED", "DELIVERY", at(day(-1), "15:20"), {
-        failureReason: "RECIPIENT_UNAVAILABLE",
-        receivedBy: "Nuwan (Colombo branch)",
-      }),
-    ],
-  });
-
-  // ---- History: 23 more closed tasks over the last 12 days (2 pages of 20 with the ones above) ----
-  const TYPES: AssignmentType[] = ["DELIVERY", "PICKUP"];
-  for (let i = 0; i < 23; i += 1) {
-    const type = TYPES[i % TYPES.length];
-    const taskDay = day(-(1 + Math.floor((i + 1) / 2)));
-    const daysAgo = 1 + Math.floor((i + 1) / 2);
-    const cancelled = i % 7 === 5;
-    const parcelTotal = (i % 3) + 1;
-    const items: PreviewItem[] = [];
-
-    for (let n = 0; n < parcelTotal; n += 1) {
-      const seed = i * 3 + n;
-      const colomboCity = COLOMBO_CITIES[seed % COLOMBO_CITIES.length];
-      const other = OTHER_PLACES[(i + n) % OTHER_PLACES.length];
-      // A PICKUP collects in Colombo; a DELIVERY ends in Colombo.
-      const [fromCity, fromDistrict]: [string, DistrictCode] = type === "DELIVERY" ? other : [colomboCity, "COLOMBO"];
-      const [toCity, toDistrict]: [string, DistrictCode] = type === "DELIVERY" ? [colomboCity, "COLOMBO"] : other;
-
-      let outcome: ItemOutcome = "PENDING";
-      const extra: Partial<PreviewItem> = {};
-      if (!cancelled) {
-        if (type === "PICKUP") {
-          outcome = n === 1 && i % 2 === 0 ? "NOT_COLLECTED" : "HANDED_OVER";
-        } else {
-          outcome = n === 1 && i % 4 === 0 ? "RETURNED" : "DELIVERED";
-        }
-        if (outcome === "NOT_COLLECTED") extra.problem = "SENDER_UNAVAILABLE";
-        if (outcome === "HANDED_OVER") extra.receivedBy = "Colombo branch desk";
-        if (outcome === "DELIVERED") extra.recipientName = contact(seed + 1, toCity, toDistrict).name;
-        if (outcome === "RETURNED") {
-          extra.failureReason = "WRONG_ADDRESS";
-          extra.receivedBy = "Colombo branch desk";
-        }
-      }
-
-      const history = journey(type, outcome, cancelled, taskDay, daysAgo, fromDistrict, toDistrict);
-      const last = history[history.length - 1];
-      const parcel = addParcel({
-        status: last.status,
-        currentBranch: last.status === "AT_BRANCH" ? last.branch : null,
-        sender: contact(seed, fromCity, fromDistrict),
-        recipient: contact(seed + 1, toCity, toDistrict),
-        weightKg: Math.round((0.5 + ((seed * 37) % 80) / 10) * 100) / 100,
-        codAmount: seed % 3 === 0 ? 1000 + (seed % 5) * 450 : null,
-        instructions: null,
-        history,
-      });
-      items.push(item(parcel.id, n + 1, outcome, type, at(taskDay, "13:00"), extra));
-    }
-
-    addTask({
+  function task(
+    n: number,
+    type: AssignmentType,
+    status: AssignmentStatus,
+    branches: { origin?: DistrictCode; destination?: DistrictCode },
+    assignedHours: number,
+    items: { parcel: string; outcome: ItemOutcome; hours: number; problem?: TaskProblem; receivedBy?: string }[],
+  ) {
+    tasks.push({
+      assignmentId: taskId(n),
       type,
-      status: cancelled ? "CANCELLED" : "COMPLETED",
-      originBranch: type === "PICKUP" ? null : "COLOMBO",
-      destinationBranch: type === "PICKUP" ? "COLOMBO" : null,
-      scheduledFor: taskDay,
-      note: cancelled ? "Cancelled by the dispatcher: parcels moved to another round." : null,
-      assignedAt: at(taskDay, `08:${String(10 + (i % 40)).padStart(2, "0")}`),
-      completedAt: cancelled ? null : at(taskDay, `16:${String(10 + (i % 40)).padStart(2, "0")}`),
-      cancelledAt: cancelled ? at(taskDay, "09:30") : null,
-      items,
+      status,
+      originBranch: branches.origin ?? null,
+      destinationBranch: branches.destination ?? null,
+      assignedAt: at(assignedHours),
+      items: items.map((item, index) => ({
+        parcelId: item.parcel,
+        sequence: index + 1,
+        outcome: item.outcome,
+        problem: item.problem ?? null,
+        receivedBy: item.receivedBy ?? null,
+        updatedAt: at(item.hours),
+        closedAt: closes(type, item.outcome) ? at(item.hours) : null,
+      })),
     });
   }
 
-  return { parcels, tasks };
-}
+  // ---- Today's work ----
 
-/**
- * The status history of a parcel in a closed sample task. The courier's own step happens on the task's day; parcels
- * from tasks 3 days old or more have gone on to be delivered since.
- */
-function journey(
-  type: AssignmentType,
-  outcome: ItemOutcome,
-  cancelled: boolean,
-  taskDay: string,
-  daysAgo: number,
-  from: DistrictCode,
-  to: DistrictCode,
-): ParcelHistoryEntry[] {
-  const before = addDays(taskDay, -1);
-  const after = addDays(taskDay, 1);
-  const later = addDays(taskDay, 2);
-  const goesOn = daysAgo >= 3;
-  const deliveredLater = [
-    entry("IN_TRANSIT", at(after, "08:00")),
-    entry("AT_BRANCH", at(after, "12:00"), to),
-    entry("OUT_FOR_DELIVERY", at(later, "09:00")),
-    entry("DELIVERED", at(later, "11:30")),
-  ];
+  // A pickup in progress: siblings in one task, one already completed.
+  const p1 = parcel(1, { status: "CREATED", history: [["CREATED", -20]], instructions: "Ask for the parcel at the front desk." });
+  const p2 = parcel(2, { status: "PICKED_UP", history: [["CREATED", -20], ["PICKED_UP", 8.5]] });
+  const p3 = parcel(3, {
+    status: "AT_BRANCH",
+    currentBranch: "COLOMBO",
+    history: [["CREATED", -21], ["PICKED_UP", 8.2], ["AT_BRANCH", 9, "COLOMBO"]],
+  });
+  task(1, "PICKUP", "IN_PROGRESS", { destination: "COLOMBO" }, 8, [
+    { parcel: p1, outcome: "PENDING", hours: 8 },
+    { parcel: p2, outcome: "COLLECTED", hours: 8.5 },
+    { parcel: p3, outcome: "HANDED_OVER", hours: 9, receivedBy: "S. Silva" },
+  ]);
 
-  if (type === "PICKUP") {
-    const created = entry("CREATED", at(before, "15:00"));
-    if (cancelled || outcome === "NOT_COLLECTED") return [created];
-    const picked = [created, entry("PICKED_UP", at(taskDay, "10:30")), entry("AT_BRANCH", at(taskDay, "13:00"), from)];
-    return goesOn ? [...picked, ...deliveredLater] : picked;
+  // A pickup not started.
+  const p4 = parcel(4, { status: "CREATED", history: [["CREATED", -6]] });
+  const p5 = parcel(5, { status: "CREATED", history: [["CREATED", -5]] });
+  task(2, "PICKUP", "ASSIGNED", { destination: "COLOMBO" }, 9.5, [
+    { parcel: p4, outcome: "PENDING", hours: 9.5 },
+    { parcel: p5, outcome: "PENDING", hours: 9.5 },
+  ]);
+
+  // A delivery in progress: to take out (cash), out for delivery, failed (to return), delivered.
+  const p6 = parcel(6, {
+    status: "AT_BRANCH",
+    currentBranch: "COLOMBO",
+    codAmount: 2450,
+    instructions: "Call before you arrive.",
+    history: [["CREATED", -48], ["PICKED_UP", -40], ["AT_BRANCH", -38, "COLOMBO"]],
+  });
+  const p7 = parcel(7, {
+    status: "OUT_FOR_DELIVERY",
+    codAmount: 1200,
+    history: [["CREATED", -50], ["PICKED_UP", -44], ["AT_BRANCH", -42, "COLOMBO"], ["OUT_FOR_DELIVERY", 8]],
+  });
+  const p8 = parcel(8, {
+    status: "FAILED",
+    failureReason: "RECIPIENT_UNAVAILABLE",
+    history: [
+      ["CREATED", -52],
+      ["PICKED_UP", -46],
+      ["AT_BRANCH", -44, "COLOMBO"],
+      ["OUT_FOR_DELIVERY", 8],
+      ["FAILED", 9.5, undefined, "RECIPIENT_UNAVAILABLE"],
+    ],
+  });
+  const p9 = parcel(9, {
+    status: "DELIVERED",
+    proofRecipientName: "Ayesha Fernando",
+    history: [["CREATED", -60], ["PICKED_UP", -50], ["AT_BRANCH", -48, "COLOMBO"], ["OUT_FOR_DELIVERY", 8], ["DELIVERED", 10]],
+  });
+  task(3, "DELIVERY", "IN_PROGRESS", { origin: "COLOMBO" }, 7.5, [
+    { parcel: p6, outcome: "PENDING", hours: 7.5 },
+    { parcel: p7, outcome: "LOADED", hours: 8 },
+    { parcel: p8, outcome: "FAILED", hours: 9.5 },
+    { parcel: p9, outcome: "DELIVERED", hours: 10 },
+  ]);
+
+  // A delivery from yesterday whose parcel is still at another branch: it can't be taken out yet.
+  const p10 = parcel(10, {
+    status: "AT_BRANCH",
+    currentBranch: "GAMPAHA",
+    history: [["CREATED", -30], ["PICKED_UP", -28], ["AT_BRANCH", -26, "GAMPAHA"]],
+  });
+  task(4, "DELIVERY", "ASSIGNED", { origin: "COLOMBO" }, -14, [{ parcel: p10, outcome: "PENDING", hours: -14 }]);
+
+  // A pickup completed today: one not collected, one handed over.
+  const p12 = parcel(12, { status: "CREATED", history: [["CREATED", -18]] });
+  const p13 = parcel(13, {
+    status: "AT_BRANCH",
+    currentBranch: "COLOMBO",
+    history: [["CREATED", -18], ["PICKED_UP", 6.5], ["AT_BRANCH", 7.25, "COLOMBO"]],
+  });
+  task(6, "PICKUP", "COMPLETED", { destination: "COLOMBO" }, 6, [
+    { parcel: p12, outcome: "NOT_COLLECTED", hours: 6.75, problem: "SENDER_UNAVAILABLE" },
+    { parcel: p13, outcome: "HANDED_OVER", hours: 7.25, receivedBy: "K. Ranasinghe" },
+  ]);
+
+  // A pickup the dispatcher cancelled before it started: never shown as work, never completed.
+  const p14 = parcel(14, { status: "CREATED", history: [["CREATED", -10]] });
+  task(7, "PICKUP", "CANCELLED", { destination: "COLOMBO" }, 6.5, [{ parcel: p14, outcome: "PENDING", hours: 6.5 }]);
+
+  // ---- Earlier days (History) ----
+
+  // One parcel worked twice: the first delivery failed and was returned, a later delivery succeeded.
+  const p15 = parcel(15, {
+    status: "DELIVERED",
+    proofRecipientName: "Ruwan Jayasinghe",
+    history: [
+      ["CREATED", -100],
+      ["PICKED_UP", -96],
+      ["AT_BRANCH", -94, "COLOMBO"],
+      ["OUT_FOR_DELIVERY", -62],
+      ["FAILED", -60, undefined, "WRONG_ADDRESS"],
+      ["AT_BRANCH", -58, "COLOMBO"],
+      ["OUT_FOR_DELIVERY", -14],
+      ["DELIVERED", -12],
+    ],
+  });
+  task(20, "DELIVERY", "COMPLETED", { origin: "COLOMBO" }, -64, [
+    { parcel: p15, outcome: "RETURNED", hours: -58, receivedBy: "M. Perera" },
+  ]);
+  task(21, "DELIVERY", "COMPLETED", { origin: "COLOMBO" }, -16, [{ parcel: p15, outcome: "DELIVERED", hours: -12 }]);
+
+  // Older completed pickups and deliveries, one per day or so.
+  for (let n = 30; n < 48; n += 1) {
+    const daysAgo = n - 29;
+    const pickup = n % 3 === 0;
+    const notCollected = n % 7 === 0;
+    const hours = -24 * daysAgo + 11;
+    const id = pickup
+      ? parcel(n, {
+          status: notCollected ? "CREATED" : "AT_BRANCH",
+          currentBranch: notCollected ? null : "COLOMBO",
+          history: notCollected ? [["CREATED", hours - 20]] : [["CREATED", hours - 20], ["PICKED_UP", hours - 2], ["AT_BRANCH", hours, "COLOMBO"]],
+        })
+      : parcel(n, {
+          status: "DELIVERED",
+          proofRecipientName: RECIPIENTS[n % RECIPIENTS.length].name,
+          history: [["CREATED", hours - 60], ["PICKED_UP", hours - 50], ["AT_BRANCH", hours - 48, "COLOMBO"], ["OUT_FOR_DELIVERY", hours - 3], ["DELIVERED", hours]],
+        });
+    task(
+      n,
+      pickup ? "PICKUP" : "DELIVERY",
+      "COMPLETED",
+      pickup ? { destination: "COLOMBO" } : { origin: "COLOMBO" },
+      hours - 4,
+      [
+        pickup
+          ? notCollected
+            ? { parcel: id, outcome: "NOT_COLLECTED", hours, problem: "PARCEL_NOT_READY" }
+            : { parcel: id, outcome: "HANDED_OVER", hours, receivedBy: "S. Silva" }
+          : { parcel: id, outcome: "DELIVERED", hours },
+      ],
+    );
   }
 
-  // DELIVERY: picked up in the sender's district, then moved on to the Colombo branch (not by this courier).
-  const inColombo = [
-    entry("CREATED", at(addDays(taskDay, -2), "10:00")),
-    entry("PICKED_UP", at(addDays(taskDay, -2), "12:00")),
-    entry("AT_BRANCH", at(before, "11:00"), from),
-    entry("IN_TRANSIT", at(before, "14:00")),
-    entry("AT_BRANCH", at(before, "17:00"), "COLOMBO"),
-  ];
-  if (cancelled) return inColombo;
-  const out = entry("OUT_FOR_DELIVERY", at(taskDay, "09:30"));
-  if (outcome === "DELIVERED") return [...inColombo, out, entry("DELIVERED", at(taskDay, "12:00"))];
-  const returned = [
-    ...inColombo,
-    out,
-    entry("FAILED", at(taskDay, "11:00"), null, "WRONG_ADDRESS"),
-    entry("AT_BRANCH", at(taskDay, "15:00"), "COLOMBO"),
-  ];
-  return goesOn
-    ? [...returned, entry("OUT_FOR_DELIVERY", at(after, "09:30")), entry("DELIVERED", at(after, "12:15"))]
-    : returned;
+  tasks.sort((a, b) => b.assignedAt.localeCompare(a.assignedAt));
+  return { now, parcels, tasks };
 }

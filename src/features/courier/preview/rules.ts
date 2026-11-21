@@ -1,57 +1,53 @@
 import type { DistrictCode, ParcelStatus } from "@/types";
-import type { AssignmentType, ItemOutcome } from "../types";
+import type { AssignmentType, CourierTargetStatus, ItemOutcome } from "../types";
 
 /*
- * PREVIEW ONLY. A copy of the backend's step rules, so the sample tasks answer like the real API:
+ * PREVIEW ONLY. A copy of the backend's step rules, so the sample parcels answer like the real API:
+ * - delivery.ParcelStatus (next)
  * - dispatch.ItemOutcome (next, closes)
- * - courier.internal.application.ParcelMoves (allowedOutcomes, readyForHandover, forOutcome)
+ * - courier.internal.application.CourierTask (stepStatuses, nextStatuses, atTheRightBranch, canMarkUnableToCollect,
+ *   unableToCollectOutcome, outcomeFor, handOverBranch)
  * The real screens never use this file: they show what the backend sends. If the backend rules change, change these.
  * Only pickups and deliveries are copied: couriers aren't given branch transfers, so a TRANSFER has no steps here.
  */
 
-/** Life-cycle order (the backend's enum order), used for allowedOutcomes. */
-const OUTCOME_ORDER: ItemOutcome[] = [
-  "PENDING",
-  "COLLECTED",
-  "LOADED",
-  "HANDED_OVER",
-  "DELIVERED",
-  "FAILED",
-  "RETURNED",
-  "NOT_COLLECTED",
-  "NOT_LOADED",
-];
+/** ParcelStatus.next: where a parcel may move from its own status. */
+const PARCEL_NEXT: Record<ParcelStatus, ParcelStatus[]> = {
+  CREATED: ["PICKED_UP"],
+  PICKED_UP: ["AT_BRANCH"],
+  AT_BRANCH: ["IN_TRANSIT", "OUT_FOR_DELIVERY"],
+  IN_TRANSIT: ["AT_BRANCH"],
+  OUT_FOR_DELIVERY: ["DELIVERED", "FAILED"],
+  FAILED: ["AT_BRANCH"],
+  DELIVERED: [],
+};
+
+export function parcelCanMoveTo(current: ParcelStatus, target: ParcelStatus): boolean {
+  return PARCEL_NEXT[current].includes(target);
+}
 
 /** ItemOutcome.next: the outcomes this one may move to in a task of this type. */
 export function nextOutcomes(type: AssignmentType, outcome: ItemOutcome): ItemOutcome[] {
-  const next: ItemOutcome[] = (() => {
-    switch (type) {
-      case "PICKUP":
-        if (outcome === "PENDING") return ["COLLECTED", "NOT_COLLECTED"];
-        if (outcome === "COLLECTED") return ["HANDED_OVER"];
-        return [];
-      case "TRANSFER":
-        // Branch transfers aren't courier work: the preview has none and offers no steps for one.
-        return [];
-      case "DELIVERY":
-        if (outcome === "PENDING") return ["LOADED", "NOT_LOADED"];
-        if (outcome === "LOADED") return ["DELIVERED", "FAILED"];
-        if (outcome === "FAILED") return ["RETURNED"];
-        return [];
-    }
-  })();
-  return OUTCOME_ORDER.filter((candidate) => next.includes(candidate));
+  switch (type) {
+    case "PICKUP":
+      if (outcome === "PENDING") return ["COLLECTED", "NOT_COLLECTED"];
+      if (outcome === "COLLECTED") return ["HANDED_OVER"];
+      return [];
+    case "TRANSFER":
+      // Not courier work: the preview has no transfers and offers no steps for one.
+      return [];
+    case "DELIVERY":
+      if (outcome === "PENDING") return ["LOADED", "NOT_LOADED"];
+      if (outcome === "LOADED") return ["DELIVERED", "FAILED"];
+      if (outcome === "FAILED") return ["RETURNED"];
+      return [];
+  }
 }
 
-export function canMoveTo(type: AssignmentType, from: ItemOutcome, to: ItemOutcome): boolean {
-  return nextOutcomes(type, from).includes(to);
-}
-
-/** ItemOutcome.closes: the courier is done with the parcel in this task. A FAILED delivery stays open until RETURNED. */
+/** ItemOutcome.closes: the courier is done with the parcel in this task. COLLECTED, LOADED and FAILED stay open. */
 export function closes(type: AssignmentType, outcome: ItemOutcome): boolean {
   switch (outcome) {
     case "HANDED_OVER":
-      return type === "PICKUP";
     case "NOT_COLLECTED":
       return type === "PICKUP";
     case "NOT_LOADED":
@@ -64,56 +60,77 @@ export function closes(type: AssignmentType, outcome: ItemOutcome): boolean {
   }
 }
 
-/** Handover outcomes go through the handover, never the one-parcel outcome endpoint. */
-export function isHandover(outcome: ItemOutcome): boolean {
-  return outcome === "HANDED_OVER" || outcome === "RETURNED";
-}
-
-/** RETURNED for a delivery (failed parcels back to the origin branch), else HANDED_OVER. */
-export function handoverOutcome(type: AssignmentType): ItemOutcome {
-  return type === "DELIVERY" ? "RETURNED" : "HANDED_OVER";
-}
-
-export interface TaskBranches {
-  type: AssignmentType;
-  originBranch: DistrictCode | null;
-  destinationBranch: DistrictCode | null;
-}
-
-/** ParcelMoves.forOutcome: the parcel status for an outcome, or null when the parcel doesn't change. */
-export function parcelMove(
-  task: TaskBranches,
-  outcome: ItemOutcome,
-): { status: ParcelStatus; branch: DistrictCode | null } | null {
-  const { type } = task;
-  switch (outcome) {
-    case "COLLECTED":
-      return type === "PICKUP" ? { status: "PICKED_UP", branch: null } : null;
-    case "LOADED":
-      if (type === "DELIVERY") return { status: "OUT_FOR_DELIVERY", branch: null };
-      return null;
-    case "HANDED_OVER":
-      return type === "PICKUP" ? { status: "AT_BRANCH", branch: task.destinationBranch } : null;
-    case "DELIVERED":
-      return type === "DELIVERY" ? { status: "DELIVERED", branch: null } : null;
-    case "FAILED":
-      return type === "DELIVERY" ? { status: "FAILED", branch: null } : null;
-    case "RETURNED":
-      return type === "DELIVERY" ? { status: "AT_BRANCH", branch: task.originBranch } : null;
-    default:
-      return null;
+/** CourierTask.stepStatuses: the statuses the task's next step moves the parcel to, while the step is open. */
+export function stepStatuses(type: AssignmentType, outcome: ItemOutcome, closed: boolean): CourierTargetStatus[] {
+  if (closed) return [];
+  switch (type) {
+    case "PICKUP":
+      if (outcome === "PENDING") return ["PICKED_UP"];
+      if (outcome === "COLLECTED") return ["AT_BRANCH"];
+      return [];
+    case "TRANSFER":
+      return [];
+    case "DELIVERY":
+      if (outcome === "PENDING") return ["OUT_FOR_DELIVERY"];
+      if (outcome === "LOADED") return ["DELIVERED", "FAILED"];
+      if (outcome === "FAILED") return ["AT_BRANCH"];
+      return [];
   }
 }
 
-/** ParcelMoves.allowedOutcomes: empty once the task is closed; never a handover outcome. */
-export function allowedOutcomes(task: TaskBranches, taskClosed: boolean, outcome: ItemOutcome): ItemOutcome[] {
-  if (taskClosed) return [];
-  return nextOutcomes(task.type, outcome).filter((next) => !isHandover(next));
+/** CourierTask.atTheRightBranch: taking a parcel out (OUT_FOR_DELIVERY) needs it at the task's origin branch. */
+export function atTheRightBranch(
+  target: ParcelStatus,
+  originBranch: DistrictCode | null,
+  currentBranch: DistrictCode | null,
+): boolean {
+  if (target !== "IN_TRANSIT" && target !== "OUT_FOR_DELIVERY") return true;
+  return originBranch !== null && originBranch === currentBranch;
 }
 
-/** ParcelMoves.readyForHandover: can move to the handover outcome, and that move has a branch. */
-export function readyForHandover(task: TaskBranches, taskClosed: boolean, outcome: ItemOutcome): boolean {
-  if (taskClosed) return false;
-  const handover = handoverOutcome(task.type);
-  return canMoveTo(task.type, outcome, handover) && parcelMove(task, handover)?.branch != null;
+/** CourierTask.nextStatuses: the step's statuses the parcel's own status allows now, at the right branch. */
+export function nextStatuses(
+  task: { type: AssignmentType; outcome: ItemOutcome; closed: boolean; originBranch: DistrictCode | null },
+  current: ParcelStatus,
+  currentBranch: DistrictCode | null,
+): CourierTargetStatus[] {
+  return stepStatuses(task.type, task.outcome, task.closed).filter(
+    (target) => parcelCanMoveTo(current, target) && atTheRightBranch(target, task.originBranch, currentBranch),
+  );
+}
+
+/** CourierTask.unableToCollectOutcome: NOT_COLLECTED for a pickup, NOT_LOADED for a delivery. */
+export function unableToCollectOutcome(type: AssignmentType): ItemOutcome {
+  return type === "PICKUP" ? "NOT_COLLECTED" : "NOT_LOADED";
+}
+
+/** CourierTask.canMarkUnableToCollect: the step is open and dispatch allows that outcome next. */
+export function canMarkUnableToCollect(type: AssignmentType, outcome: ItemOutcome, closed: boolean): boolean {
+  return !closed && nextOutcomes(type, outcome).includes(unableToCollectOutcome(type));
+}
+
+/** CourierTask.outcomeFor: the task outcome a change to `target` records. */
+export function outcomeFor(type: AssignmentType, target: CourierTargetStatus): ItemOutcome {
+  switch (target) {
+    case "PICKED_UP":
+      return "COLLECTED";
+    case "IN_TRANSIT":
+    case "OUT_FOR_DELIVERY":
+      return "LOADED";
+    case "AT_BRANCH":
+      return type === "DELIVERY" ? "RETURNED" : "HANDED_OVER";
+    case "DELIVERED":
+      return "DELIVERED";
+    case "FAILED":
+      return "FAILED";
+  }
+}
+
+/** CourierTask.handOverBranch: the destination branch, or for a delivery its origin branch (returns go there). */
+export function handOverBranch(
+  type: AssignmentType,
+  originBranch: DistrictCode | null,
+  destinationBranch: DistrictCode | null,
+): DistrictCode | null {
+  return type === "DELIVERY" ? originBranch : destinationBranch;
 }
