@@ -69,7 +69,7 @@ export function WebhookList() {
   async function switchToExistingWebhook(match: Webhook, eventTypes: WebhookEventType[]): Promise<boolean> {
     let target = match;
     if (!match.active) {
-      const updated = await turnOnWebhook(match);
+      const updated = await turnOnWebhook(match, webhooks.refresh);
       if (!updated) return false;
       webhooks.upsert(updated);
       target = updated;
@@ -92,7 +92,7 @@ export function WebhookList() {
   return (
     <ListPage
       title="Webhooks"
-      description="Get a message on your server whenever one of your orders changes status."
+      description="Get an update in your shop's system each time one of your orders moves."
       action={actions}
     >
       {!approved && user ? (
@@ -147,6 +147,7 @@ export function WebhookList() {
                     <WebhookActions
                       webhook={webhook}
                       onChange={webhooks.upsert}
+                      onStale={webhooks.refresh}
                       existing={list}
                       deliveriesHref={webhookHref(webhook.id)}
                     />
@@ -184,7 +185,7 @@ export function WebhookList() {
                       columns={COLUMNS}
                       icon={WebhookIcon}
                       title="No webhooks yet"
-                      description="Add your server's address and choose the events you want. We'll send a signed request each time one happens."
+                      description="Add your shop's web address and pick the updates you want. We'll send one each time an order moves."
                       action={approved ? <Button onClick={() => setAdding(true)}>Add webhook</Button> : undefined}
                     />
                   ) : (
@@ -204,6 +205,7 @@ export function WebhookList() {
                           <WebhookActions
                       webhook={webhook}
                       onChange={webhooks.upsert}
+                      onStale={webhooks.refresh}
                       existing={list}
                       deliveriesHref={webhookHref(webhook.id)}
                     />
@@ -237,6 +239,7 @@ export function WebhookList() {
           webhook={editRequest.webhook}
           initialEventTypes={editRequest.eventTypes}
           existing={list}
+          onStale={webhooks.refresh}
           onUpdated={(updated) => {
             webhooks.upsert(updated);
             toast({ tone: "success", title: "Webhook saved" });
@@ -334,23 +337,23 @@ function HowItWorks() {
   const facts = [
     {
       icon: Network,
-      title: "One webhook per destination",
-      text: "Choose every event that server needs. Add another webhook only for a different system, like billing.",
+      title: "One webhook for all updates",
+      text: "Tick every update you want on one webhook. Add another only for a different system, like billing.",
     },
     {
       icon: ShieldCheck,
-      title: "Every message is signed",
-      text: "Your server uses your secret to check that each message really comes from SwiftDrop before trusting it.",
+      title: "Every update is signed",
+      text: "Your shop uses the webhook's secret to check that each update really comes from SwiftDrop.",
     },
     {
       icon: Timer,
       title: "Reply within 10 seconds",
-      text: "Your server should confirm it received the message quickly, then do any slow work afterwards.",
+      text: "Your shop should say \"received\" quickly, and do any slow work after that.",
     },
     {
       icon: RotateCw,
-      title: "Missed messages are sent again",
-      text: "Right away, then after 1 min, 5 min, 15 min, 1 h and 6 h. A message can arrive twice, so your system should ignore repeats.",
+      title: "Missed updates are sent again",
+      text: "We try again after 1 min, 5 min, 15 min, 1 hour and 6 hours. The same update can arrive twice, so your shop should ignore repeats.",
     },
   ];
 

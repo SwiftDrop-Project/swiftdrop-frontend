@@ -19,8 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListPage } from "@/components/layout/list-page";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { isApiError } from "@/lib/api";
-import { formatDate, formatPhone, formatTrackingNumber } from "@/lib/format";
+import { formatDate, formatPhone, formatRs, formatTrackingNumber } from "@/lib/format";
 import type { ParcelStatus } from "@/types";
 import { merchantOrdersApi } from "../api";
 import type { MerchantOrder } from "../types";
@@ -45,12 +46,22 @@ type ListState =
   | { status: "error"; message: string }
   | { status: "ready"; orders: MerchantOrder[]; page: number; totalPages: number; totalElements: number };
 
-/** Paginated orders table for the merchant (/merchant/orders). */
-export function MerchantOrdersList() {
+/**
+ * Paginated orders table for the merchant (/merchant/orders). With `renderOrderDetails`, clicking an order (or its
+ * tracking number) opens a side panel with the order's details and whatever that function renders below them, e.g.
+ * the webhooks feature's messages about the order. This feature doesn't know what goes there, so it never imports
+ * the other feature.
+ */
+export function MerchantOrdersList({
+  renderOrderDetails,
+}: {
+  renderOrderDetails?: (order: MerchantOrder) => React.ReactNode;
+} = {}) {
   const [filter, setFilter] = React.useState<Filter>("ALL");
   const [page, setPage] = React.useState(0);
   const [attempt, setAttempt] = React.useState(0);
   const [list, setList] = React.useState<ListState>({ status: "loading" });
+  const [selected, setSelected] = React.useState<MerchantOrder | null>(null);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -145,11 +156,29 @@ export function MerchantOrdersList() {
               />
             ) : (
               list.orders.map((order) => (
-                <TableRow key={order.id} className="cursor-pointer hover:bg-grey-50">
+                <TableRow
+                  key={order.id}
+                  className={renderOrderDetails ? "cursor-pointer hover:bg-grey-50" : undefined}
+                  onClick={renderOrderDetails ? () => setSelected(order) : undefined}
+                >
                   <TableCell>
-                    <span className="tabular-nums text-label text-grey-900">
-                      {formatTrackingNumber(order.trackingNumber)}
-                    </span>
+                    {renderOrderDetails ? (
+                      // the keyboard way to open the panel (the row click is for the mouse)
+                      <Button
+                        variant="link"
+                        className="tabular-nums"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelected(order);
+                        }}
+                      >
+                        {formatTrackingNumber(order.trackingNumber)}
+                      </Button>
+                    ) : (
+                      <span className="tabular-nums text-label text-grey-900">
+                        {formatTrackingNumber(order.trackingNumber)}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <p className="text-grey-900">{order.recipient.name}</p>
@@ -181,7 +210,54 @@ export function MerchantOrdersList() {
           />
         ) : null}
       </Card>
+
+      {renderOrderDetails ? (
+        <Sheet open={selected !== null} onOpenChange={(open) => (open ? undefined : setSelected(null))}>
+          <SheetContent side="right" className="w-full! max-w-full overflow-y-auto sm:w-md!">
+            {selected ? (
+              <div className="flex flex-col gap-6 p-6 pt-14">
+                <div className="flex flex-col gap-1">
+                  <SheetTitle className="tabular-nums">{formatTrackingNumber(selected.trackingNumber)}</SheetTitle>
+                  <SheetDescription>
+                    {selected.merchantOrderRef ? `Your reference ${selected.merchantOrderRef}` : "No reference"}
+                  </SheetDescription>
+                  <div className="mt-2">
+                    <StatusBadge status={selected.status} />
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-4 text-body-sm">
+                  <OrderField label="Recipient">
+                    {selected.recipient.name}
+                    <span className="block text-grey-600 tabular-nums">{formatPhone(selected.recipient.phone)}</span>
+                  </OrderField>
+                  <OrderField label="Created">
+                    <span className="tabular-nums">{formatDate(selected.createdAt)}</span>
+                  </OrderField>
+                  <OrderField label="Weight">
+                    <span className="tabular-nums">{selected.weightKg} kg</span>
+                  </OrderField>
+                  <OrderField label="Cash on delivery">
+                    <span className="tabular-nums">
+                      {selected.codAmount !== null ? formatRs(selected.codAmount) : "None"}
+                    </span>
+                  </OrderField>
+                </dl>
+                {renderOrderDetails(selected)}
+              </div>
+            ) : null}
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </ListPage>
+  );
+}
+
+function OrderField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-caption text-grey-600">{label}</dt>
+      <dd className="text-grey-900">{children}</dd>
+    </div>
   );
 }
 

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { MerchantOrdersList } from "@/features/merchants";
+import { OrdersWithWebhookMessages } from "@/features/webhooks";
 
 export const metadata: Metadata = { title: "Orders" };
 
 export default function Page() {
-  return <MerchantOrdersList />;
+  return <OrdersWithWebhookMessages />;
 }

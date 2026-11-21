@@ -45,6 +45,7 @@ export function WebhookFormDialog({
   onCreated,
   onUpdated,
   onNotApproved,
+  onStale,
   onUseExisting,
 }: {
   open: boolean;
@@ -58,6 +59,8 @@ export function WebhookFormDialog({
   onUpdated?: (updated: Webhook) => void;
   /** The backend said the merchant isn't approved (403 MERCHANT_NOT_APPROVED). */
   onNotApproved?: () => void;
+  /** Edit: someone changed this webhook at the same moment (409 WEBHOOK_CHANGED); the caller loads the latest. */
+  onStale?: () => void;
   /**
    * Add only: "use that webhook instead". Gets the matching webhook and the events chosen here merged with its own;
    * resolves to false when it couldn't continue (e.g. turning it on was refused), so this dialog stays open.
@@ -140,6 +143,12 @@ export function WebhookFormDialog({
         return;
       }
       if (error.code === "MERCHANT_NOT_APPROVED") onNotApproved?.();
+      if (error.code === "WEBHOOK_CHANGED") {
+        // nothing was saved: show the message and load the webhook as it is now (the form then shows it)
+        setNotice({ title: saveFailedTitle(editing), message: error.message });
+        onStale?.();
+        return;
+      }
       if (error.code === "WEBHOOK_URL_IN_USE") {
         // the address is the problem, so the message goes under the address field
         setError("url", { type: "server", message: error.message }, { shouldFocus: true });

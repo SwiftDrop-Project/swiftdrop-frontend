@@ -265,6 +265,12 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
           description: "Platform-wide parcel directory across all branches.",
         },
         {
+          title: "Webhook Logs",
+          href: "/admin/webhooks",
+          icon: Webhook,
+          description: "Every merchant's webhook deliveries, failures and retries.",
+        },
+        {
           title: "Zones & Pricing",
           href: "/admin/zones",
           icon: MapIcon,
@@ -381,18 +387,6 @@ const RETAINED_ADMIN_PLACEHOLDER_ITEMS: NavItem[] = [
     href: "/admin/merchant/api-keys",
     icon: KeyRound,
     description: "Manage merchant store integration API keys.",
-  },
-  {
-    title: "Webhooks",
-    href: "/admin/merchant/webhooks",
-    icon: Webhook,
-    description: "Configure webhook endpoints for parcel status events.",
-  },
-  {
-    title: "Webhook Logs",
-    href: "/admin/merchant/webhook-logs",
-    icon: FileText,
-    description: "Inspect webhook delivery attempts, response codes and retries.",
   },
   {
     title: "Business Profile",

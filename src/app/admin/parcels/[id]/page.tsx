@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RequireCurrentUser } from "@/features/identity";
-import { ParcelDetailView } from "@/features/reporting";
+import { AdminParcelWithWebhookMessages } from "@/features/webhooks";
 
 export const metadata: Metadata = { title: "Parcel Details" };
 
@@ -19,7 +19,7 @@ export default function AdminParcelDetailPage() {
         </Card>
       }
     >
-      <ParcelDetailView />
+      <AdminParcelWithWebhookMessages />
     </RequireCurrentUser>
   );
 }

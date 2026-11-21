@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Webhook Logs" };
-
+/** Old placeholder address: the admin's webhook page is now /admin/webhooks. */
 export default function Page() {
-  return <ComingSoon href="/admin/merchant/webhook-logs" />;
+  redirect("/admin/webhooks");
 }

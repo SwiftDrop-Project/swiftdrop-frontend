@@ -75,3 +75,11 @@ export interface WebhookDelivery {
   createdAt: string;
   deliveredAt: string | null;
 }
+
+/**
+ * A delivery in the admin list (GET /admin/webhooks/deliveries): the merchant's fields plus the merchant's
+ * identity user id. The subscription's URL isn't included.
+ */
+export interface AdminWebhookDelivery extends WebhookDelivery {
+  merchantId: string;
+}
