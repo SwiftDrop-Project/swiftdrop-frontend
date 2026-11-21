@@ -15,9 +15,16 @@ Merchant webhook subscriptions and the log of parcel events sent to merchant URL
 - `WebhookDetail` (`/merchant/webhooks/[id]`): one webhook with its delivery history (status filter, pages of
   20, retry on failed deliveries, refreshes every 3 s while a delivery is about to be sent) and a setup guide
   (payload, headers, signature check in Node.js, Python and PHP).
-- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry).
+- `AdminWebhookLogs` (`/admin/webhooks`, ADMIN): every merchant's deliveries with a merchant filter (names from
+  `GET /admin/merchants?status=APPROVED`, `useMerchantNames`), the same search, event, status and date filters,
+  retry on failed deliveries, and the short error code (e.g. `HTTP_503`) next to the plain-words result. The old
+  `/admin/merchant/webhooks` and `/admin/merchant/webhook-logs` placeholders redirect here.
+- Shared by both delivery lists: `DeliveryFilters`, `DeliveryList` (`delivery-parts.tsx`), `useDeliveryFilters`, and
+  `useDeliveries`, which takes a load function so it works for one webhook or for the admin list.
+- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry) and
+  `adminWebhooksApi` (deliveries, retry).
 
-Next: the admin webhook logs page (`/admin/webhooks/deliveries`).
+Next: a parcel's webhook messages (merchant Orders side panel, admin parcel page).
 
 ## Layout
 

@@ -74,7 +74,7 @@ export function DeliveryTodayCard({ data, loadedAt, refreshing, onRefresh }: Del
           data ? (
             `${formatLongDay(data.today.date)} · Sri Lanka time`
           ) : (
-            <Skeleton className="mt-1 h-4 w-56" />
+            <span aria-hidden="true" className="mt-1 block h-4 w-56 max-w-full animate-pulse rounded-md bg-grey-100" />
           )
         }
         aside={

@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import type { PageResponse } from "@/types";
 import type {
+  AdminWebhookDelivery,
   CreateWebhookRequest,
   DeliveryEventType,
   DeliveryStatus,
@@ -72,4 +73,50 @@ export const webhooksApi = {
   /** Sends a FAILED delivery again with a new set of attempts; 409 WEBHOOK_DELIVERY_NOT_RETRYABLE otherwise. */
   retry: (deliveryId: string) =>
     apiFetch<WebhookDelivery>(`${BASE}/deliveries/${encodeURIComponent(deliveryId)}/retry`, { method: "POST" }),
+};
+
+const ADMIN_BASE = "/admin/webhooks";
+
+/** Every merchant's webhook deliveries (API.md "Webhooks"). ADMIN only. */
+export const adminWebhooksApi = {
+  /**
+   * Every merchant's deliveries, newest first. Every filter is optional (left out means all): `status`,
+   * `merchantId`, `eventType` (a wire name, including `webhook.ping`), `search`, `from` and `to`. size 1-100.
+   */
+  deliveries: (
+    {
+      status,
+      merchantId,
+      eventType,
+      search,
+      from,
+      to,
+      page,
+      size,
+    }: {
+      status?: DeliveryStatus;
+      /** The merchant's identity user id. */
+      merchantId?: string;
+      eventType?: DeliveryEventType;
+      /** Tracking number, part of an order number, or a delivery/event/parcel id. */
+      search?: string;
+      /** First day, "2026-11-01" (Sri Lankan time, included). */
+      from?: string;
+      /** Last day, "2026-11-15" (Sri Lankan time, included). */
+      to?: string;
+      page: number;
+      size: number;
+    },
+    signal?: AbortSignal,
+  ) =>
+    apiFetch<PageResponse<AdminWebhookDelivery>>(`${ADMIN_BASE}/deliveries`, {
+      query: { status, merchantId, eventType, search, from, to, page, size },
+      signal,
+    }),
+
+  /** Same as the merchant retry: a FAILED delivery gets a new set of attempts; 409 WEBHOOK_DELIVERY_NOT_RETRYABLE otherwise. */
+  retry: (deliveryId: string) =>
+    apiFetch<AdminWebhookDelivery>(`${ADMIN_BASE}/deliveries/${encodeURIComponent(deliveryId)}/retry`, {
+      method: "POST",
+    }),
 };

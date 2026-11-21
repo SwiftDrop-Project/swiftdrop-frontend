@@ -75,22 +75,35 @@ export const DELIVERY_STATUS_TONE: Record<DeliveryStatus, BadgeTone> = {
   FAILED: "error",
 };
 
+/** Who reads a delivery list: the merchant ("your server") or an admin ("the merchant's server"). */
+export type DeliveryAudience = "merchant" | "admin";
+
+const SERVER_WORDS: Record<DeliveryAudience, { Server: string; server: string }> = {
+  merchant: { Server: "Your server", server: "your server" },
+  admin: { Server: "The merchant's server", server: "the merchant's server" },
+};
+
 /**
- * The last attempt in plain words for merchants, without technical codes (API.md `lastError`: null, HTTP_<code>,
- * TIMEOUT, CONNECTION_FAILED, URL_NOT_ALLOWED, SUBSCRIPTION_INACTIVE). The merchant's response body is never stored,
- * so only the answer's code is known; it's translated here into what it means.
+ * The last attempt in plain words, without technical codes (API.md `lastError`: null, HTTP_<code>, TIMEOUT,
+ * CONNECTION_FAILED, URL_NOT_ALLOWED, SUBSCRIPTION_INACTIVE). The merchant's response body is never stored, so only
+ * the answer's code is known; it's translated here into what it means. Merchants read "your server", admins read
+ * "the merchant's server".
  */
-export function lastResult(delivery: Pick<WebhookDelivery, "attempts" | "lastStatusCode" | "lastError">): string {
+export function lastResult(
+  delivery: Pick<WebhookDelivery, "attempts" | "lastStatusCode" | "lastError">,
+  audience: DeliveryAudience = "merchant",
+): string {
   const { attempts, lastError } = delivery;
+  const { Server, server } = SERVER_WORDS[audience];
   if (lastError === null) {
-    return attempts === 0 ? "Not sent yet" : "Received by your server";
+    return attempts === 0 ? "Not sent yet" : `Received by ${server}`;
   }
-  if (lastError.startsWith("HTTP_")) return serverAnswer(Number(lastError.slice("HTTP_".length)));
+  if (lastError.startsWith("HTTP_")) return serverAnswer(Number(lastError.slice("HTTP_".length)), audience);
   switch (lastError) {
     case "TIMEOUT":
-      return "Your server didn't reply in time";
+      return `${Server} didn't reply in time`;
     case "CONNECTION_FAILED":
-      return "We couldn't reach your server";
+      return `We couldn't reach ${server}`;
     case "URL_NOT_ALLOWED":
       return "We couldn't safely reach this address";
     case "SUBSCRIPTION_INACTIVE":
@@ -101,37 +114,38 @@ export function lastResult(delivery: Pick<WebhookDelivery, "attempts" | "lastSta
 }
 
 /** What an HTTP answer from the merchant's server means, in plain words (the number itself isn't shown). */
-function serverAnswer(code: number): string {
-  if (code >= 300 && code < 400) return "Your server sent the message to a different address";
+function serverAnswer(code: number, audience: DeliveryAudience): string {
+  const { Server, server } = SERVER_WORDS[audience];
+  if (code >= 300 && code < 400) return `${Server} sent the message to a different address`;
   switch (code) {
     case 400:
     case 422:
-      return "Your server didn't accept the message";
+      return `${Server} didn't accept the message`;
     case 401:
     case 403:
-      return "Your server refused the message (access denied)";
+      return `${Server} refused the message (access denied)`;
     case 404:
-      return "This address wasn't found on your server";
+      return `This address wasn't found on ${server}`;
     case 405:
-      return "Your server doesn't accept messages at this address";
+      return `${Server} doesn't accept messages at this address`;
     case 408:
-      return "Your server didn't reply in time";
+      return `${Server} didn't reply in time`;
     case 410:
-      return "This address no longer exists on your server";
+      return `This address no longer exists on ${server}`;
     case 413:
-      return "The message was too large for your server";
+      return `The message was too large for ${server}`;
     case 429:
-      return "Your server asked us to slow down";
+      return `${Server} asked us to slow down`;
     case 500:
-      return "Your server had a problem handling the message";
+      return `${Server} had a problem handling the message`;
     case 502:
     case 503:
     case 504:
-      return "Your server was unavailable";
+      return `${Server} was unavailable`;
     default:
-      if (code >= 500) return "Your server had a problem handling the message";
-      if (code >= 400) return "Your server didn't accept the message";
-      return "Your server gave an unexpected reply";
+      if (code >= 500) return `${Server} had a problem handling the message`;
+      if (code >= 400) return `${Server} didn't accept the message`;
+      return `${Server} gave an unexpected reply`;
   }
 }
 

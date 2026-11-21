@@ -1,5 +1,4 @@
 import { Card, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -24,7 +23,7 @@ export function WeeklyDeliveriesCard({ week }: { week: PeriodSummary | null }) {
         title="Last 7 days"
         titleId="overview-week-heading"
         description={
-          week ? `${formatDay(week.from)} to ${formatDay(week.to)}, newest first` : <Skeleton className="mt-1 h-4 w-44" />
+          week ? `${formatDay(week.from)} to ${formatDay(week.to)}, newest first` : <span aria-hidden="true" className="mt-1 block h-4 w-44 max-w-full animate-pulse rounded-md bg-grey-100" />
         }
       />
       <Table>
