@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUserState } from "@/features/identity";
 import { isApiError } from "@/lib/api";
 import { customerApi } from "../api";
-import type { CustomerAddressSummary, CustomerProfile } from "../types";
+import type { CustomerAddressSummary, CustomerProfileResponse } from "../types";
 import { CustomerProfileHeaderCard } from "./customer-profile-header-card";
 import { DeliveryPreferencesCard } from "./delivery-preferences-card";
 import { PasswordSecurityCard } from "./password-security-card";
@@ -18,7 +18,7 @@ type LoadState =
   | { status: "loading" }
   | {
       status: "ready";
-      profile: CustomerProfile;
+      profile: CustomerProfileResponse;
       addresses: CustomerAddressSummary[];
     }
   | { status: "error"; message: string };
@@ -36,19 +36,9 @@ export function CustomerProfileView() {
       customerApi.getAddresses(controller.signal),
     ])
       .then(([profile, addresses]) => {
-        // If current user from identity session is ready, sync user info
-        let mergedProfile = { ...profile };
-        if (userState.status === "ready") {
-          mergedProfile = {
-            ...mergedProfile,
-            fullName: userState.user.fullName || profile.fullName,
-            email: userState.user.email || profile.email,
-            phone: userState.user.phone || profile.phone,
-          };
-        }
         setLoadState({
           status: "ready",
-          profile: mergedProfile,
+          profile,
           addresses,
         });
       })
@@ -58,14 +48,14 @@ export function CustomerProfileView() {
           status: "error",
           message: isApiError(error)
             ? error.message
-            : "We couldn't load your profile. Please check your connection and try again.",
+            : "We couldn't reach SwiftDrop backend. Check your connection or verify the backend is running.",
         });
       });
 
     return () => controller.abort();
   }, [userState, retryCount]);
 
-  function handleProfileUpdated(updated: CustomerProfile) {
+  function handleProfileUpdated(updated: CustomerProfileResponse) {
     if (loadState.status === "ready") {
       setLoadState({
         ...loadState,
@@ -74,7 +64,7 @@ export function CustomerProfileView() {
     }
   }
 
-  function handlePreferencesUpdated(updated: CustomerProfile) {
+  function handlePreferencesUpdated(updated: CustomerProfileResponse) {
     if (loadState.status === "ready") {
       setLoadState({
         ...loadState,

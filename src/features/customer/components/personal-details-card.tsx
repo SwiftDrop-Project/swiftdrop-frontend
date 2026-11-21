@@ -13,14 +13,14 @@ import { formatPhone } from "@/lib/format";
 import { isApiError } from "@/lib/api";
 import { customerApi } from "../api";
 import { personalDetailsSchema, type PersonalDetailsFormData } from "../schemas";
-import type { CustomerProfile } from "../types";
+import type { CustomerProfileResponse } from "../types";
 
 export function PersonalDetailsCard({
   profile,
   onProfileUpdated,
 }: {
-  profile: CustomerProfile;
-  onProfileUpdated: (updated: CustomerProfile) => void;
+  profile: CustomerProfileResponse;
+  onProfileUpdated: (updated: CustomerProfileResponse) => void;
 }) {
   const [rootError, setRootError] = React.useState<string | null>(null);
 
@@ -38,18 +38,17 @@ export function PersonalDetailsCard({
     },
   });
 
-  // Re-sync form default values if profile prop changes
   React.useEffect(() => {
     reset({
       fullName: profile.fullName,
       phone: profile.phone ? formatPhone(profile.phone) : "",
     });
-  }, [profile, reset]);
+  }, [profile.fullName, profile.phone, reset]);
 
   async function onSubmit(data: PersonalDetailsFormData) {
     setRootError(null);
     try {
-      const updated = await customerApi.updateProfile({
+      const updated = await customerApi.updatePersonalDetails({
         fullName: data.fullName.trim(),
         phone: data.phone.trim(),
       });

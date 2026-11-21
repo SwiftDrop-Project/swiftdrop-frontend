@@ -1,6 +1,6 @@
 import type { DistrictCode } from "@/types";
 
-/* Types matching the customer DTOs in API.md (WP2). */
+/* Types matching com.swiftdrop.customer.internal.dto in swiftdrop-backend (WP2). */
 
 export type PaymentMethod = "CASH_ON_DELIVERY" | "MOCK_CARD";
 
@@ -9,33 +9,29 @@ export interface CustomerAddressSummary {
   label: string;
   addressLine1: string;
   city: string;
-  district: DistrictCode;
+  district?: DistrictCode;
   postalCode?: string | null;
-  isDefault: boolean;
+  isDefault?: boolean;
 }
 
-export interface CustomerPreferences {
-  defaultPickupAddressId: string | null;
-  preferredPaymentMethod: PaymentMethod;
-}
-
-export interface CustomerProfile {
-  id: string;
+export interface CustomerProfileResponse {
+  userId: string;
   fullName: string;
   email: string;
   phone: string | null;
   customerSince: string;
-  deliveryCount: number;
-  savedAddressCount: number;
-  preferences: CustomerPreferences;
+  totalDeliveries: number;
+  savedAddressesCount: number;
+  defaultPickupAddressId: string | null;
+  preferredPaymentMethod: PaymentMethod;
 }
 
-export interface UpdateCustomerProfileRequest {
+export interface UpdatePersonalDetailsRequest {
   fullName: string;
   phone: string;
 }
 
-export interface UpdateCustomerPreferencesRequest {
+export interface UpdatePreferencesRequest {
   defaultPickupAddressId: string | null;
   preferredPaymentMethod: PaymentMethod;
 }

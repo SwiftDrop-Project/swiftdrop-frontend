@@ -14,21 +14,21 @@ import { toast } from "@/components/ui/toast";
 import { isApiError } from "@/lib/api";
 import { customerApi } from "../api";
 import { deliveryPreferencesSchema, type DeliveryPreferencesFormData } from "../schemas";
-import type { CustomerAddressSummary, CustomerProfile, PaymentMethod } from "../types";
+import type { CustomerAddressSummary, CustomerProfileResponse, PaymentMethod } from "../types";
 
 export function DeliveryPreferencesCard({
   profile,
   addresses,
   onPreferencesUpdated,
 }: {
-  profile: CustomerProfile;
+  profile: CustomerProfileResponse;
   addresses: CustomerAddressSummary[];
-  onPreferencesUpdated: (updated: CustomerProfile) => void;
+  onPreferencesUpdated: (updated: CustomerProfileResponse) => void;
 }) {
   const [rootError, setRootError] = React.useState<string | null>(null);
 
   const defaultAddrId =
-    profile.preferences.defaultPickupAddressId ||
+    profile.defaultPickupAddressId ||
     addresses.find((a) => a.isDefault)?.id ||
     addresses[0]?.id ||
     "";
@@ -43,16 +43,16 @@ export function DeliveryPreferencesCard({
     resolver: zodResolver(deliveryPreferencesSchema),
     defaultValues: {
       defaultPickupAddressId: defaultAddrId,
-      preferredPaymentMethod: profile.preferences.preferredPaymentMethod,
+      preferredPaymentMethod: profile.preferredPaymentMethod || "CASH_ON_DELIVERY",
     },
   });
 
   React.useEffect(() => {
     reset({
       defaultPickupAddressId: defaultAddrId,
-      preferredPaymentMethod: profile.preferences.preferredPaymentMethod,
+      preferredPaymentMethod: profile.preferredPaymentMethod || "CASH_ON_DELIVERY",
     });
-  }, [defaultAddrId, profile.preferences.preferredPaymentMethod, reset]);
+  }, [defaultAddrId, profile.preferredPaymentMethod, reset]);
 
   async function onSubmit(data: DeliveryPreferencesFormData) {
     setRootError(null);

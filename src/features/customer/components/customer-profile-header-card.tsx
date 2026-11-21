@@ -1,9 +1,9 @@
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMonthYear, initials } from "@/lib/format";
-import type { CustomerProfile } from "../types";
+import type { CustomerProfileResponse } from "../types";
 
-export function CustomerProfileHeaderCard({ profile }: { profile: CustomerProfile }) {
+export function CustomerProfileHeaderCard({ profile }: { profile: CustomerProfileResponse }) {
   return (
     <Card className="mb-6">
       <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -26,13 +26,13 @@ export function CustomerProfileHeaderCard({ profile }: { profile: CustomerProfil
         <div className="flex items-center gap-8 self-start border-t border-grey-100 pt-4 sm:self-center sm:border-t-0 sm:pt-0">
           <div className="flex flex-col">
             <span className="text-display font-semibold text-grey-900 tabular-nums">
-              {profile.deliveryCount}
+              {profile.totalDeliveries}
             </span>
             <span className="text-body-sm text-grey-600">Deliveries</span>
           </div>
           <div className="flex flex-col">
             <span className="text-display font-semibold text-grey-900 tabular-nums">
-              {profile.savedAddressCount}
+              {profile.savedAddressesCount}
             </span>
             <span className="text-body-sm text-grey-600">Saved addresses</span>
           </div>
