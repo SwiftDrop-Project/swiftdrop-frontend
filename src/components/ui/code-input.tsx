@@ -70,7 +70,12 @@ export function CodeInput({
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>, index: number) {
-    if (event.key === "Backspace") {
+    if (/^\d$/.test(event.key)) {
+      // Prevent the browser from updating the input value so React stays in control.
+      // Mobile keyboards fire key="Unidentified" and fall through to onChange instead.
+      event.preventDefault();
+      fill(index, event.key);
+    } else if (event.key === "Backspace") {
       event.preventDefault();
       if (digits[index]) {
         onChange(value.slice(0, index) + value.slice(index + 1));
@@ -105,8 +110,11 @@ export function CodeInput({
           }}
           onChange={(event) => {
             const typed = event.target.value;
-            // Typing into a filled box replaces its digit; autofill and fast typing can bring several.
-            fill(index, digit && typed.length > 1 ? typed.replace(digit, "") : typed);
+            // Desktop digit keys are handled by onKeyDown (preventDefault stops onChange).
+            // This path covers: mobile keyboards (key="Unidentified"), OTP autofill, IME.
+            const stripped = onlyDigits(typed);
+            if (!stripped) return;
+            fill(index, digit && stripped.length > 1 ? stripped.replace(digit, "") : stripped);
           }}
           onKeyDown={(event) => onKeyDown(event, index)}
           onPaste={(event) => {

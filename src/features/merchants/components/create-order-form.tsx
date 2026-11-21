@@ -4,6 +4,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Controller, useForm, type Path } from "react-hook-form";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { FormActions, FormPage, FormSection } from "@/components/layout/form-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,6 +79,7 @@ export function CreateOrderForm() {
   const router = useRouter();
   const [step, setStep] = React.useState(0);
   const [submitError, setSubmitError] = React.useState<string | undefined>();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   // Chosen on the review step, like the customer booking; required before the order is sent.
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod | null>(null);
   const [paymentError, setPaymentError] = React.useState<string | undefined>();
@@ -94,7 +105,7 @@ export function CreateOrderForm() {
   }
 
   async function onSubmit(values: CreateOrderValues) {
-    // submitOrder sends nothing without a payment method; this keeps the request type honest.
+    // handleSubmitClick guards against null; this keeps the request type honest.
     if (paymentMethod === null) return;
     setSubmitError(undefined);
     try {
@@ -127,17 +138,14 @@ export function CreateOrderForm() {
     }
   }
 
-  const submitValidOrder = handleSubmit(onSubmit);
-
-  // Without a payment method nothing is sent: the error shows under the options and the focus moves there.
-  function submitOrder(event: React.FormEvent<HTMLFormElement>) {
-    if (step === 3 && paymentMethod === null) {
-      event.preventDefault();
+  // Validates payment method before opening the confirmation dialog.
+  function handleSubmitClick() {
+    if (paymentMethod === null) {
       setPaymentError(PAYMENT_METHOD_REQUIRED);
       firstPaymentOption.current?.focus();
       return;
     }
-    void submitValidOrder(event);
+    setConfirmOpen(true);
   }
 
   return (
@@ -145,7 +153,7 @@ export function CreateOrderForm() {
       <div className="mb-8">
         <Stepper steps={STEPS} current={step} />
       </div>
-      <form className="flex flex-col gap-12" noValidate onSubmit={submitOrder}>
+      <form className="flex flex-col gap-12" noValidate onSubmit={handleSubmit(onSubmit)}>
         {step === 0 && <ContactStep prefix="pickup" title="Pickup details" description="Where should the rider collect the parcel?" register={register} control={control} errors={errors.pickup} />}
         {step === 1 && <ContactStep prefix="recipient" title="Recipient details" description="Where should the parcel be delivered?" register={register} control={control} errors={errors.recipient} />}
         {step === 2 && <ParcelStep register={register} control={control} errors={errors} />}
@@ -181,14 +189,40 @@ export function CreateOrderForm() {
             </>
           ) : (
             <>
-              <Button type="submit" loading={isSubmitting}>Submit order</Button>
-              <Button type="button" variant="secondary" onClick={() => setStep(2)}>
+              <Button type="button" loading={isSubmitting} onClick={handleSubmitClick}>Submit order</Button>
+              <Button type="button" variant="secondary" disabled={isSubmitting} onClick={() => setStep(2)}>
                 Back
               </Button>
             </>
           )}
         </FormActions>
       </form>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit this order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A rider will be assigned to collect the parcel from your pickup address.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                onClick={() => {
+                  setConfirmOpen(false);
+                  void handleSubmit(onSubmit)();
+                }}
+              >
+                Submit order
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </FormPage>
   );
 }
