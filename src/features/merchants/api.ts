@@ -1,6 +1,14 @@
 import type { User } from "@/features/identity";
 import { apiFetch } from "@/lib/api";
-import type { ApiKey, CreateApiKeyResult, MerchantApplication, MerchantApplicationStatus } from "./types";
+import type { PageResponse, ParcelStatus } from "@/types";
+import type {
+  ApiKey,
+  CreateApiKeyResult,
+  CreateMerchantOrderRequest,
+  MerchantApplication,
+  MerchantApplicationStatus,
+  MerchantOrder,
+} from "./types";
 
 /* Merchant approval endpoints (API.md "Admin", role ADMIN only). */
 export const merchantsApi = {
@@ -18,6 +26,23 @@ export const merchantsApi = {
   rejectMerchant(userId: string) {
     return apiFetch<User>(`/admin/merchants/${encodeURIComponent(userId)}/reject`, {
       method: "POST",
+    });
+  },
+};
+
+/* Merchant order endpoints (API.md "Merchant orders", role MERCHANT only). */
+export const merchantOrdersApi = {
+  list(params: { page?: number; size?: number; status?: ParcelStatus }, signal?: AbortSignal) {
+    return apiFetch<PageResponse<MerchantOrder>>("/merchant/orders", {
+      query: { page: params.page ?? 0, size: params.size ?? 20, status: params.status },
+      signal,
+    });
+  },
+
+  create(request: CreateMerchantOrderRequest) {
+    return apiFetch<MerchantOrder>("/merchant/orders", {
+      method: "POST",
+      body: request,
     });
   },
 };

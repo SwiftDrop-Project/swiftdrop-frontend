@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { PageHeader } from "@/components/layout/page-header";
+import { ZonesPricing } from "@/features/pricing";
 
 export const metadata: Metadata = { title: "Zones & Pricing" };
 
 export default function Page() {
-  return <ComingSoon href="/admin/zones" />;
+  return (
+    <>
+      <PageHeader
+        title="Zones & Pricing"
+        description="Branches, distances between them and the rate card every delivery fee comes from."
+      />
+      <ZonesPricing />
+    </>
+  );
 }
