@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Stepper } from "@/components/ui/stepper";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { PaymentMethodCard, type PaymentMethod } from "@/features/delivery";
 import { useFeeEstimate, type FeeEstimateRequest } from "@/features/pricing";
 import { useDistricts } from "@/hooks/use-districts";
 import { isApiError } from "@/lib/api";
@@ -33,6 +34,7 @@ const STEPS = [
 ];
 
 const EMPTY_CONTACT = { name: "", phone: "", addressLine: "", city: "", district: "" };
+const PAYMENT_METHOD_REQUIRED = "Choose how the delivery fee will be paid.";
 
 const DEFAULT_VALUES: CreateOrderInput = {
   merchantOrderRef: "",
@@ -67,6 +69,10 @@ export function CreateOrderForm() {
   const router = useRouter();
   const [step, setStep] = React.useState(0);
   const [submitError, setSubmitError] = React.useState<string | undefined>();
+  // Chosen on the review step, like the customer booking; required before the order is sent.
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod | null>(null);
+  const [paymentError, setPaymentError] = React.useState<string | undefined>();
+  const firstPaymentOption = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<CreateOrderInput, unknown, CreateOrderValues>({
     resolver: zodResolver(createOrderSchema),
@@ -82,7 +88,14 @@ export function CreateOrderForm() {
     if (valid) setStep((s) => s + 1);
   }
 
+  function choosePaymentMethod(value: PaymentMethod) {
+    setPaymentError(undefined);
+    setPaymentMethod(value);
+  }
+
   async function onSubmit(values: CreateOrderValues) {
+    // submitOrder sends nothing without a payment method; this keeps the request type honest.
+    if (paymentMethod === null) return;
     setSubmitError(undefined);
     try {
       const order = await merchantOrdersApi.create({
@@ -96,11 +109,14 @@ export function CreateOrderForm() {
         widthCm: values.widthCm,
         heightCm: values.heightCm,
         ...(values.keepUpright ? { keepUpright: true } : {}),
+        paymentMethod,
       });
       toast({ tone: "success", title: "Order created", description: `Tracking number: ${formatTrackingNumber(order.trackingNumber)}` });
       router.push("/merchant/orders");
     } catch (err) {
       if (isApiError(err) && Object.keys(err.fieldErrors).length > 0) {
+        // Not a form field: it shows under the payment options on the review step.
+        if (err.fieldErrors.paymentMethod) setPaymentError(err.fieldErrors.paymentMethod);
         const { handled } = applyServerFieldErrors(err, form.setError, SERVER_FIELDS);
         if (!handled) setSubmitError(err.message);
         const fieldStep = getFieldStep(err.fieldErrors);
@@ -111,16 +127,42 @@ export function CreateOrderForm() {
     }
   }
 
+  const submitValidOrder = handleSubmit(onSubmit);
+
+  // Without a payment method nothing is sent: the error shows under the options and the focus moves there.
+  function submitOrder(event: React.FormEvent<HTMLFormElement>) {
+    if (step === 3 && paymentMethod === null) {
+      event.preventDefault();
+      setPaymentError(PAYMENT_METHOD_REQUIRED);
+      firstPaymentOption.current?.focus();
+      return;
+    }
+    void submitValidOrder(event);
+  }
+
   return (
     <FormPage title="Create order" backHref="/merchant/orders" backLabel="Orders">
       <div className="mb-8">
         <Stepper steps={STEPS} current={step} />
       </div>
-      <form className="flex flex-col gap-12" noValidate onSubmit={handleSubmit(onSubmit)}>
+      <form className="flex flex-col gap-12" noValidate onSubmit={submitOrder}>
         {step === 0 && <ContactStep prefix="pickup" title="Pickup details" description="Where should the rider collect the parcel?" register={register} control={control} errors={errors.pickup} />}
         {step === 1 && <ContactStep prefix="recipient" title="Recipient details" description="Where should the parcel be delivered?" register={register} control={control} errors={errors.recipient} />}
         {step === 2 && <ParcelStep register={register} control={control} errors={errors} />}
-        {step === 3 && <ReviewStep values={getValues()} submitError={submitError} />}
+        {step === 3 && (
+          <ReviewStep
+            values={getValues()}
+            submitError={submitError}
+            payment={
+              <PaymentMethodCard
+                ref={firstPaymentOption}
+                value={paymentMethod}
+                onChange={choosePaymentMethod}
+                error={paymentError}
+              />
+            }
+          />
+        )}
 
         <FormActions>
           {step < 3 ? (
@@ -303,9 +345,12 @@ function ParcelStep({
 function ReviewStep({
   values,
   submitError,
+  payment,
 }: {
   values: CreateOrderInput;
   submitError: string | undefined;
+  /** How the delivery fee will be paid (the delivery feature's PaymentMethodCard). */
+  payment: React.ReactNode;
 }) {
   const districts = useDistricts();
 
@@ -347,6 +392,8 @@ function ReviewStep({
           </CardContent>
         </Card>
       </FormSection>
+
+      {payment}
 
       <FormSection title="Estimated fee">
         <FeeEstimateSummary state={feeState} onRetry={retryFee} />

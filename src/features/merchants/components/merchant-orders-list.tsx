@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ListPage } from "@/components/layout/list-page";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { PAYMENT_METHOD_LABEL } from "@/features/delivery";
 import { isApiError } from "@/lib/api";
 import { formatDate, formatPhone, formatRs, formatTrackingNumber } from "@/lib/format";
 import type { ParcelStatus } from "@/types";
@@ -241,6 +242,12 @@ export function MerchantOrdersList({
                       {selected.codAmount !== null ? formatRs(selected.codAmount) : "None"}
                     </span>
                   </OrderField>
+                  {selected.paymentMethod ? (
+                    <OrderField label="Delivery fee">
+                      <span className="tabular-nums">{formatRs(selected.feeAmount)}</span>
+                      <span className="block text-grey-600">{PAYMENT_METHOD_LABEL[selected.paymentMethod]}</span>
+                    </OrderField>
+                  ) : null}
                 </dl>
                 {renderOrderDetails(selected)}
               </div>

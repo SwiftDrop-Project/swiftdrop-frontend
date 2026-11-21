@@ -44,7 +44,8 @@ const ORDER_BODY = `{
   "codAmount": 2500.00,
   "lengthCm": 30,
   "widthCm": 20,
-  "heightCm": 10
+  "heightCm": 10,
+  "paymentMethod": "AT_PICKUP"
 }`;
 
 function orderSamples(url: string): { value: string; label: string; code: string }[] {
@@ -74,6 +75,7 @@ const response = await fetch("${url}", {
     recipient: order.recipient, // { name, phone, addressLine, city, district }
     weightKg: order.weightKg,
     lengthCm: order.lengthCm, widthCm: order.widthCm, heightCm: order.heightCm,
+    paymentMethod: "AT_PICKUP", // how the delivery fee is paid: "ONLINE", "AT_PICKUP" or "AT_DROP_OFF"
   }),
 });
 if (response.status === 201) {
