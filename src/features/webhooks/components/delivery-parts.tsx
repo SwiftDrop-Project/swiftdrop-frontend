@@ -215,8 +215,8 @@ export function FilterField({ id, label, children }: { id: string; label: string
 }
 
 /**
- * "Delivered", the parcel (tracking number and the merchant's order number) and the event id, which the merchant
- * can match in their own logs. A test ping has no parcel.
+ * "Delivered" and the parcel (tracking number and the merchant's order number). A test ping has no parcel.
+ * The event id isn't shown; it can still be pasted into the search box to find a delivery.
  */
 function EventCell({ delivery }: { delivery: WebhookDelivery }) {
   const parcel = [
@@ -229,9 +229,6 @@ function EventCell({ delivery }: { delivery: WebhookDelivery }) {
     <div className="flex min-w-0 flex-col">
       <span className="text-label text-grey-900">{deliveryEventLabel(delivery.eventType)}</span>
       {parcel ? <span className="text-body-sm text-grey-900 tabular-nums">{parcel}</span> : null}
-      <span className="truncate font-mono text-caption text-grey-600" title={delivery.eventId}>
-        {delivery.eventId}
-      </span>
     </div>
   );
 }
@@ -253,7 +250,7 @@ function LastResult({ delivery, audience }: { delivery: WebhookDelivery; audienc
   );
 }
 
-function RetryButton({
+export function RetryButton({
   deliveryId,
   onRetry,
   onRetried,
@@ -299,7 +296,7 @@ function RetryButton({
 }
 
 /** "2 of 6"; a test ping is tried once, so just "1 attempt". */
-function attemptsText(delivery: WebhookDelivery): string {
+export function attemptsText(delivery: WebhookDelivery): string {
   if (delivery.eventType === "webhook.ping") {
     return delivery.attempts === 1 ? "1 attempt" : `${delivery.attempts} attempts`;
   }

@@ -10,10 +10,11 @@ const SEARCH_DELAY_MS = 400;
 /**
  * Filter state of a delivery list: the filters sent to the backend, what's typed in the search box (it becomes
  * `filters.search` after a short pause or on Enter) and the page. Any filter change starts again at page 1.
+ * `initial` sets the starting filters, e.g. a search taken from the page's address.
  */
-export function useDeliveryFilters() {
-  const [filters, setFilters] = React.useState<DeliveryFilterValues>(NO_DELIVERY_FILTERS);
-  const [searchText, setSearchText] = React.useState("");
+export function useDeliveryFilters(initial?: Partial<DeliveryFilterValues>) {
+  const [filters, setFilters] = React.useState<DeliveryFilterValues>(() => ({ ...NO_DELIVERY_FILTERS, ...initial }));
+  const [searchText, setSearchText] = React.useState(() => initial?.search ?? "");
   const [page, setPage] = React.useState(0);
 
   // Search once typing pauses, so there's no request per key press.

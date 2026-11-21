@@ -5,4 +5,6 @@
 export { WebhookList } from "./components/webhook-list";
 export { WebhookDetail } from "./components/webhook-detail";
 export { AdminWebhookLogs } from "./components/admin-webhook-logs";
+export { ParcelWebhookMessages, adminWebhookLogsHref } from "./components/parcel-webhook-messages";
+export { OrdersWithWebhookMessages, AdminParcelWithWebhookMessages } from "./components/parcel-pages";
 export type * from "./types";

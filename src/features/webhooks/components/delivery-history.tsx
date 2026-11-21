@@ -74,7 +74,7 @@ export function DeliveryHistory({ webhookId, refreshSignal }: { webhookId: strin
         <p className="text-body-sm text-grey-600">
           If your server doesn&apos;t receive a message, we try again after 1 min, 5 min, 15 min, 1 h and 6 h. After{" "}
           {MAX_ATTEMPTS} tries, or if your server clearly refuses the message, it&apos;s marked Failed and you can
-          send it again here (10 seconds after its last try). A test message is tried once.
+          send it again here (10 seconds after its last try). A test ping is tried once.
         </p>
       </CardContent>
     </Card>

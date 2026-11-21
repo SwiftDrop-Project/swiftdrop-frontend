@@ -69,7 +69,7 @@ export async function sendTestPing(webhook: Webhook): Promise<boolean> {
     toast({
       tone: "success",
       title: "Test sent",
-      description: `A test message should reach ${hostOf(webhook.url)} within a few seconds.`,
+      description: `A test ping should reach ${hostOf(webhook.url)} within a few seconds.`,
     });
     return true;
   } catch (error) {

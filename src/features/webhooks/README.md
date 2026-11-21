@@ -29,7 +29,13 @@ Merchant webhook subscriptions and the log of parcel events sent to merchant URL
 - `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry) and
   `adminWebhooksApi` (deliveries, retry).
 
-Next: a parcel's webhook messages (merchant Orders side panel, admin parcel page).
+- `ParcelWebhookMessages`: every message sent about one parcel, from all the merchant's webhooks (merchant:
+  `GET /merchant/webhooks/deliveries?search=<parcel id>`, with the webhook's host; admin: the admin list with the
+  parcel's merchant, plus a link to that merchant's Webhook Logs). Retry on failed rows.
+- Wired into other features' pages through their slots, here in `parcel-pages.tsx`, so merchants and reporting
+  never import webhooks: `OrdersWithWebhookMessages` (`/merchant/orders`: click an order for a side panel) and
+  `AdminParcelWithWebhookMessages` (`/admin/parcels/[id]`: a card for merchant parcels).
+- Webhook Logs reads and keeps `?merchantId=` and `?search=` in the address (`adminWebhookLogsHref`).
 
 ## Layout
 

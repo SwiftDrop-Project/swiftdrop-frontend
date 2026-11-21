@@ -38,8 +38,18 @@ function ParcelDetailSkeleton() {
   );
 }
 
-/** One parcel for the admin (GET /admin/parcels/{id}): contacts, parcel, outcome, sender account and history. */
-export function ParcelDetailView({ parcelId }: { parcelId?: string }) {
+/**
+ * One parcel for the admin (GET /admin/parcels/{id}): contacts, parcel, outcome, sender account and history.
+ * `renderExtra` adds cards below the parcel's own (e.g. the webhooks feature's messages about it) without this
+ * feature importing the other one.
+ */
+export function ParcelDetailView({
+  parcelId,
+  renderExtra,
+}: {
+  parcelId?: string;
+  renderExtra?: (parcel: AdminParcelDetail) => React.ReactNode;
+}) {
   const params = useParams<{ id?: string }>();
   const id = parcelId ?? params.id ?? "";
   const districts = useDistricts();
@@ -220,6 +230,8 @@ export function ParcelDetailView({ parcelId }: { parcelId?: string }) {
             <Field label="Photo">{parcel.hasProofPhoto ? "Photo on file" : "No photo"}</Field>
           </DetailCard>
         ) : null}
+
+        {renderExtra?.(parcel)}
       </div>
     </DetailPage>
   );

@@ -70,6 +70,36 @@ export const webhooksApi = {
       signal,
     }),
 
+  /**
+   * All the merchant's deliveries, from every webhook, newest first (GET /merchant/webhooks/deliveries). Same
+   * optional filters as `deliveries`; `search` with a parcel id gives every message sent about that parcel.
+   */
+  allDeliveries: (
+    {
+      status,
+      eventType,
+      search,
+      from,
+      to,
+      page,
+      size,
+    }: {
+      status?: DeliveryStatus;
+      eventType?: DeliveryEventType;
+      /** A parcel id, tracking number, part of an order number, or a delivery/event id. */
+      search?: string;
+      from?: string;
+      to?: string;
+      page: number;
+      size: number;
+    },
+    signal?: AbortSignal,
+  ) =>
+    apiFetch<PageResponse<WebhookDelivery>>(`${BASE}/deliveries`, {
+      query: { status, eventType, search, from, to, page, size },
+      signal,
+    }),
+
   /** Sends a FAILED delivery again with a new set of attempts; 409 WEBHOOK_DELIVERY_NOT_RETRYABLE otherwise. */
   retry: (deliveryId: string) =>
     apiFetch<WebhookDelivery>(`${BASE}/deliveries/${encodeURIComponent(deliveryId)}/retry`, { method: "POST" }),

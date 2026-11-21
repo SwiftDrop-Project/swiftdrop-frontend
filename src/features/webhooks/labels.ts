@@ -51,7 +51,7 @@ export const MAX_ACTIVE_WEBHOOKS = 5;
 export const MAX_ATTEMPTS = 6;
 
 export function deliveryEventLabel(type: DeliveryEventType): string {
-  return type === "webhook.ping" ? "Test message" : WEBHOOK_EVENT_LABEL[type];
+  return type === "webhook.ping" ? "Test ping" : WEBHOOK_EVENT_LABEL[type];
 }
 
 /**

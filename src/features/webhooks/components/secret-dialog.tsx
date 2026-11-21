@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, KeyRound } from "lucide-react";
+import { Check, Copy, KeyRound } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { toast } from "@/components/ui/toast";
+
+/** How long the button says "Copied". */
+const COPIED_MS = 2_000;
 
 /**
  * Shows a signing secret once, after creating a webhook or rotating its secret. The secret lives only in the
@@ -32,10 +35,17 @@ export function SecretDialog({
   onClose: () => void;
 }) {
   const [saved, setSaved] = React.useState(false);
+  // "Copied" on the button for a moment instead of a toast per click, so repeated clicks don't stack messages
+  const [copied, setCopied] = React.useState(false);
+  const copiedTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const open = secret !== null;
+
+  React.useEffect(() => () => clearTimeout(copiedTimer.current), []);
 
   function close() {
     setSaved(false);
+    clearTimeout(copiedTimer.current);
+    setCopied(false);
     onClose();
   }
 
@@ -48,10 +58,12 @@ export function SecretDialog({
   }
 
   async function copy() {
-    if (!secret) return;
+    if (!secret || copied) return;
     try {
       await navigator.clipboard.writeText(secret);
-      toast({ tone: "success", title: "Secret copied" });
+      setCopied(true);
+      clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
     } catch {
       toast({ tone: "error", title: "We couldn't copy it", description: "Select the secret and copy it yourself." });
     }
@@ -79,11 +91,15 @@ export function SecretDialog({
               >
                 {secret}
               </code>
-              <Button type="button" variant="secondary" onClick={copy}>
-                <Copy aria-hidden="true" />
-                Copy
+              <Button type="button" variant="secondary" onClick={copy} disabled={copied}>
+                {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                {copied ? "Copied" : "Copy"}
               </Button>
             </div>
+            {/* tells screen readers once, instead of a toast */}
+            <span className="sr-only" role="status" aria-live="polite">
+              {copied ? "Secret copied" : ""}
+            </span>
           </div>
           <InlineNotice tone="info" title="You'll only see this once">
             Store it in your server&apos;s settings now. If you lose it, rotate the secret to get a new one.
