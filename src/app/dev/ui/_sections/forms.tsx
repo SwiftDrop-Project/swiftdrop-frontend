@@ -5,6 +5,7 @@ import * as React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CodeInput } from "@/components/ui/code-input";
 import { FieldError, FormField } from "@/components/ui/form-field";
+import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -349,6 +350,43 @@ export function Forms() {
           </Example>
         </div>
       </Section>
+
+      <Section
+        id="image-picker"
+        title="ImagePicker"
+        description="One image: Take photo (the camera on phones) or Choose file, then a preview with Replace and Remove. It only picks; the caller checks the type and size."
+      >
+        <ExampleGrid>
+          <Example label="Interactive" stack>
+            <ImagePickerExample />
+          </Example>
+          <Example label="Error" stack>
+            <ImagePicker
+              id="g-image-error"
+              label="Proof of delivery photo"
+              file={null}
+              onChange={noop}
+              error="Add a photo of the signed delivery slip."
+            />
+          </Example>
+          <Example label="Disabled" stack>
+            <ImagePicker id="g-image-disabled" label="Proof of delivery photo" file={null} onChange={noop} disabled />
+          </Example>
+        </ExampleGrid>
+      </Section>
     </>
+  );
+}
+
+function ImagePickerExample() {
+  const [file, setFile] = React.useState<File | null>(null);
+  return (
+    <ImagePicker
+      id="g-image"
+      label="Proof of delivery photo"
+      helper="A photo of the delivery slip the recipient signed. JPEG, PNG or WebP, up to 5 MB."
+      file={file}
+      onChange={setFile}
+    />
   );
 }

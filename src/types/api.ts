@@ -27,8 +27,15 @@ export type ApiErrorCode =
   | "PHONE_ALREADY_REGISTERED"
   | "PROFILE_ALREADY_COMPLETE"
   | "PARCEL_NEEDS_MANUAL_QUOTE"
+  | "INVALID_STATUS_TRANSITION"
+  // Courier tasks (API.md "Courier"); ASSIGNMENT_CHANGED also comes from dispatch.
+  | "TASK_STEP_NOT_ALLOWED"
+  | "ASSIGNMENT_CLOSED"
+  | "ASSIGNMENT_NOT_FINISHED"
+  | "ASSIGNMENT_CHANGED"
   | "UNSUPPORTED_MEDIA_TYPE"
   | "INTERNAL_ERROR"
+  | "SERVICE_UNAVAILABLE"
   | "NETWORK_ERROR";
 
 /** Body of every non-2xx response. `fieldErrors` only comes with VALIDATION_FAILED. */
