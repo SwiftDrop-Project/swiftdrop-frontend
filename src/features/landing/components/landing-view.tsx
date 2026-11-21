@@ -1,5 +1,7 @@
 import * as React from "react";
+import { AssistantLauncher } from "@/features/assistant";
 import { LandingAudience } from "./landing-audience";
+import { LandingCoverage } from "./landing-coverage";
 import { LandingCta } from "./landing-cta";
 import { LandingFooter } from "./landing-footer";
 import { LandingHeader } from "./landing-header";
@@ -13,10 +15,12 @@ export function LandingView() {
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         <LandingHero />
         <LandingHowItWorks />
+        <LandingCoverage />
         <LandingAudience />
         <LandingCta />
       </main>
       <LandingFooter />
+      <AssistantLauncher />
     </div>
   );
 }

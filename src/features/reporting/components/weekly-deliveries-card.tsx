@@ -23,7 +23,12 @@ export function WeeklyDeliveriesCard({ week }: { week: PeriodSummary | null }) {
         title="Last 7 days"
         titleId="overview-week-heading"
         description={
-          week ? `${formatDay(week.from)} to ${formatDay(week.to)}, newest first` : <span aria-hidden="true" className="mt-1 block h-4 w-44 max-w-full animate-pulse rounded-md bg-grey-100" />
+          week ? (
+            `${formatDay(week.from)} to ${formatDay(week.to)}, newest first`
+          ) : (
+            // A span, not Skeleton (a div): the description is rendered inside a <p>.
+            <span aria-hidden="true" className="mt-1 block h-4 w-44 animate-pulse rounded-md bg-grey-100" />
+          )
         }
       />
       <Table>

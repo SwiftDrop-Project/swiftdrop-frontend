@@ -74,7 +74,11 @@ export function DeliveryTodayCard({ data, loadedAt, refreshing, onRefresh }: Del
           data ? (
             `${formatLongDay(data.today.date)} · Sri Lanka time`
           ) : (
-            <span aria-hidden="true" className="mt-1 block h-4 w-56 max-w-full animate-pulse rounded-md bg-grey-100" />
+            // A span, not Skeleton (a div): the description is rendered inside a <p>.
+            <span
+              aria-hidden="true"
+              className="mt-1 block h-4 w-56 animate-pulse rounded-md bg-grey-100"
+            />
           )
         }
         aside={

@@ -7,6 +7,7 @@ import { FormField } from "@/components/ui/form-field";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { reportingApi } from "../api";
 import { useReportSummary } from "../hooks/use-report-summary";
 import {
@@ -23,13 +24,32 @@ import { DailyVolumeCard } from "./daily-volume-card";
 import { ReportFigures } from "./report-figures";
 import { StatusBreakdownCard } from "./status-breakdown-card";
 
+// The date never changes while the page is open, so there is nothing to subscribe to. The server has no date (null).
+const subscribeNever = () => () => {};
+const serverToday = (): string | null => null;
+
 /**
  * The admin's Reports & Analytics page (/admin/reports): delivery volume for a range of Sri Lanka days, compared with
  * the period before it, parcels per day and parcels by status, with a CSV download. The filters sit in one row above
  * everything and scope all of it. Read only.
  */
 export function ReportsAnalytics() {
-  const today = React.useMemo(() => sriLankaToday(), []);
+  // Today's date is read in the browser only: reading it while Next.js prerenders the page would freeze it to the
+  // build date.
+  const today = React.useSyncExternalStore(subscribeNever, sriLankaToday, serverToday);
+
+  if (today === null) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy="true">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  return <ReportsContent today={today} />;
+}
+
+function ReportsContent({ today }: { today: string }) {
   const [preset, setPreset] = React.useState<ReportPreset>("LAST_30_DAYS");
   const [custom, setCustom] = React.useState<ReportRange>(() => presetRange("LAST_30_DAYS", today));
 
