@@ -15,9 +15,27 @@ Merchant webhook subscriptions and the log of parcel events sent to merchant URL
 - `WebhookDetail` (`/merchant/webhooks/[id]`): one webhook with its delivery history (status filter, pages of
   20, retry on failed deliveries, refreshes every 3 s while a delivery is about to be sent) and a setup guide
   (payload, headers, signature check in Node.js, Python and PHP).
-- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry).
+- `AdminWebhookLogs` (`/admin/webhooks`, ADMIN): every merchant's deliveries with a merchant filter (names from
+  `GET /admin/merchants?status=APPROVED`, `useMerchantNames`), the same search, event, status and date filters,
+  retry on failed deliveries, and the short error code (e.g. `HTTP_503`) next to the plain-words result. The old
+  `/admin/merchant/webhooks` and `/admin/merchant/webhook-logs` placeholders redirect here.
+- Shared by both delivery lists: `DeliveryFilters`, `DeliveryList` (`delivery-parts.tsx`), `useDeliveryFilters`, and
+  `useDeliveries`, which takes a load function so it works for one webhook or for the admin list.
+- Limits (API.md "Webhooks", "Limits"): after "Send test" the button counts down 10 s ("Send test (8 s)"), on the
+  detail page and in the ⋯ menu alike; a 429 on Send test or Retry shows "Try again in N seconds" and counts down its
+  `Retry-After` (`use-cooldown.ts`). Only a convenience: the backend enforces the limits.
+- 409 `WEBHOOK_CHANGED` (someone changed the webhook at the same moment): the message is shown and the list reloads
+  without flashing (`useWebhooks().refresh`), so the merchant sees the latest version.
+- `api.ts`: `webhooksApi` (list, create, update, turnOff, rotateSecret, sendTest, deliveries, retry) and
+  `adminWebhooksApi` (deliveries, retry).
 
-Next: the admin webhook logs page (`/admin/webhooks/deliveries`).
+- `ParcelWebhookMessages`: every message sent about one parcel, from all the merchant's webhooks (merchant:
+  `GET /merchant/webhooks/deliveries?search=<parcel id>`, with the webhook's host; admin: the admin list with the
+  parcel's merchant, plus a link to that merchant's Webhook Logs). Retry on failed rows.
+- Wired into other features' pages through their slots, here in `parcel-pages.tsx`, so merchants and reporting
+  never import webhooks: `OrdersWithWebhookMessages` (`/merchant/orders`: click an order for a side panel) and
+  `AdminParcelWithWebhookMessages` (`/admin/parcels/[id]`: a card for merchant parcels).
+- Webhook Logs reads and keeps `?merchantId=` and `?search=` in the address (`adminWebhookLogsHref`).
 
 ## Layout
 

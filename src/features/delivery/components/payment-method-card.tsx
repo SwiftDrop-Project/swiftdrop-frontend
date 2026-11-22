@@ -36,8 +36,8 @@ interface PaymentMethodCardProps {
 }
 
 /**
- * How the delivery fee will be paid: online, at pickup or at drop-off. The review step requires a choice.
- * UI only for now: the choice isn't sent with the booking yet (see PaymentMethod).
+ * How the delivery fee will be paid: online, at pickup or at drop-off. The review step requires a choice, and it is
+ * sent with the booking as paymentMethod.
  */
 export function PaymentMethodCard({ value, onChange, error, ref }: PaymentMethodCardProps) {
   const titleId = React.useId();

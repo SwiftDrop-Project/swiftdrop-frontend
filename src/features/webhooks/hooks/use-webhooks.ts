@@ -37,6 +37,9 @@ export function useWebhooks() {
     setAttempt((value) => value + 1);
   }, []);
 
+  /** Fetches the list again but keeps the rows on screen until the answer arrives (e.g. after 409 WEBHOOK_CHANGED). */
+  const refresh = React.useCallback(() => setAttempt((value) => value + 1), []);
+
   /** Adds a new webhook at the top (newest first) or replaces the one with the same id. */
   const upsert = React.useCallback((webhook: Webhook) => {
     setState((current) => {
@@ -49,7 +52,7 @@ export function useWebhooks() {
     });
   }, []);
 
-  return { ...state, reload, upsert };
+  return { ...state, reload, refresh, upsert };
 }
 
 /** Drops the secret if a create/rotate response is passed in: it must never stay in the list's state. */

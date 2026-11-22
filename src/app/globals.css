@@ -82,7 +82,7 @@
 
   --container-content: 1200px; /* max-w-content: app content */
   --container-wide: 1440px;    /* max-w-wide: public landing and info pages */
-  --container-form: 440px;     /* max-w-form: auth form column (login and register) */
+  --container-form: 400px;     /* max-w-form: auth form column (login and register) */
   --container-form-app: 640px; /* max-w-form-app: in-app forms */
 
   /* ---------- Radius ---------- */

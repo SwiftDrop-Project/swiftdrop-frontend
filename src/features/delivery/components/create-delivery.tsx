@@ -27,7 +27,7 @@ import { isApiError } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
 import { formatPhone, formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
 import { deliveryApi } from "../api";
-import { sizeText } from "../labels";
+import { PAYMENT_METHOD_LABEL, sizeText } from "../labels";
 import { deliveryHref } from "../routes";
 import { createDeliverySchema, type CreateDeliveryInput, type CreateDeliveryValues } from "../schemas";
 import type { Delivery, ParcelSize, PaymentMethod } from "../types";
@@ -114,7 +114,7 @@ export function CreateDelivery() {
   const [step, setStep] = React.useState<Step>("details");
   const [created, setCreated] = React.useState<Delivery | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
-  // Kept here, not in the form: it isn't part of the POST /deliveries body yet (see PaymentMethod).
+  // Kept here, not in the form: it is chosen on the review step, after the details form is valid.
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod | null>(null);
 
   const {
@@ -150,11 +150,12 @@ export function CreateDelivery() {
   });
 
   const createDelivery = handleSubmit(async (values) => {
+    // The review step sends nothing without a payment method; this keeps the request type honest.
+    if (paymentMethod === null) return;
     setNotice(null);
     try {
-      // TODO(payments): send paymentMethod with the booking (and start the online payment) once POST /deliveries
-      // takes it. Until then the review step only asks for it.
-      setCreated(await deliveryApi.create(values));
+      // Only the choice is sent: taking an online payment is the payments work.
+      setCreated(await deliveryApi.create({ ...values, paymentMethod }));
       setStep("done");
       window.scrollTo({ top: 0 });
     } catch (error) {
@@ -558,6 +559,12 @@ function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; on
             <span className="text-label text-grey-600">Delivery fee</span>
             <span className="text-body text-grey-900 tabular-nums">{formatRs(delivery.feeAmount)}</span>
           </div>
+          {delivery.paymentMethod ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-label text-grey-600">Payment</span>
+              <span className="text-body text-grey-900">{PAYMENT_METHOD_LABEL[delivery.paymentMethod]}</span>
+            </div>
+          ) : null}
           <div>
             <Button type="button" variant="secondary" onClick={copyTrackingNumber}>
               <Copy aria-hidden="true" />

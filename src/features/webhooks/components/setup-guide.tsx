@@ -1,13 +1,98 @@
 "use client";
 
 import { Copy } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
+import { apiUrl } from "@/lib/api";
+import { WEBHOOK_EVENT_DESCRIPTION, WEBHOOK_EVENT_LABEL, WEBHOOK_EVENT_TYPES } from "../labels";
 
-/* Static content from API.md "Webhooks (WP6)": what arrives, the headers and how to check the signature. */
+/*
+ * Static content from API.md "Merchant Orders (WP5)" and "Webhooks (WP6)": the whole integration in the order a
+ * developer builds it. The shop sends orders with its API key (setting its own order number), and webhooks report
+ * back on those orders: what arrives, the headers, how to check the signature and the rules.
+ */
+
+/** Shown until SwiftDrop runs at its real web address. */
+const PLACEHOLDER_ORDERS_URL = "https://<your SwiftDrop address>/api/v1/merchant/orders";
+
+/**
+ * Where the API-key examples send orders: SwiftDrop's address from NEXT_PUBLIC_API_URL once it's hosted. A local
+ * address (localhost, 127.0.0.1) is never shown to merchants: they see the placeholder instead.
+ */
+function ordersUrl(): string {
+  try {
+    const url = apiUrl("/merchant/orders");
+    const host = new URL(url).hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") return PLACEHOLDER_ORDERS_URL;
+    return url;
+  } catch {
+    return PLACEHOLDER_ORDERS_URL;
+  }
+}
+
+const ORDER_BODY = `{
+  "merchantOrderRef": "TECH-ORD-1001",
+  "pickup":    { "name": "Lanka Crafts", "phone": "077 123 4567", "addressLine": "12 High Level Road",
+                 "city": "Nugegoda", "district": "COLOMBO" },
+  "recipient": { "name": "Nimal Perera", "phone": "0719876543", "addressLine": "45 Peradeniya Road",
+                 "city": "Kandy", "district": "KANDY" },
+  "weightKg": 1.5,
+  "codAmount": 2500.00,
+  "lengthCm": 30,
+  "widthCm": 20,
+  "heightCm": 10,
+  "paymentMethod": "AT_PICKUP"
+}`;
+
+function orderSamples(url: string): { value: string; label: string; code: string }[] {
+  return [
+    {
+      value: "curl",
+      label: "curl",
+      code: `curl -X POST "${url}" \\
+  -H "X-Api-Key: $SWIFTDROP_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '${ORDER_BODY.replaceAll("\n", "\n  ")}'`,
+    },
+    {
+      value: "node",
+      label: "Node.js",
+      code: `// On your server only: never put the API key in a browser or mobile app.
+const response = await fetch("${url}", {
+  method: "POST",
+  headers: {
+    "X-Api-Key": process.env.SWIFTDROP_API_KEY,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    merchantOrderRef: order.number, // your own order number: webhooks send it back
+    pickup: { name: "Lanka Crafts", phone: "077 123 4567", addressLine: "12 High Level Road",
+              city: "Nugegoda", district: "COLOMBO" },
+    recipient: order.recipient, // { name, phone, addressLine, city, district }
+    weightKg: order.weightKg,
+    lengthCm: order.lengthCm, widthCm: order.widthCm, heightCm: order.heightCm,
+    paymentMethod: "AT_PICKUP", // how the delivery fee is paid: "ONLINE", "AT_PICKUP" or "AT_DROP_OFF"
+  }),
+});
+if (response.status === 201) {
+  const parcel = await response.json();
+  saveTrackingNumber(order.number, parcel.trackingNumber); // e.g. SD2611004817
+}`,
+    },
+  ];
+}
+
+const ORDER_ANSWERS: { status: string; meaning: string }[] = [
+  { status: "201", meaning: "The order was created. You get its tracking number and delivery fee." },
+  { status: "400", meaning: "Some order details are missing or wrong. The answer says which ones." },
+  { status: "401", meaning: "The API key is missing, wrong, or was turned off." },
+  { status: "403", meaning: "Your business account isn't approved." },
+  { status: "409", meaning: "The parcel is too big or heavy for our vehicles. Contact us for a price." },
+];
 
 const EXAMPLE_PAYLOAD = `{
   "id": "6f1c2a8e-4b0d-4c1e-9f3a-2d7b8e5c1a90",
@@ -51,10 +136,10 @@ const ROUTING_EXAMPLE = `app.post("/webhooks/swiftdrop", express.raw({ type: "ap
 });`;
 
 const HEADERS: { name: string; value: string }[] = [
-  { name: "X-SwiftDrop-Event-Id", value: "Same as id in the body. The same on every attempt and retry." },
-  { name: "X-SwiftDrop-Event-Type", value: "Same as type, e.g. parcel.delivered or webhook.ping." },
-  { name: "X-SwiftDrop-Timestamp", value: "Unix time in seconds when this attempt was sent (new on every attempt)." },
-  { name: "X-SwiftDrop-Signature", value: "sha256= followed by the lowercase hex HMAC-SHA256 of <timestamp>.<raw body>." },
+  { name: "X-SwiftDrop-Event-Id", value: "The update's ID (the same if it's sent again)." },
+  { name: "X-SwiftDrop-Event-Type", value: "What happened, for example parcel.delivered." },
+  { name: "X-SwiftDrop-Timestamp", value: "When this update was sent." },
+  { name: "X-SwiftDrop-Signature", value: "The signature your system checks with the secret." },
 ];
 
 const SAMPLES: { value: string; label: string; code: string }[] = [
@@ -112,43 +197,189 @@ function isFromSwiftDrop(string $rawBody, string $secret): bool
 ];
 
 const RULES: { title: string; text: string }[] = [
-  { title: "Answer quickly", text: "Reply with any 2xx within 10 seconds, then do slow work. Redirects aren't followed." },
   {
-    title: "Expect repeats",
-    text: "Delivery is at least once: ignore an id you have already processed.",
+    title: "Reply quickly",
+    text: "Your system should say \"received\" within 10 seconds, and do any slow work after that.",
   },
   {
-    title: "Order by sequence",
-    text: "Events can arrive late or out of order. Ignore one whose sequence is lower than the last you saw for that parcel.",
+    title: "Missed updates are sent again",
+    text: "If your system doesn't reply, we try again after 1 min, 5 min, 15 min, 1 hour and 6 hours. After that the update shows as Failed, and you can send it again from the webhook's page.",
   },
   {
-    title: "No personal data",
-    text: "Bodies never contain customer names, phone numbers, addresses or courier notes. Use merchantOrderRef to find your order.",
+    title: "The same update can arrive twice",
+    text: "Each update has its own ID. If you get one you've already handled, just ignore it.",
+  },
+  {
+    title: "Updates can arrive late",
+    text: "Each update has a number that goes up for every change to the order. Ignore one with a lower number than the last you got for that order.",
+  },
+  {
+    title: "Test pings",
+    text: "A test ping is sent once and only checks that your address works. You can send a new one every 10 seconds.",
+  },
+  {
+    title: "No personal details",
+    text: "Updates never include your customers' names, phone numbers or addresses. Use your order number to find the order.",
   },
 ];
 
-/** The integration guide on a webhook's page. */
+/**
+ * The setup guide on a webhook's page, in plain words for the merchant, in the order they set things up: send orders
+ * with the API key, choose the updates, then receive and check them. Code is only shown as examples "for your
+ * developer".
+ */
 export function SetupGuide() {
+  const url = ordersUrl();
+  const samples = orderSamples(url);
+
   return (
     <div className="flex flex-col gap-6">
-      <Card aria-labelledby="guide-payload-heading">
+      <Card aria-labelledby="guide-orders-heading">
         <CardHeader
-          title="What your server receives"
-          titleId="guide-payload-heading"
-          description="A POST request with Content-Type: application/json. A test ping has data: { subscriptionId }."
+          title="1. Connect your shop with an API key"
+          titleId="guide-orders-heading"
+          description="Your shop sends its orders to SwiftDrop by itself. Then we send your shop an update each time an order moves."
         />
         <CardContent className="flex flex-col gap-4">
-          <CodeBlock code={EXAMPLE_PAYLOAD} label="Example body" />
+          <ol className="flex list-decimal flex-col gap-2 pl-5 text-body-sm text-grey-900">
+            <li>
+              Create a key on the{" "}
+              <Link href="/merchant/api-keys" className="text-orange-700 hover:text-orange-800 hover:underline">
+                API keys
+              </Link>{" "}
+              page. Keep it secret, like a password: only your shop&apos;s system should have it.
+            </li>
+            <li>
+              Your shop sends each new order to <span className="font-mono break-all">{url}</span>, with the key
+              attached. Nobody needs to be signed in to SwiftDrop for this to work.
+            </li>
+            <li>
+              Add your own order number to each order. We include it in every update, so you know which order it&apos;s
+              about. Sending the same order number twice won&apos;t create a second order.
+            </li>
+          </ol>
+          <Tabs defaultValue={samples[0].value}>
+            <TabsList aria-label="Order examples">
+              {samples.map((sample) => (
+                <TabsTrigger key={sample.value} value={sample.value}>
+                  {sample.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {samples.map((sample) => (
+              <TabsContent key={sample.value} value={sample.value}>
+                <CodeBlock code={sample.code} label="Example for your developer" />
+              </TabsContent>
+            ))}
+          </Tabs>
         </CardContent>
-      </Card>
-
-      <Card aria-labelledby="guide-headers-heading">
-        <CardHeader title="Headers" titleId="guide-headers-heading" />
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Header</TableHead>
-              <TableHead>Value</TableHead>
+              <TableHead>Answer code</TableHead>
+              <TableHead>What it means</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ORDER_ANSWERS.map((answer) => (
+              <TableRow key={answer.status}>
+                <TableCell className="font-mono text-body-sm whitespace-nowrap">{answer.status}</TableCell>
+                <TableCell className="text-body-sm text-grey-700">{answer.meaning}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Card aria-labelledby="guide-events-heading">
+        <CardHeader
+          title="2. Updates you can get"
+          titleId="guide-events-heading"
+          description="Pick the ones you want when you add or edit the webhook. You only get updates about your own orders."
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Update</TableHead>
+              <TableHead>Sent when</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {WEBHOOK_EVENT_TYPES.map((type) => (
+              <TableRow key={type}>
+                <TableCell className="whitespace-nowrap">
+                  <span className="block text-label text-grey-900">{WEBHOOK_EVENT_LABEL[type]}</span>
+                  <span className="block font-mono text-caption text-grey-600">{type}</span>
+                </TableCell>
+                <TableCell className="text-body-sm text-grey-700">{WEBHOOK_EVENT_DESCRIPTION[type]}</TableCell>
+              </TableRow>
+            ))}
+            <TableRow>
+              <TableCell className="whitespace-nowrap">
+                <span className="block text-label text-grey-900">Test ping</span>
+                <span className="block font-mono text-caption text-grey-600">webhook.ping</span>
+              </TableCell>
+              <TableCell className="text-body-sm text-grey-700">
+                Only when you press Send test, to check that your address works.
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Card aria-labelledby="guide-payload-heading">
+        <CardHeader
+          title="3. What an update looks like"
+          titleId="guide-payload-heading"
+          description="Each update says what happened and gives your order number and tracking number. It never includes your customers' personal details."
+        />
+        <CardContent className="flex flex-col gap-4">
+          <CodeBlock code={EXAMPLE_PAYLOAD} label="Example update" />
+        </CardContent>
+      </Card>
+
+      <Card aria-labelledby="guide-route-heading">
+        <CardHeader
+          title="4. Handle all updates in one place"
+          titleId="guide-route-heading"
+          description="One webhook address can get every update you picked. Your system looks at what happened and updates the right order."
+        />
+        <CardContent className="flex flex-col gap-4">
+          <CodeBlock code={ROUTING_EXAMPLE} label="Example for your developer" />
+          <p className="text-body-sm text-grey-600">
+            For a test ping, or an update you don&apos;t use, your system can simply reply &quot;received&quot; and do
+            nothing else.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card aria-labelledby="guide-verify-heading">
+        <CardHeader
+          title="5. Make sure an update really comes from SwiftDrop"
+          titleId="guide-verify-heading"
+          description="Every update is signed with your webhook's secret. Your system checks the signature before trusting an update, and ignores updates older than 5 minutes."
+        />
+        <CardContent className="flex flex-col gap-6">
+          <Tabs defaultValue={SAMPLES[0].value}>
+            <TabsList aria-label="Code examples">
+              {SAMPLES.map((sample) => (
+                <TabsTrigger key={sample.value} value={sample.value}>
+                  {sample.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {SAMPLES.map((sample) => (
+              <TabsContent key={sample.value} value={sample.value}>
+                <CodeBlock code={sample.code} label="Example for your developer" />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Sent with every update</TableHead>
+              <TableHead>What it is</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,58 +393,8 @@ export function SetupGuide() {
         </Table>
       </Card>
 
-      <Card aria-labelledby="guide-route-heading">
-        <CardHeader
-          title="Handle every event in one endpoint"
-          titleId="guide-route-heading"
-          description="One webhook can carry all the events you chose. Check the signature first, then branch on type."
-        />
-        <CardContent className="flex flex-col gap-4">
-          <CodeBlock code={ROUTING_EXAMPLE} label="Node.js example" />
-          <p className="text-body-sm text-grey-600">
-            Answer a <code className="font-mono">webhook.ping</code> with 200 and nothing else: it only checks that
-            your endpoint is reachable. Answer unknown types with 200 too, so a new event type never causes retries.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card aria-labelledby="guide-verify-heading">
-        <CardHeader
-          title="Check the signature"
-          titleId="guide-verify-heading"
-          description="Do this before you trust a request."
-        />
-        <CardContent className="flex flex-col gap-6">
-          <ol className="flex list-decimal flex-col gap-2 pl-5 text-body-sm text-grey-900">
-            <li>Read the raw request body before any JSON parsing.</li>
-            <li>
-              Compute HMAC-SHA256 of <code className="font-mono">{"<timestamp>.<raw body>"}</code>, using the whole
-              secret (including <code className="font-mono">whsec_</code>) as the key.
-            </li>
-            <li>
-              Compare <code className="font-mono">sha256=&lt;hex&gt;</code> with X-SwiftDrop-Signature in constant time.
-            </li>
-            <li>Reject the request if the timestamp is more than 5 minutes old.</li>
-          </ol>
-          <Tabs defaultValue={SAMPLES[0].value}>
-            <TabsList aria-label="Code examples">
-              {SAMPLES.map((sample) => (
-                <TabsTrigger key={sample.value} value={sample.value}>
-                  {sample.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {SAMPLES.map((sample) => (
-              <TabsContent key={sample.value} value={sample.value}>
-                <CodeBlock code={sample.code} label={`${sample.label} example`} />
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
-
       <Card aria-labelledby="guide-rules-heading">
-        <CardHeader title="Rules for your endpoint" titleId="guide-rules-heading" />
+        <CardHeader title="6. Good to know" titleId="guide-rules-heading" />
         <CardContent>
           <ul className="grid gap-4 sm:grid-cols-2">
             {RULES.map((rule) => (

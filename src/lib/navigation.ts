@@ -151,16 +151,16 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
     {
       items: [
         {
-          title: "Today's deliveries",
+          title: "Today's parcels",
           href: "/courier",
           icon: Truck,
-          description: "Parcels assigned to you for today.",
+          description: "Your parcels to pick up and deliver, and the ones you finished today.",
         },
         {
-          title: "Delivery history",
+          title: "Parcel history",
           href: "/courier/history",
           icon: ListClock,
-          description: "Every parcel you have picked up or delivered.",
+          description: "Parcels you finished, pickups and deliveries. Search by tracking number.",
         },
       ],
     },
@@ -263,6 +263,12 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
           href: "/admin/parcels",
           icon: Package,
           description: "Platform-wide parcel directory across all branches.",
+        },
+        {
+          title: "Webhook Logs",
+          href: "/admin/webhooks",
+          icon: Webhook,
+          description: "Every merchant's webhook deliveries, failures and retries.",
         },
         {
           title: "Zones & Pricing",
@@ -381,18 +387,6 @@ const RETAINED_ADMIN_PLACEHOLDER_ITEMS: NavItem[] = [
     href: "/admin/merchant/api-keys",
     icon: KeyRound,
     description: "Manage merchant store integration API keys.",
-  },
-  {
-    title: "Webhooks",
-    href: "/admin/merchant/webhooks",
-    icon: Webhook,
-    description: "Configure webhook endpoints for parcel status events.",
-  },
-  {
-    title: "Webhook Logs",
-    href: "/admin/merchant/webhook-logs",
-    icon: FileText,
-    description: "Inspect webhook delivery attempts, response codes and retries.",
   },
   {
     title: "Business Profile",

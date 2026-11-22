@@ -8,4 +8,6 @@ export { CustomerParcelsCard } from "./components/customer-parcels-card";
 export { DeliveryDetail } from "./components/delivery-detail";
 export { MerchantOrdersCard } from "./components/merchant-orders-card";
 export { MyDeliveries } from "./components/my-deliveries";
+export { PaymentMethodCard } from "./components/payment-method-card";
+export { PAYMENT_METHOD_LABEL } from "./labels";
 export type * from "./types";

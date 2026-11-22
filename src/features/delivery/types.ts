@@ -15,8 +15,9 @@ export type FailureReason =
   | "OTHER";
 
 /**
- * How the delivery fee is paid, chosen on the review step. UI only for now: POST /deliveries doesn't take it yet, so
- * it isn't in CreateDeliveryRequest. The payments work adds it there (and takes the online payment).
+ * How the delivery fee is paid (backend delivery.PaymentMethod), chosen on the review step and stored with the parcel,
+ * so the courier knows whether to collect the fee and from whom. It is not the cash on delivery (codAmount). Taking
+ * the online payment itself is the payments work.
  */
 export type PaymentMethod = "ONLINE" | "AT_PICKUP" | "AT_DROP_OFF";
 
@@ -51,6 +52,8 @@ export interface CreateDeliveryRequest {
   heightCm: number;
   /** Default false: the parcel may lie on its side. */
   keepUpright?: boolean;
+  /** Required: how the delivery fee is paid. */
+  paymentMethod: PaymentMethod;
 }
 
 /** Who received a delivered parcel, and whether the courier added a photo. */
@@ -86,6 +89,8 @@ export interface Delivery {
   vehicle: Vehicle | null;
   /** The weight the fee was charged for (whole kg); null before sizes. */
   billableWeightKg: number | null;
+  /** How the fee is paid, as booked; null for parcels booked before payment methods. */
+  paymentMethod: PaymentMethod | null;
 }
 
 /** One status change of a delivery. */

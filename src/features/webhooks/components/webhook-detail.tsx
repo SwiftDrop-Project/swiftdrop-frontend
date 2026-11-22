@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/format";
+import { useCooldown } from "../hooks/use-cooldown";
 import { useWebhooks } from "../hooks/use-webhooks";
 import { WEBHOOK_EVENT_LABEL } from "../labels";
 import { WEBHOOKS_HREF } from "../routes";
@@ -19,7 +20,7 @@ import type { Webhook } from "../types";
 import { ActiveBadge } from "./active-badge";
 import { DeliveryHistory } from "./delivery-history";
 import { SetupGuide } from "./setup-guide";
-import { WebhookActions, hostOf, sendTestPing } from "./webhook-actions";
+import { WebhookActions, hostOf, sendTestPing, testCooldownKey } from "./webhook-actions";
 
 /**
  * /merchant/webhooks/[id]: one webhook with its delivery history (filter, retry, live refresh while something is
@@ -85,13 +86,11 @@ export function WebhookDetail({ id: idProp }: { id?: string }) {
       status={<ActiveBadge active={webhook.active} />}
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => sendTest(webhook)} loading={sending}>
-            <Send aria-hidden="true" />
-            Send test
-          </Button>
+          <SendTestButton webhook={webhook} sending={sending} onSend={() => sendTest(webhook)} />
           <WebhookActions
             webhook={webhook}
             onChange={webhooks.upsert}
+            onStale={webhooks.refresh}
             onTestSent={refreshHistory}
             existing={webhooks.webhooks}
           />
@@ -101,7 +100,7 @@ export function WebhookDetail({ id: idProp }: { id?: string }) {
     >
       {!webhook.active ? (
         <InlineNotice title="This webhook is turned off">
-          It gets no new parcel events, and deliveries still waiting aren&apos;t sent. A test message is still sent,
+          It gets no new parcel events, and deliveries still waiting aren&apos;t sent. A test ping is still sent,
           so you can check the address before you turn it on again.
         </InlineNotice>
       ) : null}
@@ -118,6 +117,17 @@ export function WebhookDetail({ id: idProp }: { id?: string }) {
         </TabsContent>
       </Tabs>
     </DetailPage>
+  );
+}
+
+/** "Send test", counting down the wait before the next test ("Send test (8 s)"), shared with the ⋯ menu. */
+function SendTestButton({ webhook, sending, onSend }: { webhook: Webhook; sending: boolean; onSend: () => void }) {
+  const wait = useCooldown(testCooldownKey(webhook.id));
+  return (
+    <Button variant="secondary" onClick={onSend} loading={sending} disabled={wait > 0}>
+      <Send aria-hidden="true" />
+      {wait > 0 ? `Send test (${wait} s)` : "Send test"}
+    </Button>
   );
 }
 
