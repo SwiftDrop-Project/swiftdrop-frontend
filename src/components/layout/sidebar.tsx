@@ -6,6 +6,7 @@ import { ChevronDown, LoaderCircle, LogOut, type LucideIcon } from "lucide-react
 import * as React from "react";
 import { Logo } from "@/components/ui/logo";
 import { useCurrentUserState } from "@/features/identity";
+import { initials } from "@/lib/format";
 import { activeHref, helpItem, NAVIGATION, type NavGroup } from "@/lib/navigation";
 import { ROLE_HOME } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ export function SidebarContent({ role, onNavigate }: { role: Role; onNavigate?: 
   const pathname = usePathname();
   const active = activeHref(role, pathname);
   const help = helpItem(role);
-  const { logout, loggingOut } = useCurrentUserState();
+  const { state, logout, loggingOut } = useCurrentUserState();
   const groups = NAVIGATION[role];
   const baseId = React.useId();
 
@@ -144,7 +145,7 @@ export function SidebarContent({ role, onNavigate }: { role: Role; onNavigate?: 
         })}
       </nav>
 
-      <ul className="flex shrink-0 flex-col gap-1 border-t border-grey-200 px-3 py-4">
+      <ul className="flex shrink-0 flex-col gap-1 border-t border-grey-200 px-3 py-3">
         <li>
           <NavLink
             href={help.href}
@@ -171,6 +172,47 @@ export function SidebarContent({ role, onNavigate }: { role: Role; onNavigate?: 
           </button>
         </li>
       </ul>
+
+      {role === "CUSTOMER" ? (
+        <div className="shrink-0 border-t border-grey-200 p-3">
+          <Link
+            href="/customer/profile"
+            onClick={onNavigate}
+            aria-current={pathname === "/customer/profile" ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-md p-2 transition-colors",
+              pathname === "/customer/profile"
+                ? "bg-orange-50 font-semibold text-orange-800"
+                : "text-grey-700 hover:bg-grey-50 hover:text-grey-900",
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex size-9 shrink-0 items-center justify-center rounded-full text-label font-semibold",
+                pathname === "/customer/profile"
+                  ? "bg-orange-100 text-orange-800"
+                  : "border border-grey-200 bg-grey-50 text-grey-800",
+              )}
+            >
+              {state.status === "ready" ? initials(state.user.fullName) : "NP"}
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-label text-grey-900">
+                {state.status === "ready" ? state.user.fullName : "Nimali Perera"}
+              </span>
+              <span
+                className={cn(
+                  "text-caption font-normal",
+                  pathname === "/customer/profile" ? "text-orange-700" : "text-grey-600",
+                )}
+              >
+                Customer
+              </span>
+            </span>
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
