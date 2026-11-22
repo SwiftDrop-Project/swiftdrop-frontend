@@ -14,7 +14,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { TextButton, TextLink } from "@/components/ui/text-link";
 import { isApiError, retryMessage } from "@/lib/api";
 import { applyServerFieldErrors } from "@/lib/form-errors";
-import { getSafeNext } from "@/lib/roles";
+import { onboardingFromUser, resolvePostAuthDestination } from "@/lib/roles";
 import { authApi } from "../api";
 import { useLeavingPage } from "../hooks/use-leaving-page";
 import { cooldownKeys, markCodeSent, startCooldown, useCooldown } from "../lib/cooldown";
@@ -67,6 +67,8 @@ function noticeFor(code: string, message: string): FormNotice {
       return { ...GOOGLE_SIGN_IN_ERRORS.account_rejected, body: message };
     case "ACCOUNT_DISABLED":
       return { ...GOOGLE_SIGN_IN_ERRORS.account_disabled, body: message };
+    case "ACCOUNT_REMOVED":
+      return { tone: "error", title: "Account removed", body: message };
     case "EMAIL_NOT_VERIFIED":
       return {
         tone: "info",
@@ -153,7 +155,7 @@ export function LoginForm() {
       startRedirecting();
       // Read ?next here rather than with useSearchParams, so the form can be prerendered.
       const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(getSafeNext(next, user.role));
+      router.replace(resolvePostAuthDestination(onboardingFromUser(user), next));
     } catch (error) {
       if (!isApiError(error)) {
         setNotice({ tone: "error", title: "We couldn't log you in", body: UNKNOWN_ERROR });

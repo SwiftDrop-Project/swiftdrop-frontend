@@ -1,16 +1,27 @@
 # Reporting
 
-Delivery and cash-on-delivery reports for the dispatcher (`/dispatcher/reports`).
+Figures and reports for the admin portal: the admin overview (`/admin`) and, later, Reports & Analytics
+(`/admin/reports`).
 
 | | |
 |---|---|
 | Backend module | `com.swiftdrop.reporting` (`../swiftdrop-backend/src/main/java/com/swiftdrop/reporting`) |
-| Owner | TBD |
+| Owner | WP4 |
 | Import as | `@/features/reporting` (only what `index.ts` exports) |
 
 ## Built so far
 
-Nothing yet. Start with `types.ts` and `api.ts` from the backend contract, then the components.
+- `AdminOverviewStats` (`GET /admin/reports/overview`): deliveries today (booked, delivered, failed, 7-day success
+  rate), the last 7 days per day, accounts per role with merchants waiting for approval, and the newest accounts.
+  Shown on `/admin` inside identity's `AdminOverview`, above the workspace cards.
+- `ParcelDirectory` (`/admin/parcels`, `GET /admin/parcels` and `/stats`): summary cards, search, filters (status,
+  payment, pickup and delivery district, booking dates, sort), the parcel table and the CSV export link.
+- `ParcelDetailView` (`/admin/parcels/[id]`, `GET /admin/parcels/{id}`): sender and receiver, parcel details, proof of
+  delivery, the account that booked it and the tracking history. Read only: admins don't assign couriers.
+- `ReportsAnalytics` (`/admin/reports`, `GET /admin/reports/summary?from=&to=` and `/summary/export`): a period
+  (last 7/30/90 days, this or last month, or a custom range of up to 366 Sri Lanka days), four figures compared with
+  the previous period, parcels per day as two column charts (booked; delivered and failed) with a table view, parcels
+  by status now, and a CSV download.
 
 ## Layout
 

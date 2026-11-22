@@ -59,7 +59,11 @@ export function backendOrigin(): string {
   return new URL(apiBase()).origin;
 }
 
-function apiUrl(path: string, query?: RequestOptions["query"]): string {
+/**
+ * The full backend URL for `path`, e.g. for a file download link that the browser opens directly (it sends the
+ * SD_TOKEN cookie itself). Use apiFetch for everything that returns JSON.
+ */
+export function apiUrl(path: string, query?: RequestOptions["query"]): string {
   const url = new URL(apiBase() + path);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined) url.searchParams.set(key, String(value));
@@ -79,11 +83,14 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 /**
  * The only function in the app that calls `fetch`. Features wrap it in their own api.ts, e.g.
  * `export const deliveryApi = { get: (id: string) => apiFetch<Delivery>(`/deliveries/${id}`) }`.
- * Always sends the SD_TOKEN cookie (credentials: "include") and speaks JSON.
+ * Always sends the SD_TOKEN cookie (credentials: "include") and speaks JSON. A `FormData` body (a file upload) is
+ * sent as multipart/form-data instead; the answer is still JSON.
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, query, signal } = options;
 
+  // A FormData body (a file upload) goes as it is: the browser sets multipart/form-data with its boundary.
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   let response: Response;
   try {
     response = await fetch(apiUrl(path, query), {
@@ -92,9 +99,9 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(body !== undefined && !isForm ? { "Content-Type": "application/json" } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       signal,
     });
   } catch (error) {

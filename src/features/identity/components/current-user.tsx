@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { isApiError } from "@/lib/api";
-import { ROLE_HOME } from "@/lib/roles";
+import {
+  CHANGE_PASSWORD_PATH,
+  COMPLETE_PROFILE_PATH,
+  onboardingFromUser,
+  resolvePostAuthDestination,
+} from "@/lib/roles";
 import type { Role } from "@/types";
 import { authApi } from "../api";
 import { useLeavingPage } from "../hooks/use-leaving-page";
@@ -36,33 +41,43 @@ function currentPath() {
  */
 export function CurrentUserProvider({ area, children }: { area: Role; children: React.ReactNode }) {
   const router = useRouter();
+  const [prevArea, setPrevArea] = React.useState(area);
   const [state, setState] = React.useState<UserState>({ status: "loading" });
   const [attempt, setAttempt] = React.useState(0);
   const [loggingOut, setLoggingOut] = React.useState(false);
   const [leaving, startLeaving] = useLeavingPage();
   const [logoutError, setLogoutError] = React.useState<string | null>(null);
+  const epochRef = React.useRef(0);
+
+  if (area !== prevArea) {
+    setPrevArea(area);
+    setState({ status: "loading" });
+  }
 
   React.useEffect(() => {
+    const epoch = ++epochRef.current;
     const controller = new AbortController();
 
     authApi
       .me(controller.signal)
       .then((user) => {
-        // Signed up with Google but not finished: the API refuses everything else (403 PROFILE_INCOMPLETE).
-        if (user.status === "PROFILE_INCOMPLETE") {
-          router.replace("/register/complete");
+        if (controller.signal.aborted || epoch !== epochRef.current) return;
+        const destination = resolvePostAuthDestination(onboardingFromUser(user));
+        if (destination === COMPLETE_PROFILE_PATH || destination === CHANGE_PASSWORD_PATH) {
+          router.replace(destination);
           return;
         }
         if (user.role !== area) {
-          router.replace(ROLE_HOME[user.role]);
+          router.replace(destination);
           return;
         }
         setState({ status: "ready", user });
       })
       .catch(async (error: unknown) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || epoch !== epochRef.current) return;
         if (isApiError(error) && error.status === 401) {
           await authApi.logout().catch(() => undefined);
+          if (epoch !== epochRef.current) return;
           router.replace(`/login?next=${encodeURIComponent(currentPath())}`);
           return;
         }
@@ -72,19 +87,24 @@ export function CurrentUserProvider({ area, children }: { area: Role; children: 
         });
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+    };
   }, [area, attempt, router]);
 
   const retry = React.useCallback(() => {
+    epochRef.current += 1;
     setState({ status: "loading" });
     setAttempt((value) => value + 1);
   }, []);
 
   const logout = React.useCallback(async () => {
+    epochRef.current += 1;
     setLoggingOut(true);
     setLogoutError(null);
     try {
       await authApi.logout();
+      setState({ status: "loading" });
       startLeaving();
       router.replace("/login");
     } catch (error) {

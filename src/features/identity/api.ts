@@ -1,11 +1,25 @@
 import { apiFetch, backendOrigin } from "@/lib/api";
+import type { PageResponse } from "@/types";
 import type {
+  AdminResetPasswordRequest,
+  AdminUser,
+  AdminUserDetail,
+  UpdateUserRequest,
+  UserListParams,
+  UserStats,
   ChangePasswordRequest,
   CompleteProfileRequest,
+  CourierDetail,
+  CourierListParams,
+  CreateCourierRequest,
+  CreateDispatcherRequest,
+  DispatcherDetail,
+  DispatcherListParams,
   LoginRequest,
   MessageResponse,
   RegisterRequest,
   ResetPasswordRequest,
+  UpdateCourierRequest,
   User,
   VerifyEmailRequest,
 } from "./types";
@@ -79,5 +93,116 @@ export const authApi = {
    */
   googleSignInUrl() {
     return `${backendOrigin()}/oauth2/authorization/google`;
+  },
+};
+
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") {
+      search.set(key, String(value));
+    }
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+/** Admin staff management endpoints (/admin/couriers, /admin/dispatchers). */
+export const staffApi = {
+  listCouriers(params: CourierListParams = {}, signal?: AbortSignal) {
+    const query = buildQuery({
+      q: params.q?.trim() || undefined,
+      branch: params.branch || undefined,
+      status: params.status || undefined,
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+    });
+    return apiFetch<PageResponse<CourierDetail>>(`/admin/couriers${query}`, { signal });
+  },
+
+  getCourier(id: string, signal?: AbortSignal) {
+    return apiFetch<CourierDetail>(`/admin/couriers/${encodeURIComponent(id)}`, { signal });
+  },
+
+  createCourier(body: CreateCourierRequest) {
+    return apiFetch<CourierDetail>("/admin/couriers", { method: "POST", body });
+  },
+
+  updateCourier(id: string, body: UpdateCourierRequest) {
+    return apiFetch<CourierDetail>(`/admin/couriers/${encodeURIComponent(id)}`, { method: "PUT", body });
+  },
+
+  blockCourier(id: string) {
+    return apiFetch<CourierDetail>(`/admin/couriers/${encodeURIComponent(id)}/block`, { method: "POST" });
+  },
+
+  unblockCourier(id: string) {
+    return apiFetch<CourierDetail>(`/admin/couriers/${encodeURIComponent(id)}/unblock`, { method: "POST" });
+  },
+
+  removeCourier(id: string) {
+    return apiFetch<CourierDetail>(`/admin/couriers/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
+  resetCourierPassword(id: string, body: AdminResetPasswordRequest) {
+    return apiFetch<CourierDetail>(`/admin/couriers/${encodeURIComponent(id)}/reset-password`, {
+      method: "POST",
+      body,
+    });
+  },
+
+  listDispatchers(params: DispatcherListParams = {}, signal?: AbortSignal) {
+    const query = buildQuery({
+      q: params.q?.trim() || undefined,
+      branch: params.branch || undefined,
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+    });
+    return apiFetch<PageResponse<DispatcherDetail>>(`/admin/dispatchers${query}`, { signal });
+  },
+
+  getDispatcher(id: string, signal?: AbortSignal) {
+    return apiFetch<DispatcherDetail>(`/admin/dispatchers/${encodeURIComponent(id)}`, { signal });
+  },
+
+  createDispatcher(body: CreateDispatcherRequest) {
+    return apiFetch<DispatcherDetail>("/admin/dispatchers", { method: "POST", body });
+  },
+};
+
+/** Admin user management for every account (API.md "Users (admin)", role ADMIN only). */
+export const userAdminApi = {
+  listUsers(params: UserListParams = {}, signal?: AbortSignal) {
+    const query = buildQuery({
+      q: params.q?.trim() || undefined,
+      role: params.role,
+      status: params.status,
+      registeredFrom: params.registeredFrom || undefined,
+      registeredTo: params.registeredTo || undefined,
+      sort: params.sort,
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+    });
+    return apiFetch<PageResponse<AdminUser>>(`/admin/users${query}`, { signal });
+  },
+
+  stats(signal?: AbortSignal) {
+    return apiFetch<UserStats>("/admin/users/stats", { signal });
+  },
+
+  getUser(id: string, signal?: AbortSignal) {
+    return apiFetch<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}`, { signal });
+  },
+
+  updateUser(id: string, body: UpdateUserRequest) {
+    return apiFetch<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}`, { method: "PUT", body });
+  },
+
+  /** BLOCKED: an active account is blocked and logged out. ACTIVE: a blocked account gets its access back. */
+  setStatus(id: string, status: "BLOCKED" | "ACTIVE") {
+    return apiFetch<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: { status },
+    });
   },
 };

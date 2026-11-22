@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError } from "@/lib/api";
-import { ROLE_HOME } from "@/lib/roles";
+import { onboardingFromUser, resolvePostAuthDestination } from "@/lib/roles";
 import { authApi } from "../api";
 import { useLeavingPage } from "../hooks/use-leaving-page";
 import { useRegisterErrorHandler } from "../hooks/use-register-error-handler";
@@ -54,7 +54,7 @@ export function CompleteProfileView() {
       .then((user) => {
         if (user.status !== "PROFILE_INCOMPLETE") {
           clearGoogleAccountType();
-          router.replace(ROLE_HOME[user.role]);
+          router.replace(resolvePostAuthDestination(onboardingFromUser(user)));
           return;
         }
         // The tab picked before going to Google (login and the customer tab save "customer").
@@ -250,10 +250,10 @@ function CustomerCompleteForm() {
     clearNotice();
     try {
       // The API replaces the cookie with one for an ACTIVE account.
-      await authApi.completeProfile({ accountType: "CUSTOMER", ...values });
+      const completed = await authApi.completeProfile({ accountType: "CUSTOMER", ...values });
       clearGoogleAccountType();
       startRedirecting();
-      router.replace(ROLE_HOME.CUSTOMER);
+      router.replace(resolvePostAuthDestination(onboardingFromUser(completed)));
     } catch (error) {
       handleError(error);
     }

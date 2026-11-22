@@ -1,11 +1,9 @@
-import Link from "next/link";
-import { Check, Package, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { TextLink } from "@/components/ui/text-link";
 
-/* The cards on the customer overview (docs/design/03 Dashboard shell.png). */
+/* The cards on the customer overview (docs/design/03 Dashboard shell.png). The parcels card loads data, so it
+ * lives in customer-parcels-card.tsx. */
 
 const SETUP_STEPS = [
   {
@@ -30,33 +28,6 @@ const HELP_LINKS = [
   { label: "Delivery rates by district", href: "/customer/help" },
   { label: "Contact support", href: "/customer/help" },
 ];
-
-/** The customer's parcels. Until the list is built, the empty state for a new customer. */
-export function CustomerParcelsCard() {
-  return (
-    <Card className="p-6 sm:p-10" aria-label="Your parcels">
-      <EmptyState
-        icon={Package}
-        size="lg"
-        title="You haven’t sent any parcels yet"
-        description="Create a delivery and a rider will collect it from your address. Every parcel you send will be listed here with its latest status."
-        actions={
-          <>
-            <Button asChild>
-              <Link href="/customer/deliveries/new">
-                <Plus aria-hidden="true" />
-                Create delivery
-              </Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/customer/addresses">Add a pickup address</Link>
-            </Button>
-          </>
-        }
-      />
-    </Card>
-  );
-}
 
 /** "Get set up" checklist for a new customer. */
 export function CustomerSetupCard() {

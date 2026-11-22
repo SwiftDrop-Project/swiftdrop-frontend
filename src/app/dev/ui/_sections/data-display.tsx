@@ -245,8 +245,10 @@ export function DataDisplay() {
           <Example label="In progress" stack>
             <Timeline
               items={[
-                { id: "4", title: PARCEL_STATUS_LABEL.OUT_FOR_DELIVERY, description: "With rider Kasun, Kandy", timestamp: "2026-11-03T03:10:00Z" },
-                { id: "3", title: PARCEL_STATUS_LABEL.IN_TRANSIT, description: "Left the Colombo branch", timestamp: "2026-11-02T11:40:00Z" },
+                { id: "6", title: PARCEL_STATUS_LABEL.OUT_FOR_DELIVERY, description: "With rider Kasun, Kandy", timestamp: "2026-11-03T03:10:00Z" },
+                { id: "5", title: PARCEL_STATUS_LABEL.AT_BRANCH, description: "Kandy branch", timestamp: "2026-11-02T16:20:00Z" },
+                { id: "4", title: PARCEL_STATUS_LABEL.IN_TRANSIT, description: "Left the Colombo branch", timestamp: "2026-11-02T11:40:00Z" },
+                { id: "3", title: PARCEL_STATUS_LABEL.AT_BRANCH, description: "Colombo branch", timestamp: "2026-11-02T08:00:00Z" },
                 { id: "2", title: PARCEL_STATUS_LABEL.PICKED_UP, description: "Collected from Nugegoda", timestamp: "2026-11-02T05:15:00Z" },
                 { id: "1", title: PARCEL_STATUS_LABEL.CREATED, timestamp: "2026-11-02T03:30:00Z" },
               ]}

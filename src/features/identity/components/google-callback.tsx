@@ -3,7 +3,7 @@
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { ROLE_HOME } from "@/lib/roles";
+import { COMPLETE_PROFILE_PATH, onboardingFromUser, resolvePostAuthDestination } from "@/lib/roles";
 import { authApi } from "../api";
 import { clearGoogleAccountType } from "../lib/google-sign-in";
 
@@ -19,12 +19,11 @@ export function GoogleCallback() {
     authApi
       .me(controller.signal)
       .then((user) => {
-        if (user.status === "PROFILE_INCOMPLETE") {
-          router.replace("/register/complete");
-          return;
+        const destination = resolvePostAuthDestination(onboardingFromUser(user));
+        if (destination !== COMPLETE_PROFILE_PATH) {
+          clearGoogleAccountType();
         }
-        clearGoogleAccountType();
-        router.replace(ROLE_HOME[user.role]);
+        router.replace(destination);
       })
       .catch(() => {
         if (controller.signal.aborted) return;

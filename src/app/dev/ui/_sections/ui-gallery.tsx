@@ -24,6 +24,8 @@ const NAV: { group: string; items: [id: string, label: string][] }[] = [
       ["code-input", "CodeInput"],
       ["checkbox", "Checkbox"],
       ["segmented-control", "SegmentedControl"],
+      ["radio-cards", "RadioCards"],
+      ["image-picker", "ImagePicker"],
     ],
   },
   {

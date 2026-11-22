@@ -1,10 +1,11 @@
-import type { DistrictCode, ParcelsPerMonth, Role } from "@/types";
+import type { DistrictCode, ParcelsPerMonth, Role, VehicleType } from "@/types";
 
-/* Types matching the identity DTOs in API.md (User, auth requests). */
+/* Types matching the identity DTOs in API.md (User, auth requests, admin staff management). */
 
 /**
  * PENDING_EMAIL_VERIFICATION: signed up with a password and must still enter the emailed 6-digit code.
  * PROFILE_INCOMPLETE: signed up with Google and must still call POST /auth/complete-profile.
+ * REMOVED: soft-deleted internal staff account (history preserved, login permanently blocked).
  */
 export type UserStatus =
   | "ACTIVE"
@@ -12,7 +13,8 @@ export type UserStatus =
   | "PENDING_APPROVAL"
   | "REJECTED"
   | "DISABLED"
-  | "PROFILE_INCOMPLETE";
+  | "PROFILE_INCOMPLETE"
+  | "REMOVED";
 
 /** A merchant's approval. Part of the User response, so it lives here; merchants imports it. */
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -32,6 +34,8 @@ export interface User {
   phone: string | null;
   role: Role;
   status: UserStatus;
+  /** True when an admin created or reset this account's password and it must be changed before continuing. */
+  mustChangePassword: boolean;
   /** Only for role MERCHANT, otherwise null. */
   merchant: MerchantInfo | null;
 }
@@ -122,3 +126,138 @@ export type GoogleSignInError =
   | "account_pending_approval"
   | "account_rejected"
   | "account_disabled";
+
+/* Admin staff management DTOs (/admin/couriers, /admin/dispatchers). */
+
+export interface CourierDetail {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  branch: DistrictCode | null;
+  vehicleType: VehicleType | null;
+  status: UserStatus;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface CreateCourierRequest {
+  fullName: string;
+  phone: string;
+  email: string;
+  branch: DistrictCode;
+  vehicleType: VehicleType;
+  password: string;
+}
+
+export interface UpdateCourierRequest {
+  fullName: string;
+  phone: string;
+  email: string;
+  branch: DistrictCode;
+  vehicleType: VehicleType;
+}
+
+export interface AdminResetPasswordRequest {
+  newPassword: string;
+}
+
+export interface CourierListParams {
+  q?: string;
+  branch?: DistrictCode;
+  status?: UserStatus;
+  page?: number;
+  size?: number;
+}
+
+export interface DispatcherDetail {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  branch: DistrictCode | null;
+  status: UserStatus;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDispatcherRequest {
+  fullName: string;
+  phone: string;
+  branch: DistrictCode;
+  email: string;
+  password: string;
+}
+
+export interface DispatcherListParams {
+  q?: string;
+  branch?: DistrictCode;
+  page?: number;
+  size?: number;
+}
+
+/* Admin user management DTOs (/admin/users, API.md "Users (admin)"). */
+
+/** The `status` filter of GET /admin/users: account statuses grouped the way the page shows them. */
+export type UserStatusFilter = "ACTIVE" | "BLOCKED" | "PENDING" | "REJECTED" | "REMOVED";
+
+/** The `sort` parameter of GET /admin/users. */
+export type UserSort = "NEWEST" | "OLDEST" | "NAME";
+
+/** One row of GET /admin/users. `phone` is null only while a Google sign-up is not finished. */
+export interface AdminUser {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  role: Role;
+  status: UserStatus;
+  createdAt: string;
+}
+
+/** GET /admin/users/{id}. `branch` for couriers and dispatchers, `vehicleType` for couriers, `merchant` for merchants. */
+export interface AdminUserDetail extends AdminUser {
+  mustChangePassword: boolean;
+  googleLinked: boolean;
+  branch: DistrictCode | null;
+  vehicleType: VehicleType | null;
+  merchant: {
+    businessName: string;
+    pickupDistrict: DistrictCode;
+    city: string;
+    approvalStatus: ApprovalStatus;
+  } | null;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+/** GET /admin/users/stats. Removed accounts are never counted. */
+export interface UserStats {
+  total: number;
+  active: number;
+  blocked: number;
+  pending: number;
+  newLast30Days: number;
+}
+
+export interface UserListParams {
+  q?: string;
+  role?: Role;
+  status?: UserStatusFilter;
+  /** "2026-11-01", Sri Lanka days, both included. */
+  registeredFrom?: string;
+  registeredTo?: string;
+  sort?: UserSort;
+  page?: number;
+  size?: number;
+}
+
+/** PUT /admin/users/{id} */
+export interface UpdateUserRequest {
+  fullName: string;
+  phone: string;
+  email: string;
+}

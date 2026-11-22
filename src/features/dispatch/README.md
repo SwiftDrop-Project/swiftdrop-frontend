@@ -5,12 +5,24 @@ Assigning parcels to couriers by zone: the dispatcher's unassigned parcels and c
 | | |
 |---|---|
 | Backend module | `com.swiftdrop.dispatch` (`../swiftdrop-backend/src/main/java/com/swiftdrop/dispatch`) |
-| Owner | TBD |
+| Owner | D.M.A.I. Disanayaka (dispatcher role and live tracking) |
 | Import as | `@/features/dispatch` (only what `index.ts` exports) |
 
 ## Built so far
 
-- Overview cards: `CourierTodayCard` (`/courier`) and `DispatcherOverviewCard` (`/dispatcher`), empty states for now.
+Dispatcher screens (role `DISPATCHER`, also open to `ADMIN`), on `/api/v1/dispatch/**`:
+
+| Route | Component | What it does |
+|---|---|---|
+| `/dispatcher` | `DispatcherOverviewCard` | Today's figures for a branch: parcels waiting, open tasks, issues |
+| `/dispatcher/assign` | `DispatchQueue` | Unassigned parcels (pickups, or parcels at the branch); select some and create a courier task |
+| `/dispatcher/parcels` | `TaskList` | Every courier task, filtered by branch, status, type, day or courier (`?courierId=`) |
+| `/dispatcher/tasks/[id]` | `TaskDetail` | One task: its parcels and outcomes; add or take out parcels, change courier, cancel |
+| `/dispatcher/couriers` | `CourierWorkloadView` | Active couriers at a branch and their open tasks, least busy first |
+| `/dispatcher/issues` | `DeliveryIssues` | Parcels couriers couldn't collect, load or deliver |
+
+The chosen branch is remembered in this browser (`swiftdrop.dispatch.branch`), because `/auth/me` has no branch.
+The courier's own card, `CourierTodayCard` (`/courier`), is still an empty state. `/dispatcher/tracking` is next (live tracking).
 
 ## Layout
 

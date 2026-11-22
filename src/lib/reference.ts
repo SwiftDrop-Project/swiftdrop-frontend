@@ -1,4 +1,4 @@
-import type { ParcelsPerMonth } from "@/types";
+import type { ParcelsPerMonth, VehicleType } from "@/types";
 
 /** Options for "Parcels per month" (merchant sign-up), in the backend's order. */
 export const PARCELS_PER_MONTH_OPTIONS: { value: ParcelsPerMonth; label: string }[] = [
@@ -15,4 +15,21 @@ export const PARCELS_PER_MONTH_VALUES = PARCELS_PER_MONTH_OPTIONS.map((option) =
 
 export function parcelsPerMonthLabel(value: ParcelsPerMonth): string {
   return PARCELS_PER_MONTH_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+/** Courier vehicle types (matches shared.reference.VehicleType). */
+export const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
+  { value: "MOTORBIKE", label: "Motorbike" },
+  { value: "THREE_WHEELER", label: "Three-wheeler" },
+  { value: "VAN", label: "Van" },
+  { value: "LORRY", label: "Lorry" },
+];
+
+export const VEHICLE_TYPE_VALUES = VEHICLE_TYPE_OPTIONS.map((option) => option.value) as [
+  VehicleType,
+  ...VehicleType[],
+];
+
+export function vehicleTypeLabel(value: VehicleType): string {
+  return VEHICLE_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
