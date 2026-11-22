@@ -4,7 +4,7 @@ import * as React from "react";
 import { isApiError } from "@/lib/api";
 import type { PageResponse } from "@/types";
 import { deliveryApi } from "../api";
-import type { Delivery, DeliveryDetail, DeliveryListQuery } from "../types";
+import type { Delivery, DeliveryDetail, DeliveryListQuery, DeliveryReceipt } from "../types";
 
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
 
@@ -77,5 +77,32 @@ export function useDelivery(id: string) {
 
   const retry = React.useCallback(() => setAttempt((value) => value + 1), []);
   const state: DeliveryState = settled?.key === key ? settled.state : { status: "loading" };
+  return { state, retry };
+}
+
+/**
+ * GET /deliveries/{id}/receipt for the receipt preview; nothing is loaded while no delivery is chosen (`id` null).
+ * Choosing another delivery cancels the request for the one before.
+ */
+export function useReceipt(id: string | null) {
+  const [attempt, setAttempt] = React.useState(0);
+  const [settled, setSettled] = React.useState<Settled<LoadState<DeliveryReceipt>> | null>(null);
+  const key = `${id ?? ""}|${attempt}`;
+
+  React.useEffect(() => {
+    if (id === null) return;
+    const controller = new AbortController();
+    deliveryApi
+      .receipt(id, controller.signal)
+      .then((data) => setSettled({ key, state: { status: "ready", data } }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setSettled({ key, state: { status: "error", message: errorMessage(error) } });
+      });
+    return () => controller.abort();
+  }, [key, id]);
+
+  const retry = React.useCallback(() => setAttempt((value) => value + 1), []);
+  const state: LoadState<DeliveryReceipt> = settled?.key === key ? settled.state : { status: "loading" };
   return { state, retry };
 }
