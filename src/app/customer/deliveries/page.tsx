@@ -11,7 +11,7 @@ export default function Page() {
   return (
     <ListPage
       title="My deliveries"
-      description="Every parcel you've sent, newest first."
+      description="Every delivery you have booked, with its status and receipt."
       action={
         <Button asChild>
           <Link href="/customer/deliveries/new">

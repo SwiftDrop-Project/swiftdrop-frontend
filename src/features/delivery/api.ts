@@ -1,6 +1,6 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUrl } from "@/lib/api";
 import type { PageResponse } from "@/types";
-import type { CreateDeliveryRequest, Delivery, DeliveryDetail, DeliveryListQuery } from "./types";
+import type { CreateDeliveryRequest, Delivery, DeliveryDetail, DeliveryListQuery, DeliveryReceipt } from "./types";
 
 /** Delivery endpoints (API.md "Deliveries (WP3)"). */
 export const deliveryApi = {
@@ -14,4 +14,14 @@ export const deliveryApi = {
   /** GET /deliveries/{id}: one of the customer's deliveries with its history. 404 NOT_FOUND when it isn't theirs. */
   get: (id: string, signal?: AbortSignal) =>
     apiFetch<DeliveryDetail>(`/deliveries/${encodeURIComponent(id)}`, { signal }),
+
+  /** GET /deliveries/{id}/receipt: the receipt of one of the customer's deliveries. 404 NOT_FOUND when not theirs. */
+  receipt: (id: string, signal?: AbortSignal) =>
+    apiFetch<DeliveryReceipt>(`/deliveries/${encodeURIComponent(id)}/receipt`, { signal }),
+
+  /**
+   * GET /deliveries/{id}/receipt/pdf, as a link the browser opens itself (it sends the SD_TOKEN cookie). The API
+   * answers with Content-Disposition: attachment, so the PDF downloads and the page stays open.
+   */
+  receiptPdfUrl: (id: string) => apiUrl(`/deliveries/${encodeURIComponent(id)}/receipt/pdf`),
 };
