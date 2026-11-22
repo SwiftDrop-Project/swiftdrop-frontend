@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { cleanQuestion, MAX_SENT, toRequest } from "../src/features/assistant/conversation.ts";
+import { lineDetail, priceCaption } from "../src/features/assistant/price-text.ts";
 import { reportFileName, reportToCsv } from "../src/features/assistant/report-csv.ts";
 
 const turn = (role, text) => ({ id: text, role, text, cards: [] });
@@ -78,4 +79,49 @@ test("the report CSV has every section, with commas and quotes escaped", () => {
   assert.ok(lines.includes('"the recipient wasn\'t available, ""again""",2'));
   assert.ok(lines.includes("Merchants waiting for approval,2"));
   assert.equal(reportFileName(report), "swiftdrop-weekly-report-2026-11-16.csv");
+});
+
+// The rate card example from the server: 2.5 kg, 40 x 30 x 12 cm, Colombo to Kandy.
+const price = {
+  pickupDistrict: "Colombo",
+  dropOffDistrict: "Kandy",
+  weightKg: 2.5,
+  status: "COMPLETE",
+  currency: "LKR",
+  total: 522.6,
+  billableWeightKg: 3,
+  vehicle: "BIKE",
+  vehicleText: "bike",
+  sizeCm: "40 x 30 x 12",
+  distanceKm: 122.6,
+  lines: [
+    { component: "WEIGHT", amount: 100 },
+    { component: "PICKUP", amount: 150 },
+    { component: "DELIVERY", amount: 150 },
+    { component: "LINEHAUL", amount: 122.6 },
+  ],
+  note: "Full estimate.",
+};
+
+test("the price card shows the size and the vehicle", () => {
+  assert.equal(priceCaption(price), "40 x 30 x 12 cm, by bike");
+  assert.equal(priceCaption({ ...price, vehicleText: null }), "40 x 30 x 12 cm");
+  assert.equal(priceCaption({ ...price, sizeCm: undefined, vehicleText: null }), null);
+});
+
+test("each fee line says what it was worked out from", () => {
+  assert.deepEqual(
+    price.lines.map((line) => lineDetail(price, line.component)),
+    [" (billed as 3 kg)", " (bike)", " (bike)", " (122.6 km)"],
+  );
+  // The server's figures are shown as sent: the card never works out a number itself.
+  assert.equal(price.lines.reduce((sum, line) => sum + line.amount, 0).toFixed(2), price.total.toFixed(2));
+});
+
+test("a fee line without its detail gets none", () => {
+  const manual = { ...price, status: "MANUAL_QUOTE", total: null, vehicle: null, vehicleText: null };
+  assert.equal(lineDetail(manual, "PICKUP"), null);
+  assert.equal(lineDetail({ ...price, distanceKm: 0 }, "LINEHAUL"), null);
+  assert.equal(lineDetail({ ...price, billableWeightKg: null }, "WEIGHT"), null);
+  assert.equal(lineDetail(price, "COD"), null);
 });
