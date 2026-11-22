@@ -1,40 +1,15 @@
-import { apiFetch, isApiError } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import type {
-  CustomerAddressSummary,
+  CustomerAddress,
+  CustomerAddressRequest,
   CustomerProfileResponse,
   UpdatePersonalDetailsRequest,
   UpdatePreferencesRequest,
 } from "./types";
 
-export const DEMO_CUSTOMER_ADDRESSES: CustomerAddressSummary[] = [
-  {
-    id: "a0000000-0000-0000-0000-000000000001",
-    label: "Home",
-    addressLine1: "24 Temple Road",
-    city: "Nugegoda",
-    district: "COLOMBO",
-    postalCode: "10250",
-    isDefault: true,
-  },
-  {
-    id: "a0000000-0000-0000-0000-000000000002",
-    label: "Work",
-    addressLine1: "Level 4, Orion City",
-    city: "Colombo 09",
-    district: "COLOMBO",
-    postalCode: "00900",
-    isDefault: false,
-  },
-  {
-    id: "a0000000-0000-0000-0000-000000000003",
-    label: "Warehouse",
-    addressLine1: "12 Galle Road",
-    city: "Dehiwala",
-    district: "COLOMBO",
-    postalCode: "10350",
-    isDefault: false,
-  },
-];
+function addressPath(id: string): string {
+  return `/customer/addresses/${encodeURIComponent(id)}`;
+}
 
 export const customerApi = {
   /**
@@ -67,20 +42,28 @@ export const customerApi = {
     });
   },
 
-  /**
-   * GET /customer/addresses
-   * Returns saved pickup and delivery addresses for the customer.
-   * If not yet implemented in backend, falls back gracefully.
-   */
-  async getAddresses(signal?: AbortSignal): Promise<CustomerAddressSummary[]> {
-    try {
-      return await apiFetch<CustomerAddressSummary[]>("/customer/addresses", { signal });
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      if (isApiError(error) && (error.status === 404 || error.code === "NETWORK_ERROR")) {
-        return DEMO_CUSTOMER_ADDRESSES;
-      }
-      return DEMO_CUSTOMER_ADDRESSES;
-    }
+  /** GET /customer/addresses: the saved addresses, the default pickup address first. */
+  getAddresses(signal?: AbortSignal): Promise<CustomerAddress[]> {
+    return apiFetch<CustomerAddress[]>("/customer/addresses", { signal });
+  },
+
+  /** POST /customer/addresses: 201 with the saved address; 409 ADDRESS_LIMIT_REACHED after 20. */
+  createAddress(body: CustomerAddressRequest): Promise<CustomerAddress> {
+    return apiFetch<CustomerAddress>("/customer/addresses", { method: "POST", body });
+  },
+
+  /** PUT /customer/addresses/{id}: replaces every field. 404 NOT_FOUND when it isn't the customer's. */
+  updateAddress(id: string, body: CustomerAddressRequest): Promise<CustomerAddress> {
+    return apiFetch<CustomerAddress>(addressPath(id), { method: "PUT", body });
+  },
+
+  /** PUT /customer/addresses/{id}/default: makes it the default pickup address. */
+  makeDefaultAddress(id: string): Promise<CustomerAddress> {
+    return apiFetch<CustomerAddress>(`${addressPath(id)}/default`, { method: "PUT" });
+  },
+
+  /** DELETE /customer/addresses/{id}: 204. Deleting the default leaves no default. */
+  deleteAddress(id: string): Promise<void> {
+    return apiFetch<void>(addressPath(id), { method: "DELETE" });
   },
 };

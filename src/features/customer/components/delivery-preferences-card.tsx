@@ -107,7 +107,7 @@ export function DeliveryPreferencesCard({
                   ) : null}
                   {addresses.map((addr) => (
                     <option key={addr.id} value={addr.id}>
-                      {addr.label} · {addr.addressLine1}, {addr.city}
+                      {addr.label} · {addr.addressLine}, {addr.city}
                     </option>
                   ))}
                 </Select>

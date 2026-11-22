@@ -16,6 +16,17 @@ Customer profile, saved pickup and delivery addresses, delivery history, receipt
   - Personal details card with name and mobile number update.
   - Delivery preferences card with default pickup address selection and preferred payment method.
   - Password and security card linking to Settings.
+  - The default pickup address dropdown lists the real saved addresses (`GET /customer/addresses`).
+- Saved addresses: `CustomerAddresses` (`/customer/addresses`)
+  - The list (`useAddresses`, `GET /customer/addresses`), the default pickup address first with a "Default" badge,
+    each with Make default (`PUT /customer/addresses/{id}/default`), Edit and Delete (after a confirmation,
+    `DELETE /customer/addresses/{id}`; deleting the default leaves no default).
+  - `AddressForm` beside the list (below it on smaller screens): "Add address" (`POST`) or, after Edit, "Edit
+    address" (`PUT`). Fields: label, contact name, mobile, address line, city, district, 5-digit postal code,
+    optional landmark, and "Use as my default pickup address". Rules and messages in `schemas.ts` match API.md; a new
+    address starts with the customer's own name and mobile, and is ticked as default when there is none yet.
+  - Up to 20 addresses: the form is replaced by a notice at 20 (the API answers `409 ADDRESS_LIMIT_REACHED`).
+  - City is a field of its own (not in the first design) because a booking's pickup and recipient need it.
 
 ## Layout
 
