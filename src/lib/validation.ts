@@ -34,8 +34,14 @@ const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/;
 /** Needs a dot in the domain part, e.g. name@example.com. */
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/** "077 123 4567", "771234567" or "+94771234567" → "+94771234567", or null if invalid. */
+export function normalizeSriLankanMobile(value: string): string | null {
+  const match = PHONE_PATTERN.exec(value.replace(/\s+/g, ""));
+  return match ? `+94${match[1]}` : null;
+}
+
 export function isSriLankanMobile(value: string): boolean {
-  return PHONE_PATTERN.test(value.replace(/\s+/g, ""));
+  return normalizeSriLankanMobile(value) !== null;
 }
 
 export const personName = (message: string) => z.string().trim().min(2, message).max(100, message);
