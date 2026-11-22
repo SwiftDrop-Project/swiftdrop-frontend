@@ -19,7 +19,13 @@ import { authApi } from "../api";
 import { useLeavingPage } from "../hooks/use-leaving-page";
 import { cooldownKeys, markCodeSent, startCooldown, useCooldown } from "../lib/cooldown";
 import { GOOGLE_SIGN_IN_ERRORS, isGoogleSignInError } from "../lib/google-sign-in";
-import { verifyEmailHref } from "../lib/routes";
+import {
+  classifyLoginIdentifier,
+  createBoundEmailFlow,
+  createBoundPhoneFlow,
+  MALFORMED_RECOVERY_IDENTIFIER,
+} from "../lib/recovery-flow";
+import { forgotPasswordHref, verifyEmailHref } from "../lib/routes";
 import { loginSchema, type LoginValues } from "../schemas";
 import type { GoogleSignInError } from "../types";
 import { GoogleSignIn } from "./google-sign-in";
@@ -47,13 +53,19 @@ function readPasswordUpdated(): boolean {
 
 /** The URL only changes by navigation, which remounts the form, so there is nothing to subscribe to. */
 function subscribeToNothing() {
-  return () => {};
+  return () => { };
 }
 
 /** A known ?error= code from a Google sign-in redirect; unknown values are ignored. */
 function readUrlError(): GoogleSignInError | null {
   const error = new URLSearchParams(window.location.search).get("error");
   return isGoogleSignInError(error) ? error : null;
+}
+
+/** Optional ?identifier= carried back from Forgot password ("Back to login"), never a password. */
+function readUrlIdentifier(): string | null {
+  const identifier = new URLSearchParams(window.location.search).get("identifier")?.trim();
+  return identifier ? identifier : null;
 }
 
 const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment.";
@@ -94,6 +106,7 @@ export function LoginForm() {
     control,
     handleSubmit,
     setError,
+    setValue,
     getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginValues>({
@@ -115,173 +128,203 @@ export function LoginForm() {
   if (urlPasswordUpdated && !passwordUpdated) {
     setPasswordUpdated(true);
   }
-
+  // Returning from Forgot password ("Back to login"): restore only the identifier so the user can edit it.
+  // Runs on mount and whenever Next.js/React <Activity> unhides /login on client navigation.
   React.useEffect(() => {
-    if (urlError === null && !urlPasswordUpdated) return;
+    const returnedIdentifier = readUrlIdentifier();
+    if (returnedIdentifier !== null) {
+      setValue("identifier", returnedIdentifier);
+      setValue("password", "");
+    }
+    if (urlError === null && !urlPasswordUpdated && returnedIdentifier === null) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("error");
     url.searchParams.delete("notice");
+    url.searchParams.delete("identifier");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [urlError, urlPasswordUpdated]);
+}, [urlError, urlPasswordUpdated, setValue]);
 
-  const shownNotice: FormNotice | null =
-    notice ??
-    (googleError ? GOOGLE_SIGN_IN_ERRORS[googleError] : null) ??
-    (passwordUpdated ? PASSWORD_UPDATED : null);
+/** Carries a valid login identifier into a bound recovery flow, or shows a clear correction error if malformed. */
+function handleForgotPassword(event: React.MouseEvent<HTMLAnchorElement>) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+    return;
+  }
+  const classified = classifyLoginIdentifier(getValues("identifier"));
+  if (classified.kind === "empty") {
+    setValue("password", "");
+    return;
+  }
+  event.preventDefault();
+  if (classified.kind === "invalid") {
+    setError("identifier", { type: "manual", message: MALFORMED_RECOVERY_IDENTIFIER }, { shouldFocus: true });
+    return;
+  }
+  setValue("password", "");
+  const flowId =
+    classified.kind === "email"
+      ? createBoundEmailFlow(classified.identifier, classified.raw)
+      : createBoundPhoneFlow(classified.identifier, classified.raw);
+  router.push(forgotPasswordHref(flowId));
+}
 
-  /** "Verify email": a fresh code for an email identifier; a mobile number has /verify-email ask for the email. */
-  async function openVerifyEmail() {
-    const identifier = getValues("identifier").trim();
-    if (!identifier.includes("@")) {
-      router.push(verifyEmailHref());
+const shownNotice: FormNotice | null =
+  notice ??
+  (googleError ? GOOGLE_SIGN_IN_ERRORS[googleError] : null) ??
+  (passwordUpdated ? PASSWORD_UPDATED : null);
+
+/** "Verify email": a fresh code for an email identifier; a mobile number has /verify-email ask for the email. */
+async function openVerifyEmail() {
+  const identifier = getValues("identifier").trim();
+  if (!identifier.includes("@")) {
+    router.push(verifyEmailHref());
+    return;
+  }
+  startOpeningVerify();
+  try {
+    await authApi.resendVerification(identifier);
+    markCodeSent(cooldownKeys.verify(identifier));
+  } catch {
+    // A code may still be on its way (the 60-second limit); /verify-email can send another one.
+  }
+  router.push(verifyEmailHref(identifier));
+}
+
+const onSubmit = handleSubmit(async (values) => {
+  setNotice(null);
+  setGoogleError(null);
+  setPasswordUpdated(false);
+  try {
+    const user = await authApi.login(values);
+    startRedirecting();
+    // Read ?next here rather than with useSearchParams, so the form can be prerendered.
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.replace(resolvePostAuthDestination(onboardingFromUser(user), next));
+  } catch (error) {
+    if (!isApiError(error)) {
+      setNotice({ tone: "error", title: "We couldn't log you in", body: UNKNOWN_ERROR });
       return;
     }
-    startOpeningVerify();
-    try {
-      await authApi.resendVerification(identifier);
-      markCodeSent(cooldownKeys.verify(identifier));
-    } catch {
-      // A code may still be on its way (the 60-second limit); /verify-email can send another one.
+    if (error.code === "VALIDATION_FAILED") {
+      const { handled, unmatched } = applyServerFieldErrors(error, setError, ["identifier", "password"]);
+      if (handled && unmatched.length === 0) return;
+      setNotice({ tone: "error", title: "We couldn't log you in", body: unmatched[0] ?? error.message });
+      return;
     }
-    router.push(verifyEmailHref(identifier));
+    if (error.code === "TOO_MANY_REQUESTS") {
+      startCooldown(LOGIN_COOLDOWN, error.retryAfterSeconds ?? 60);
+      setNotice({ tone: "error", title: "Too many attempts", body: retryMessage(error), kind: "rateLimited" });
+      return;
+    }
+    setNotice(noticeFor(error.code, error.message));
   }
+});
 
-  const onSubmit = handleSubmit(async (values) => {
-    setNotice(null);
-    setGoogleError(null);
-    setPasswordUpdated(false);
-    try {
-      const user = await authApi.login(values);
-      startRedirecting();
-      // Read ?next here rather than with useSearchParams, so the form can be prerendered.
-      const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(resolvePostAuthDestination(onboardingFromUser(user), next));
-    } catch (error) {
-      if (!isApiError(error)) {
-        setNotice({ tone: "error", title: "We couldn't log you in", body: UNKNOWN_ERROR });
-        return;
-      }
-      if (error.code === "VALIDATION_FAILED") {
-        const { handled, unmatched } = applyServerFieldErrors(error, setError, ["identifier", "password"]);
-        if (handled && unmatched.length === 0) return;
-        setNotice({ tone: "error", title: "We couldn't log you in", body: unmatched[0] ?? error.message });
-        return;
-      }
-      if (error.code === "TOO_MANY_REQUESTS") {
-        startCooldown(LOGIN_COOLDOWN, error.retryAfterSeconds ?? 60);
-        setNotice({ tone: "error", title: "Too many attempts", body: retryMessage(error), kind: "rateLimited" });
-        return;
-      }
-      setNotice(noticeFor(error.code, error.message));
-    }
-  });
+return (
+  <div className="flex flex-col">
+    <h1 className="text-display text-grey-900">Log in</h1>
+    <p className="mt-2 text-body text-grey-600">
+      Use the mobile number or email linked to your account.
+    </p>
 
-  return (
-    <div className="flex flex-col">
-      <h1 className="text-display text-grey-900">Log in</h1>
-      <p className="mt-2 text-body text-grey-600">
-        Use the mobile number or email linked to your account.
-      </p>
-
-      <form onSubmit={onSubmit} noValidate className="mt-8 flex flex-col gap-6">
-        {shownNotice ? (
-          <InlineNotice tone={shownNotice.tone} title={shownNotice.title}>
-            {shownNotice.kind === "rateLimited" ? (
-              waitSeconds > 0 ? (
-                `Try again in ${waitSeconds} ${waitSeconds === 1 ? "second" : "seconds"}.`
-              ) : (
-                "You can try again now."
-              )
+    <form onSubmit={onSubmit} noValidate className="mt-8 flex flex-col gap-6">
+      {shownNotice ? (
+        <InlineNotice tone={shownNotice.tone} title={shownNotice.title}>
+          {shownNotice.kind === "rateLimited" ? (
+            waitSeconds > 0 ? (
+              `Try again in ${waitSeconds} ${waitSeconds === 1 ? "second" : "seconds"}.`
             ) : (
-              shownNotice.body
-            )}
-            {shownNotice.kind === "emailNotVerified" ? (
-              <>
-                {" "}
-                <TextButton onClick={() => void openVerifyEmail()} disabled={openingVerify}>
-                  Verify email
-                </TextButton>
-              </>
-            ) : null}
-          </InlineNotice>
-        ) : null}
+              "You can try again now."
+            )
+          ) : (
+            shownNotice.body
+          )}
+          {shownNotice.kind === "emailNotVerified" ? (
+            <>
+              {" "}
+              <TextButton onClick={() => void openVerifyEmail()} disabled={openingVerify}>
+                Verify email
+              </TextButton>
+            </>
+          ) : null}
+        </InlineNotice>
+      ) : null}
 
-        <div className="flex flex-col gap-5">
-          <FormField id="identifier" label="Mobile number or email" error={errors.identifier?.message}>
-            {(a11y) => (
-              <Input
-                {...a11y}
-                {...register("identifier")}
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                placeholder="077 123 4567 or name@example.com"
-              />
-            )}
-          </FormField>
+      <div className="flex flex-col gap-5">
+        <FormField id="identifier" label="Mobile number or email" error={errors.identifier?.message}>
+          {(a11y) => (
+            <Input
+              {...a11y}
+              {...register("identifier")}
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="077 123 4567 or name@example.com"
+            />
+          )}
+        </FormField>
 
-          <FormField
-            id="password"
-            label="Password"
-            error={errors.password?.message}
-            labelAside={
-              <TextLink href="/forgot-password" className="text-label">
+        <FormField
+          id="password"
+          label="Password"
+          error={errors.password?.message}
+          labelAside={
+              <TextLink href="/forgot-password" onClick={handleForgotPassword} className="text-label">
                 Forgot password?
               </TextLink>
             }
           >
-            {(a11y) => (
-              <PasswordInput {...a11y} {...register("password")} autoComplete="current-password" />
-            )}
-          </FormField>
+              {(a11y) => (
+                <PasswordInput {...a11y} {...register("password")} autoComplete="current-password" />
+              )}
+            </FormField>
         </div>
 
-        <Controller
-          name="rememberMe"
-          control={control}
-          render={({ field }) => (
-            <div className="flex items-center gap-3">
-              <Checkbox
-                id="rememberMe"
-                ref={field.ref}
-                name={field.name}
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-                onBlur={field.onBlur}
-              />
-              <label htmlFor="rememberMe" className="cursor-pointer text-body text-grey-700">
-                Keep me logged in on this device
-              </label>
-            </div>
-          )}
-        />
+      <Controller
+        name="rememberMe"
+        control={control}
+        render={({ field }) => (
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="rememberMe"
+              ref={field.ref}
+              name={field.name}
+              checked={field.value}
+              onCheckedChange={(checked) => field.onChange(checked === true)}
+              onBlur={field.onBlur}
+            />
+            <label htmlFor="rememberMe" className="cursor-pointer text-body text-grey-700">
+              Keep me logged in on this device
+            </label>
+          </div>
+        )}
+      />
 
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full"
-          disabled={waitSeconds > 0}
-          loading={isSubmitting || redirecting}
-        >
-          Log in
-        </Button>
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full"
+        disabled={waitSeconds > 0}
+        loading={isSubmitting || redirecting}
+      >
+        Log in
+      </Button>
 
-        <GoogleSignIn accountType="customer" />
+      <GoogleSignIn accountType="customer" />
 
-        <p className="text-body text-grey-600">
-          New to SwiftDrop? <TextLink href="/register">Create an account</TextLink>
-        </p>
-      </form>
+      <p className="text-body text-grey-600">
+        New to SwiftDrop? <TextLink href="/register">Create an account</TextLink>
+      </p>
+    </form>
 
-      <hr className="my-5 border-grey-200" />
+    <hr className="my-5 border-grey-200" />
 
-      <div className="flex gap-3 text-body text-grey-600">
-        <Package className="mt-0.5 size-5 shrink-0 text-grey-700" aria-hidden="true" />
-        <p>
-          Only need to check on a parcel? <TextLink href="/track">Track a parcel</TextLink> without
-          logging in.
-        </p>
-      </div>
+    <div className="flex gap-3 text-body text-grey-600">
+      <Package className="mt-0.5 size-5 shrink-0 text-grey-700" aria-hidden="true" />
+      <p>
+        Only need to check on a parcel? <TextLink href="/track">Track a parcel</TextLink> without
+        logging in.
+      </p>
     </div>
-  );
+  </div>
+);
 }

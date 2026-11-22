@@ -15,6 +15,7 @@ import type {
   CreateDispatcherRequest,
   DispatcherDetail,
   DispatcherListParams,
+  ForgotPasswordRequest,
   LoginRequest,
   MessageResponse,
   RegisterRequest,
@@ -64,47 +65,48 @@ export const authApi = {
     return apiFetch<User>("/auth/me", { signal });
   },
 
-  /** Always 202 with the same message; if an account matches, its email gets a 6-digit code. */
-  forgotPassword(identifier: string) {
-    return apiFetch<MessageResponse>("/auth/password/forgot", { method: "POST", body: { identifier } });
-  },
+    /** Always 202 with the same message; if the details match an account, its registered email gets a 6-digit code. */
+    forgotPassword(input: string | ForgotPasswordRequest) {
+      const body: ForgotPasswordRequest = typeof input === "string" ? { identifier: input } : input;
+      return apiFetch<MessageResponse>("/auth/password/forgot", { method: "POST", body });
+    },
 
-  /** 204. Ends every session of the account; the user then logs in with the new password. */
-  resetPassword(body: ResetPasswordRequest) {
-    return apiFetch<void>("/auth/password/reset", { method: "POST", body });
-  },
+    /** 204. Ends every session of the account; the user then logs in with the new password. */
+    resetPassword(body: ResetPasswordRequest) {
+      return apiFetch<void>("/auth/password/reset", { method: "POST", body });
+    },
 
-  /** 204 with a fresh cookie for this session; the user's other sessions end. */
-  changePassword(body: ChangePasswordRequest) {
-    return apiFetch<void>("/auth/password/change", { method: "POST", body });
-  },
+    /** 204 with a fresh cookie for this session; the user's other sessions end. */
+    changePassword(body: ChangePasswordRequest) {
+      return apiFetch<void>("/auth/password/change", { method: "POST", body });
+    },
 
-  /**
-   * Finishes a Google sign-up (status PROFILE_INCOMPLETE).
-   * Customer: ACTIVE, fresh cookie. Merchant: PENDING_APPROVAL, cookie cleared.
-   */
-  completeProfile(body: CompleteProfileRequest) {
-    return apiFetch<User>("/auth/complete-profile", { method: "POST", body });
-  },
+    /**
+     * Finishes a Google sign-up (status PROFILE_INCOMPLETE).
+     * Customer: ACTIVE, fresh cookie. Merchant: PENDING_APPROVAL, cookie cleared.
+     */
+    completeProfile(body: CompleteProfileRequest) {
+      return apiFetch<User>("/auth/complete-profile", { method: "POST", body });
+    },
 
-  /**
-   * Where "Continue with Google" sends the browser (a full-page navigation, not fetch).
-   * It is on the backend origin, outside /api/v1.
-   */
-  googleSignInUrl() {
-    return `${backendOrigin()}/oauth2/authorization/google`;
-  },
-};
+    /**
+     * Where "Continue with Google" sends the browser (a full-page navigation, not fetch).
+     * It is on the backend origin, outside /api/v1.
+     */
+    googleSignInUrl() {
+      return `${backendOrigin()}/oauth2/authorization/google`;
+    },
+  };
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") {
-      search.set(key, String(value));
-    }
+  function buildQuery(params: Record<string, string | number | undefined>): string {
+    const search = new URLSearchParams();
+for (const [key, value] of Object.entries(params)) {
+  if (value !== undefined && value !== "") {
+    search.set(key, String(value));
   }
-  const query = search.toString();
-  return query ? `?${query}` : "";
+}
+const query = search.toString();
+return query ? `?${query}` : "";
 }
 
 /** Admin staff management endpoints (/admin/couriers, /admin/dispatchers). */

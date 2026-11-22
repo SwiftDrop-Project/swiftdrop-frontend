@@ -89,6 +89,9 @@ export function formatCountdown(seconds: number): string {
 /** Keys used by the screens, in one place so the register form, login and /verify-email agree. */
 export const cooldownKeys = {
   verify: (email: string) => `verify:${email.trim().toLowerCase()}`,
-  reset: (identifier: string) => `reset:${identifier.trim().toLowerCase()}`,
+  reset: (identifier: string, confirmationEmail?: string) =>
+    confirmationEmail
+      ? `reset:${identifier.trim().toLowerCase()}:${confirmationEmail.trim().toLowerCase()}`
+      : `reset:${identifier.trim().toLowerCase()}`,
   rateLimit: (action: string) => `429:${action}`,
 };
