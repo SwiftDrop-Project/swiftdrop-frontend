@@ -193,8 +193,21 @@ export function DataDisplay() {
       <Section
         id="tabs"
         title="Tabs"
-        description="Switch between views of the same thing. Active tab: grey-900 label with an orange-600 underline. Scrolls sideways on phones."
+        description="Switch between views of the same thing. Underline (default): grey-900 label with an orange-600 underline. Pills (variant=&quot;pills&quot;): filter chips for one list, the active one filled grey-900. Both scroll sideways on phones."
       >
+        <Example label="Pills" stack>
+          <Tabs defaultValue="all">
+            <TabsList variant="pills" aria-label="Show deliveries">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="delivered">Delivered</TabsTrigger>
+              <TabsTrigger value="failed">Failed</TabsTrigger>
+              <TabsTrigger value="returned" disabled>
+                Returned
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </Example>
         <Tabs defaultValue="details">
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>

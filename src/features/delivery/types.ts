@@ -148,6 +148,8 @@ export interface DeliveryReceipt {
 export interface DeliveryListQuery {
   page: number;
   size: number;
-  /** Leave out for every status. */
-  status?: ParcelStatus;
+  /** One status, or several (the delivery is in any of them, sent as repeated `status`). Leave out for every status. */
+  status?: ParcelStatus | readonly ParcelStatus[];
+  /** Part of a tracking number, spaces and case ignored; at most 30 characters. Leave out for no search. */
+  q?: string;
 }

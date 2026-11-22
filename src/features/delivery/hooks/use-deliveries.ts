@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { isApiError } from "@/lib/api";
-import type { PageResponse } from "@/types";
+import type { PageResponse, ParcelStatus } from "@/types";
 import { deliveryApi } from "../api";
 import type { Delivery, DeliveryDetail, DeliveryListQuery, DeliveryReceipt } from "../types";
 
@@ -29,23 +29,27 @@ function errorMessage(error: unknown): string {
   return isApiError(error) ? error.message : UNKNOWN_ERROR;
 }
 
-/** GET /deliveries for one page and status. A request that is no longer wanted is cancelled. */
-export function useDeliveries({ page, size, status }: DeliveryListQuery) {
+/** GET /deliveries for one page, status (or statuses) and search. A request that is no longer wanted is cancelled. */
+export function useDeliveries({ page, size, status, q }: DeliveryListQuery) {
   const [attempt, setAttempt] = React.useState(0);
   const [settled, setSettled] = React.useState<Settled<LoadState<PageResponse<Delivery>>> | null>(null);
-  const key = `${page}|${size}|${status ?? ""}|${attempt}`;
+  // Several statuses are joined, so a new array with the same statuses is the same request.
+  const statusKey = status === undefined ? "" : ([] as readonly ParcelStatus[]).concat(status).join(",");
+  const search = q ?? "";
+  const key = `${page}|${size}|${statusKey}|${search}|${attempt}`;
 
   React.useEffect(() => {
     const controller = new AbortController();
+    const statuses = statusKey === "" ? undefined : (statusKey.split(",") as ParcelStatus[]);
     deliveryApi
-      .list({ page, size, status }, controller.signal)
+      .list({ page, size, status: statuses, q: search }, controller.signal)
       .then((data) => setSettled({ key, state: { status: "ready", data } }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setSettled({ key, state: { status: "error", message: errorMessage(error) } });
       });
     return () => controller.abort();
-  }, [key, page, size, status]);
+  }, [key, page, size, statusKey, search]);
 
   const retry = React.useCallback(() => setAttempt((value) => value + 1), []);
   const state: LoadState<PageResponse<Delivery>> = settled?.key === key ? settled.state : { status: "loading" };

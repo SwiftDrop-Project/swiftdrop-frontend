@@ -7,9 +7,12 @@ export const deliveryApi = {
   /** POST /deliveries: books a delivery for the logged-in customer; 201 with the new delivery. */
   create: (body: CreateDeliveryRequest) => apiFetch<Delivery>("/deliveries", { method: "POST", body }),
 
-  /** GET /deliveries: the logged-in customer's deliveries, newest first. */
-  list: ({ page, size, status }: DeliveryListQuery, signal?: AbortSignal) =>
-    apiFetch<PageResponse<Delivery>>("/deliveries", { query: { page, size, status }, signal }),
+  /**
+   * GET /deliveries: the logged-in customer's deliveries, newest first. Several statuses go as a repeated `status`
+   * (the "Active" tab); `q` searches the tracking number.
+   */
+  list: ({ page, size, status, q }: DeliveryListQuery, signal?: AbortSignal) =>
+    apiFetch<PageResponse<Delivery>>("/deliveries", { query: { page, size, status, q: q || undefined }, signal }),
 
   /** GET /deliveries/{id}: one of the customer's deliveries with its history. 404 NOT_FOUND when it isn't theirs. */
   get: (id: string, signal?: AbortSignal) =>
