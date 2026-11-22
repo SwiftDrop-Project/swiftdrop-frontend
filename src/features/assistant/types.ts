@@ -31,6 +31,10 @@ export interface AssistantPrice {
   total: number | null;
   billableWeightKg: number | null;
   vehicle: string | null;
+  /** "bike", "tuk-tuk" or "lorry": the vehicle whose fee is added for the pickup and the delivery. */
+  vehicleText?: string | null;
+  /** "30 x 20 x 10" (cm). */
+  sizeCm?: string;
   distanceKm: number | null;
   lines: PriceLine[];
   note: string;
