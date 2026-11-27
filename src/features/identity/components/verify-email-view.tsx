@@ -94,10 +94,20 @@ function EnterCode({
   const [resending, setResending] = React.useState(false);
   const [notice, setNotice] = React.useState<Notice | null>(null);
   const [codeInvalid, setCodeInvalid] = React.useState(false);
+  const inFlightRef = React.useRef(false);
+  const pendingFocusRef = React.useRef(false);
   const resendIn = useCooldown(cooldownKeys.verify(email));
 
+  React.useEffect(() => {
+    if (!submitting && !redirecting && pendingFocusRef.current) {
+      pendingFocusRef.current = false;
+      document.getElementById(CODE_INPUT_ID)?.focus();
+    }
+  }, [submitting, redirecting]);
+
   async function verify(value: string) {
-    if (submitting || value.length !== 6) return;
+    if (inFlightRef.current || submitting || redirecting || value.length !== 6) return;
+    inFlightRef.current = true;
     setSubmitting(true);
     setNotice(null);
     try {
@@ -114,8 +124,10 @@ function EnterCode({
       setNotice({ tone: "error", title, body });
       setCodeInvalid(true);
       setCode("");
-      document.getElementById(CODE_INPUT_ID)?.focus();
+      // Focus once `disabled` clears after `setSubmitting(false)` commits.
+      pendingFocusRef.current = true;
     } finally {
+      inFlightRef.current = false;
       setSubmitting(false);
     }
   }

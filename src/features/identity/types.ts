@@ -104,6 +104,12 @@ export interface VerifyEmailRequest {
   code: string;
 }
 
+/** POST /auth/password/forgot. Optional confirmationEmail requires the stored account email to match. */
+export interface ForgotPasswordRequest {
+  identifier: string;
+  confirmationEmail?: string;
+}
+
 /** POST /auth/password/reset. `identifier`: email or mobile number of the account. */
 export interface ResetPasswordRequest {
   identifier: string;

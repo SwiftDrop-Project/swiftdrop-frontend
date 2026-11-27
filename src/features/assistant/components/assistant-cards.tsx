@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TextLink } from "@/components/ui/text-link";
 import { formatRs, formatTrackingNumber, humanizeCode } from "@/lib/format";
+import { lineDetail, priceCaption } from "../price-text";
 import type { AssistantCard, AssistantFacts, AssistantParcel, AssistantPrice } from "../types";
 import { ReportCard } from "./report-card";
 
@@ -34,12 +35,16 @@ function ParcelSummary({ parcel }: { parcel: AssistantParcel }) {
 }
 
 function PriceCard({ price }: { price: AssistantPrice }) {
+  const caption = priceCaption(price);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-body-sm text-grey-700">
-          {price.pickupDistrict} to {price.dropOffDistrict}, {price.weightKg} kg
-        </p>
+        <div>
+          <p className="text-body-sm text-grey-700">
+            {price.pickupDistrict} to {price.dropOffDistrict}, {price.weightKg} kg
+          </p>
+          {caption ? <p className="text-caption text-grey-600">{caption}</p> : null}
+        </div>
         <p className="text-h3 tabular-nums text-grey-900">
           {price.total === null ? "Manual quote" : formatRs(price.total)}
         </p>
@@ -48,7 +53,10 @@ function PriceCard({ price }: { price: AssistantPrice }) {
         <dl className="space-y-1 border-t border-grey-100 pt-2 text-body-sm">
           {price.lines.map((line) => (
             <div key={line.component} className="flex justify-between gap-2">
-              <dt className="text-grey-600">{humanizeCode(line.component)}</dt>
+              <dt className="text-grey-600">
+                {humanizeCode(line.component)}
+                {lineDetail(price, line.component)}
+              </dt>
               <dd className="tabular-nums text-grey-900">{formatRs(line.amount)}</dd>
             </div>
           ))}
