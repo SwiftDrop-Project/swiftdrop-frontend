@@ -110,10 +110,46 @@ export interface DeliveryDetail {
   history: DeliveryHistoryEntry[];
 }
 
+/** Whether the delivery fee has been paid (backend ReceiptResponse.PaymentStatus). */
+export type ReceiptPaymentStatus = "PAID" | "DUE";
+
+/** One fee line of a receipt. `label` is the text to show, e.g. "Extra weight (1 kg)". */
+export interface ReceiptLine {
+  /** BASE, WEIGHT, PICKUP, DELIVERY, LINEHAUL, COD, or FEE for parcels booked before pricing. */
+  component: string;
+  label: string;
+  amount: number;
+}
+
+/** GET /deliveries/{id}/receipt: the fee as booked, line by line (the PDF has the same content). */
+export interface DeliveryReceipt {
+  trackingNumber: string;
+  status: ParcelStatus;
+  bookedAt: string;
+  pickup: DeliveryContact;
+  recipient: DeliveryContact;
+  weightKg: number;
+  /** null for parcels booked before sizes. */
+  billableWeightKg: number | null;
+  size: ParcelSize | null;
+  vehicle: Vehicle | null;
+  /** They add up to `total`. */
+  lines: ReceiptLine[];
+  total: number;
+  currency: string;
+  /** Cash collected from the recipient for the sender; not part of the fee. */
+  codAmount: number | null;
+  paymentMethod: PaymentMethod | null;
+  /** null when SwiftDrop can't tell: online payments aren't recorded yet, and parcels without a method. */
+  paymentStatus: ReceiptPaymentStatus | null;
+}
+
 /** The query of GET /deliveries. `page` is 0-based; `size` is 1-100. */
 export interface DeliveryListQuery {
   page: number;
   size: number;
-  /** Leave out for every status. */
-  status?: ParcelStatus;
+  /** One status, or several (the delivery is in any of them, sent as repeated `status`). Leave out for every status. */
+  status?: ParcelStatus | readonly ParcelStatus[];
+  /** Part of a tracking number, spaces and case ignored; at most 30 characters. Leave out for no search. */
+  q?: string;
 }

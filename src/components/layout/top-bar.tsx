@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, ChevronDown, CircleQuestionMark, LogOut, Menu, Search, SlidersHorizontal } from "lucide-react";
+import { Bell, ChevronDown, CircleQuestionMark, LogOut, Menu, Search, SlidersHorizontal, User as UserIcon } from "lucide-react";
 import * as React from "react";
 import {
   DropdownMenu,
@@ -129,6 +129,14 @@ function UserMenu({ role }: { role: Role }) {
           <span className="block truncate">{user.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {user.role === "CUSTOMER" ? (
+          <DropdownMenuItem asChild>
+            <Link href="/customer/profile">
+              <UserIcon aria-hidden="true" />
+              Profile
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         {settings ? (
           <DropdownMenuItem asChild>
             <Link href={settings}>
