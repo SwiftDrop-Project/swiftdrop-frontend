@@ -69,6 +69,48 @@ export interface Place {
   district: DistrictCode;
 }
 
+/**
+ * How the customer chose to pay the delivery fee (backend delivery.PaymentMethod): online, in cash to the courier at
+ * pickup (the sender pays), or in cash at drop-off (the recipient pays). It is a choice made at booking, not a payment
+ * status: SwiftDrop doesn't record payments yet, so ONLINE never means the fee was paid.
+ */
+export type FeePaymentMethod = "ONLINE" | "AT_PICKUP" | "AT_DROP_OFF";
+
+/**
+ * Where the delivery fee's payment stands (backend delivery.FeePaymentStatus), from the payment the backend recorded:
+ * - AWAITING_CASH_COLLECTION: AT_PICKUP / AT_DROP_OFF, not collected yet
+ * - CASH_COLLECTED: a courier collected it in cash
+ * - AWAITING_ONLINE_VERIFICATION: ONLINE was chosen, but no verified payment is recorded (not paid, as far as we know)
+ * - ONLINE_VERIFIED: a verified online payment is recorded
+ * - NOT_RECORDED: booked before payment methods
+ */
+export type FeePaymentStatus =
+  | "AWAITING_CASH_COLLECTION"
+  | "CASH_COLLECTED"
+  | "AWAITING_ONLINE_VERIFICATION"
+  | "ONLINE_VERIFIED"
+  | "NOT_RECORDED";
+
+/**
+ * DeliveryFeeResponse: SwiftDrop's delivery fee as fixed at booking, how the customer chose to pay it, and where its
+ * payment stands. Never the cash on delivery (`codAmount`, the price of the goods).
+ */
+export interface DeliveryFee {
+  amount: number;
+  /** e.g. "LKR". */
+  currency: string;
+  /** null for parcels booked before payment methods. */
+  paymentMethod: FeePaymentMethod | null;
+  status: FeePaymentStatus;
+  /** ISO timestamp: when it was collected or verified; null while unpaid. */
+  collectedAt: string | null;
+  /**
+   * The status change of this step that must confirm the cash collection (`feeCollected: true`): PICKED_UP or
+   * DELIVERED; null when nothing is collected in this step (always on a finished step). Decided by the backend.
+   */
+  collectOn: "PICKED_UP" | "DELIVERED" | null;
+}
+
 /** TaskResponse: the courier's dispatch task for this parcel. */
 export interface CourierTask {
   assignmentId: string;
@@ -109,6 +151,11 @@ export interface CourierDelivery {
   weightKg: number;
   /** Cash to collect in rupees; null when already paid. */
   codAmount: number | null;
+  /**
+   * The delivery fee and how it is paid. The backend always sends it; null only when an older backend leaves it out,
+   * and then the screens show nothing about the fee.
+   */
+  deliveryFee: DeliveryFee | null;
   instructions: string | null;
   /** ISO timestamp: when the dispatcher created the task. */
   assignedAt: string;
@@ -206,12 +253,15 @@ export type CourierTargetStatus = Exclude<ParcelStatus, "CREATED">;
 /**
  * StatusChangeRequest: body of POST /courier/deliveries/{parcelId}/status. Each status carries only its own fields
  * (the backend refuses the others): AT_BRANCH needs `receivedBy`, DELIVERED `recipientName` and the uploaded
- * `proofPhotoId`, FAILED `failureReason` (and a note of 3+ characters for OTHER).
+ * `proofPhotoId`, FAILED `failureReason` (and a note of 3+ characters for OTHER). `feeCollected: true` confirms the
+ * delivery fee's cash collection: sent with PICKED_UP or DELIVERED exactly when `deliveryFee.collectOn` is that status
+ * (required then, refused otherwise). Never an amount.
  */
 export type StatusChangeRequest =
-  | { status: "PICKED_UP" | "OUT_FOR_DELIVERY"; note?: string }
+  | { status: "PICKED_UP"; note?: string; feeCollected?: true }
+  | { status: "OUT_FOR_DELIVERY"; note?: string }
   | { status: "AT_BRANCH"; receivedBy: string; note?: string }
-  | { status: "DELIVERED"; recipientName: string; proofPhotoId: string; note?: string }
+  | { status: "DELIVERED"; recipientName: string; proofPhotoId: string; note?: string; feeCollected?: true }
   | { status: "FAILED"; failureReason: FailureReason; note?: string };
 
 /** UnableToCollectRequest: body of POST /courier/deliveries/{parcelId}/unable-to-collect. OTHER needs a note. */

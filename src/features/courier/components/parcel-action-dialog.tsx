@@ -8,12 +8,19 @@ import { InlineNotice } from "@/components/ui/inline-notice";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { formatRs } from "@/lib/format";
 import { ImagePicker } from "@/components/ui/image-picker";
+import {
+  cashToCollect,
+  COD_CONFIRMATION_REQUIRED,
+  codConfirmationLabel,
+  FEE_CONFIRMATION_REQUIRED,
+  feeConfirmationLabel,
+} from "../lib/delivery-fee";
 import { FAILURE_REASON_OPTIONS, TASK_PROBLEM_OPTIONS } from "../lib/labels";
 import {
   actionId,
   submitDelivered,
+  submitStatus,
   type ActionFailure,
   type ParcelAction,
   type UploadedProof,
@@ -41,6 +48,7 @@ import {
 } from "../schemas";
 import type { CourierDelivery, CourierDeliveryDetail } from "../types";
 import { ActionFormShell, GuardedDialog } from "./action-dialog";
+import { FeeConfirmationField } from "./delivery-fee";
 import { HandoverForm } from "./handover-dialog";
 import { useActionSubmit, type ActionFormProps } from "./use-action-submit";
 
@@ -153,7 +161,73 @@ function NoteField({
   );
 }
 
-/** PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY: confirm, with an optional note. */
+/**
+ * One required "I collected …" box (null label: no box): whether the form may send, a check before sending that shows
+ * `requiredMessage` under an unticked box, and the box itself. Every cash confirmation looks and behaves the same.
+ */
+function useCashConfirmation(label: string | null, requiredMessage: string) {
+  const [checked, setChecked] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  return {
+    label,
+    /** True when the form may send: nothing to confirm, or the box is ticked. */
+    ready: label === null || checked,
+    /** The box is shown and ticked. */
+    confirmed: label !== null && checked,
+    /** Before sending: refuses (with the message under the box) while the box is shown and not ticked. */
+    check: () => {
+      if (label !== null && !checked) {
+        setError(requiredMessage);
+        return false;
+      }
+      return true;
+    },
+    showError: setError,
+    field: label ? (
+      <FeeConfirmationField
+        label={label}
+        checked={checked}
+        onCheckedChange={(value) => {
+          setChecked(value);
+          if (value) setError(null);
+        }}
+        error={error}
+      />
+    ) : null,
+  };
+}
+
+/**
+ * The courier's "I collected the delivery fee" confirmation for this status change, when the backend says the fee is
+ * collected here (`deliveryFee.collectOn`). Sent as `feeCollected: true`; a field-error taker puts the backend's
+ * `feeCollected` message under the box.
+ */
+function useFeeConfirmation(delivery: ActionFormProps["delivery"], status: "PICKED_UP" | "DELIVERED" | null) {
+  const box = useCashConfirmation(status ? feeConfirmationLabel(delivery, status) : null, FEE_CONFIRMATION_REQUIRED);
+  return {
+    ...box,
+    takeFieldErrors: ({ feeCollected, ...rest }: Record<string, string>) => {
+      if (feeCollected && box.label !== null) {
+        box.showError(feeCollected);
+        return rest;
+      }
+      return feeCollected ? { ...rest, feeCollected } : rest;
+    },
+  };
+}
+
+/**
+ * The courier's "I collected the cash on delivery" confirmation of a DELIVERED parcel with cash on delivery: required
+ * to mark it delivered, kept apart from the fee's box. Frontend only: nothing is sent (no COD payment is recorded).
+ */
+function useCodConfirmation(delivery: ActionFormProps["delivery"]) {
+  return useCashConfirmation(codConfirmationLabel(delivery), COD_CONFIRMATION_REQUIRED);
+}
+
+/**
+ * PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY: confirm, with an optional note. A pickup whose fee the sender pays now
+ * (AT_PICKUP, not collected) also needs the "I collected the delivery fee" box ticked.
+ */
 function ConfirmForm(props: ActionFormProps) {
   const {
     register,
@@ -161,8 +235,10 @@ function ConfirmForm(props: ActionFormProps) {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<ConfirmStepValues>({ resolver: zodResolver(confirmStepSchema), defaultValues: { note: "" } });
-  const { text, notice, sendStatus } = useActionSubmit(props, setError, ["note"]);
+  const { text, notice, sendWith } = useActionSubmit(props, setError, ["note"]);
   const status = props.action.kind === "confirm" ? props.action.status : "PICKED_UP";
+  const fee = useFeeConfirmation(props.delivery, status === "PICKED_UP" ? "PICKED_UP" : null);
+  const parcelId = props.delivery.parcelId;
 
   return (
     <ActionFormShell
@@ -171,9 +247,15 @@ function ConfirmForm(props: ActionFormProps) {
       notice={notice}
       submitLabel={text.submit}
       saving={isSubmitting}
-      onSubmit={handleSubmit((values) => sendStatus(confirmStepRequest(status, confirmStepSchema.parse(values))))}
+      submitDisabled={!fee.ready}
+      onSubmit={handleSubmit((values) => {
+        if (!fee.check()) return;
+        const body = confirmStepRequest(status, confirmStepSchema.parse(values), fee.confirmed);
+        return sendWith(() => submitStatus(parcelId, body), fee.takeFieldErrors);
+      })}
       onCancel={props.onClose}
     >
+      {fee.field}
       <NoteField
         id="action-note"
         error={errors.note?.message}
@@ -186,7 +268,8 @@ function ConfirmForm(props: ActionFormProps) {
 
 /**
  * DELIVERED with proof of delivery: who received it, and a photo of the delivery slip they signed (both required),
- * plus a reminder of the cash to collect. Confirming uploads the photo first and then marks the parcel DELIVERED with
+ * plus a reminder of the cash to collect and a required box for each cash amount collected here: the delivery fee
+ * (AT_DROP_OFF, unpaid; sent as `feeCollected`) and the cash on delivery (frontend only, never sent). Confirming uploads the photo first and then marks the parcel DELIVERED with
  * it; if the upload fails nothing is delivered, and if the second step fails the uploaded photo is reused on retry
  * (unless it was changed or refused).
  */
@@ -206,7 +289,12 @@ function DeliveredForm(props: ActionFormProps) {
   const [photoError, setPhotoError] = React.useState<string | null>(null);
   const [progress, setProgress] = React.useState<string | null>(null);
   const uploaded = React.useRef<UploadedProof | null>(null);
-  const cash = props.delivery.codAmount;
+  // The dialog opens only for an action the API offers now, so this is a live step.
+  const cash = cashToCollect(props.delivery, true);
+  // The recipient pays the fee now (AT_DROP_OFF, not collected): the box must be ticked too.
+  const fee = useFeeConfirmation(props.delivery, "DELIVERED");
+  // Cash on delivery to collect: its own box, also required (frontend only).
+  const cod = useCodConfirmation(props.delivery);
   const photoReady = photo !== null && proofFileError(photo) === null;
 
   function choose(file: File | null) {
@@ -222,6 +310,11 @@ function DeliveredForm(props: ActionFormProps) {
       setPhotoError(problem ?? PROOF_MESSAGES.required);
       return;
     }
+    // Both checked (not short-circuited), so each unticked box shows its message.
+    const feeReady = fee.check();
+    const codReady = cod.check();
+    if (!feeReady || !codReady) return;
+    const feeCollected = fee.confirmed;
     const parsed = deliveredSchema.parse(values);
     setProgress(
       uploaded.current?.file === photo
@@ -240,17 +333,18 @@ function DeliveredForm(props: ActionFormProps) {
         const result = await submitDelivered(
           props.delivery.parcelId,
           { original: photo, prepared: prepared.blob, fileName: prepared.fileName },
-          (proofPhotoId) => deliveredRequest(parsed, proofPhotoId),
+          (proofPhotoId) => deliveredRequest(parsed, proofPhotoId, feeCollected),
           uploaded.current,
         );
         if (!result.ok) uploaded.current = result.uploaded;
         return result;
       },
-      // Photo problems (the upload's "file", or a refused "proofPhotoId") go under the photo, not in a notice.
+      // Photo problems (the upload's "file", or a refused "proofPhotoId") go under the photo, not in a notice; a
+      // refused fee confirmation goes under its box.
       ({ file, proofPhotoId, ...rest }) => {
         const message = file ?? proofPhotoId;
         if (message) setPhotoError(message);
-        return rest;
+        return fee.takeFieldErrors(rest);
       },
     );
   };
@@ -262,15 +356,20 @@ function DeliveredForm(props: ActionFormProps) {
       notice={notice}
       submitLabel={text.submit}
       saving={isSubmitting}
-      submitDisabled={!isValid || !photoReady}
+      submitDisabled={!isValid || !photoReady || !fee.ready || !cod.ready}
       onSubmit={(event) => void handleSubmit(confirm)(event)}
       onCancel={props.onClose}
     >
       {cash !== null ? (
-        <InlineNotice title={`Collect ${formatRs(cash)} in cash`}>
+        <InlineNotice title={cash.summary}>
+          {cash.fee !== null && cash.cod !== null
+            ? `Delivery fee ${cash.fee} and cash on delivery ${cash.cod}. `
+            : ""}
           Take the cash before you hand the parcel over.
         </InlineNotice>
       ) : null}
+      {fee.field}
+      {cod.field}
       <FormField id="action-recipient" label="Received by" error={errors.recipientName?.message}>
         {(a11y) => <Input {...a11y} {...register("recipientName")} autoComplete="off" />}
       </FormField>

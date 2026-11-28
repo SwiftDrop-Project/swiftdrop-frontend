@@ -88,6 +88,7 @@ function pickup(overrides: Partial<Delivery> = {}, task: Partial<Task> = {}): De
     to: { city: "Kandy", district: "KANDY" },
     weightKg: 1.2,
     codAmount: null,
+    deliveryFee: null,
     instructions: null,
     assignedAt: "2026-11-05T02:30:00Z",
     // Java Instants can carry fractions of a second.
@@ -124,6 +125,7 @@ function delivery(overrides: Partial<Delivery> = {}, task: Partial<Task> = {}): 
     to: { city: "Kandy", district: "KANDY" },
     weightKg: 1.2,
     codAmount: 2450,
+    deliveryFee: null,
     instructions: "Call before you arrive.",
     assignedAt: "2026-11-05T02:30:00Z",
     updatedAt: "2026-11-05T05:10:00Z",

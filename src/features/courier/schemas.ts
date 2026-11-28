@@ -126,10 +126,18 @@ export function optionalNote(value: string): string | undefined {
  * Request bodies from parsed (trimmed) form values. Each status sends only its own fields.
  */
 
+/**
+ * PICKED_UP / OUT_FOR_DELIVERY. `feeCollected`: the courier ticked "I collected the delivery fee" (sent only with
+ * PICKED_UP, and only when true: the backend refuses it where there is nothing to collect).
+ */
 export function confirmStepRequest(
   status: "PICKED_UP" | "OUT_FOR_DELIVERY",
   values: z.output<typeof confirmStepSchema>,
+  feeCollected = false,
 ): StatusChangeRequest {
+  if (status === "PICKED_UP" && feeCollected) {
+    return { status, note: optionalNote(values.note), feeCollected: true };
+  }
   return { status, note: optionalNote(values.note) };
 }
 
@@ -137,9 +145,17 @@ export function handoverRequest(values: z.output<typeof handoverSchema>): Status
   return { status: "AT_BRANCH", receivedBy: values.receivedBy, note: optionalNote(values.note) };
 }
 
-/** DELIVERED with the recipient's name and the proof photo the backend stored for this parcel. */
-export function deliveredRequest(values: z.output<typeof deliveredSchema>, proofPhotoId: string): StatusChangeRequest {
-  return { status: "DELIVERED", recipientName: values.recipientName, proofPhotoId, note: optionalNote(values.note) };
+/**
+ * DELIVERED with the recipient's name and the proof photo the backend stored for this parcel; `feeCollected` when the
+ * courier ticked "I collected the delivery fee" (sent only when true).
+ */
+export function deliveredRequest(
+  values: z.output<typeof deliveredSchema>,
+  proofPhotoId: string,
+  feeCollected = false,
+): StatusChangeRequest {
+  const body = { status: "DELIVERED" as const, recipientName: values.recipientName, proofPhotoId, note: optionalNote(values.note) };
+  return feeCollected ? { ...body, feeCollected: true } : body;
 }
 
 export function failedRequest(values: FailedValues): StatusChangeRequest {
@@ -203,6 +219,28 @@ const taskSchema = z.object({
   receivedBy: z.string().nullable(),
 });
 
+/**
+ * The delivery fee and its payment. The whole object defaults to null when the backend leaves it out (a backend from
+ * before the field); inside it every field is required.
+ */
+const deliveryFeeSchema = z
+  .object({
+    amount: z.number(),
+    currency: z.string(),
+    paymentMethod: z.enum(["ONLINE", "AT_PICKUP", "AT_DROP_OFF"]).nullable(),
+    status: z.enum([
+      "AWAITING_CASH_COLLECTION",
+      "CASH_COLLECTED",
+      "AWAITING_ONLINE_VERIFICATION",
+      "ONLINE_VERIFIED",
+      "NOT_RECORDED",
+    ]),
+    collectedAt: instant.nullable(),
+    collectOn: z.enum(["PICKED_UP", "DELIVERED"]).nullable(),
+  })
+  .nullable()
+  .default(null);
+
 const deliveryShape = {
   parcelId: id,
   trackingNumber: z.string(),
@@ -214,6 +252,7 @@ const deliveryShape = {
   to: placeSchema.nullable(),
   weightKg: z.number(),
   codAmount: z.number().nullable(),
+  deliveryFee: deliveryFeeSchema,
   instructions: z.string().nullable(),
   assignedAt: instant,
   updatedAt: instant,

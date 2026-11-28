@@ -1,6 +1,14 @@
 import type { DistrictCode, ParcelStatus } from "@/types";
-import type { AssignmentStatus, AssignmentType, Contact, FailureReason, ItemOutcome, TaskProblem } from "../types";
-import { closes } from "./rules";
+import type {
+  AssignmentStatus,
+  AssignmentType,
+  Contact,
+  FailureReason,
+  FeePaymentMethod,
+  ItemOutcome,
+  TaskProblem,
+} from "../types";
+import { closes, type FeePaymentSource } from "./rules";
 
 /*
  * PREVIEW ONLY. Sample parcels and the dispatch tasks that hold them, for the courier preview: made-up people, phone
@@ -28,6 +36,13 @@ export interface PreviewParcel {
   recipient: Contact;
   weightKg: number;
   codAmount: number | null;
+  /** The delivery fee as booked, its currency, and how it is paid (null: booked before payment methods). */
+  feeAmount: number;
+  currency: string;
+  paymentMethod: FeePaymentMethod | null;
+  /** The fee's recorded payment, as delivery.fee_payments keeps it: who recorded it and when; null while unpaid. */
+  feePaidBy: FeePaymentSource | null;
+  feePaidAt: string | null;
   instructions: string | null;
   failureReason: FailureReason | null;
   proofRecipientName: string | null;
@@ -123,17 +138,23 @@ const RECIPIENTS = [
   contact("Kasun Bandara", "+94770000205", "12 Main Street", "Galle", "GALLE"),
 ];
 
+/** The payment methods the sample parcels cycle through, unless a parcel sets its own. */
+const FEE_METHODS: readonly FeePaymentMethod[] = ["AT_PICKUP", "AT_DROP_OFF", "ONLINE"];
+
 /**
  * The sample, worked out from `now`:
  * - A pickup in progress (3 parcels): one to pick up, one picked up and waiting for the handover, one already handed
  *   over today (completed while its siblings stay active).
- * - A pickup not started (2 parcels): pick up or mark Unable to Collect.
- * - A delivery in progress (4 parcels): one to take out (with cash to collect), one out for delivery, one failed and
+ * - A pickup not started (3 parcels): pick up or mark Unable to Collect.
+ * - A delivery in progress (6 parcels): one to take out (with cash to collect), three out for delivery, one failed and
  *   waiting to be returned to the branch, one delivered today.
  * - A delivery from yesterday whose parcel isn't at the branch yet (only Unable to Collect is possible).
  * - A pickup completed today (handed over, not collected), and a cancelled pickup that never shows as work.
  * - About 20 completed parcels on earlier days for History, including one parcel finished twice: a failed delivery
  *   returned to the branch, then delivered in a later task.
+ * - Delivery fees paid every way: at pickup (the parcel to pick up shows the sender reminder), at drop-off (with and
+ *   without cash on delivery), online (never shown as paid: there is no payment status), and one parcel booked before
+ *   payment methods.
  */
 export function createSampleStore(now: Date = new Date()): PreviewStore {
   const yymm = colomboDay(now).slice(2, 7).replace("-", "");
@@ -167,6 +188,11 @@ export function createSampleStore(now: Date = new Date()): PreviewStore {
       recipient: RECIPIENTS[n % RECIPIENTS.length],
       weightKg: 0.5 + (n % 5) * 0.4,
       codAmount: null,
+      feeAmount: 350 + (n % 5) * 42.5,
+      currency: "LKR",
+      paymentMethod: FEE_METHODS[n % FEE_METHODS.length],
+      feePaidBy: null,
+      feePaidAt: null,
       instructions: null,
       failureReason: null,
       proofRecipientName: null,
@@ -209,8 +235,13 @@ export function createSampleStore(now: Date = new Date()): PreviewStore {
   // ---- Today's work ----
 
   // A pickup in progress: siblings in one task, one already completed.
-  const p1 = parcel(1, { status: "CREATED", history: [["CREATED", -20]], instructions: "Ask for the parcel at the front desk." });
-  const p2 = parcel(2, { status: "PICKED_UP", history: [["CREATED", -20], ["PICKED_UP", 8.5]] });
+  const p1 = parcel(1, {
+    status: "CREATED",
+    paymentMethod: "AT_PICKUP",
+    history: [["CREATED", -20]],
+    instructions: "Ask for the parcel at the front desk.",
+  });
+  const p2 = parcel(2, { status: "PICKED_UP", paymentMethod: "AT_PICKUP", history: [["CREATED", -20], ["PICKED_UP", 8.5]] });
   const p3 = parcel(3, {
     status: "AT_BRANCH",
     currentBranch: "COLOMBO",
@@ -223,11 +254,15 @@ export function createSampleStore(now: Date = new Date()): PreviewStore {
   ]);
 
   // A pickup not started.
-  const p4 = parcel(4, { status: "CREATED", history: [["CREATED", -6]] });
-  const p5 = parcel(5, { status: "CREATED", history: [["CREATED", -5]] });
+  const p4 = parcel(4, { status: "CREATED", paymentMethod: "ONLINE", history: [["CREATED", -6]] });
+  // Booked before payment methods.
+  const p5 = parcel(5, { status: "CREATED", paymentMethod: null, history: [["CREATED", -5]] });
+  // The sender pays the fee at pickup; the cash on delivery is for the recipient, at delivery (not asked for here).
+  const p17 = parcel(17, { status: "CREATED", paymentMethod: "AT_PICKUP", codAmount: 3200, history: [["CREATED", -4]] });
   task(2, "PICKUP", "ASSIGNED", { destination: "COLOMBO" }, 9.5, [
     { parcel: p4, outcome: "PENDING", hours: 9.5 },
     { parcel: p5, outcome: "PENDING", hours: 9.5 },
+    { parcel: p17, outcome: "PENDING", hours: 9.5 },
   ]);
 
   // A delivery in progress: to take out (cash), out for delivery, failed (to return), delivered.
@@ -235,17 +270,22 @@ export function createSampleStore(now: Date = new Date()): PreviewStore {
     status: "AT_BRANCH",
     currentBranch: "COLOMBO",
     codAmount: 2450,
+    // The recipient pays the fee and the cash on delivery: shown apart, with the total.
+    paymentMethod: "AT_DROP_OFF",
     instructions: "Call before you arrive.",
     history: [["CREATED", -48], ["PICKED_UP", -40], ["AT_BRANCH", -38, "COLOMBO"]],
   });
   const p7 = parcel(7, {
     status: "OUT_FOR_DELIVERY",
     codAmount: 1200,
+    paymentMethod: "ONLINE",
     history: [["CREATED", -50], ["PICKED_UP", -44], ["AT_BRANCH", -42, "COLOMBO"], ["OUT_FOR_DELIVERY", 8]],
   });
   const p8 = parcel(8, {
     status: "FAILED",
     failureReason: "RECIPIENT_UNAVAILABLE",
+    // Not collected while the parcel goes back to the branch.
+    paymentMethod: "AT_DROP_OFF",
     history: [
       ["CREATED", -52],
       ["PICKED_UP", -46],
@@ -259,17 +299,33 @@ export function createSampleStore(now: Date = new Date()): PreviewStore {
     proofRecipientName: "Ayesha Fernando",
     history: [["CREATED", -60], ["PICKED_UP", -50], ["AT_BRANCH", -48, "COLOMBO"], ["OUT_FOR_DELIVERY", 8], ["DELIVERED", 10]],
   });
+  // Out for delivery, the recipient pays only the fee (no cash on delivery).
+  const p16 = parcel(16, {
+    status: "OUT_FOR_DELIVERY",
+    paymentMethod: "AT_DROP_OFF",
+    history: [["CREATED", -50], ["PICKED_UP", -44], ["AT_BRANCH", -42, "COLOMBO"], ["OUT_FOR_DELIVERY", 8]],
+  });
+  // Out for delivery, the fee was for the sender at pickup: only the cash on delivery is collected here.
+  const p18 = parcel(18, {
+    status: "OUT_FOR_DELIVERY",
+    paymentMethod: "AT_PICKUP",
+    codAmount: 3200,
+    history: [["CREATED", -50], ["PICKED_UP", -44], ["AT_BRANCH", -42, "COLOMBO"], ["OUT_FOR_DELIVERY", 8]],
+  });
   task(3, "DELIVERY", "IN_PROGRESS", { origin: "COLOMBO" }, 7.5, [
     { parcel: p6, outcome: "PENDING", hours: 7.5 },
     { parcel: p7, outcome: "LOADED", hours: 8 },
     { parcel: p8, outcome: "FAILED", hours: 9.5 },
     { parcel: p9, outcome: "DELIVERED", hours: 10 },
+    { parcel: p16, outcome: "LOADED", hours: 8 },
+    { parcel: p18, outcome: "LOADED", hours: 8 },
   ]);
 
   // A delivery from yesterday whose parcel is still at another branch: it can't be taken out yet.
   const p10 = parcel(10, {
     status: "AT_BRANCH",
     currentBranch: "GAMPAHA",
+    paymentMethod: "AT_DROP_OFF",
     history: [["CREATED", -30], ["PICKED_UP", -28], ["AT_BRANCH", -26, "GAMPAHA"]],
   });
   task(4, "DELIVERY", "ASSIGNED", { origin: "COLOMBO" }, -14, [{ parcel: p10, outcome: "PENDING", hours: -14 }]);
@@ -343,6 +399,26 @@ export function createSampleStore(now: Date = new Date()): PreviewStore {
           : { parcel: id, outcome: "DELIVERED", hours },
       ],
     );
+  }
+
+  // Cash fees already collected, as the backend would have recorded them: an AT_PICKUP fee once its parcel was picked
+  // up, an AT_DROP_OFF fee once delivered. ONLINE fees stay unconfirmed (nothing verifies them), except one sample
+  // below that shows how a verified online payment looks.
+  for (const parcel of parcels.values()) {
+    const picked = parcel.history.find((entry) => entry.status === "PICKED_UP");
+    const delivered = parcel.history.find((entry) => entry.status === "DELIVERED");
+    const paidAt = parcel.paymentMethod === "AT_PICKUP" ? picked : parcel.paymentMethod === "AT_DROP_OFF" ? delivered : undefined;
+    if (paidAt) {
+      parcel.feePaidBy = "COURIER_CASH";
+      parcel.feePaidAt = paidAt.occurredAt;
+    }
+  }
+  // PREVIEW SAMPLE ONLY: a verified online payment, to show the "Already Paid" badge. The real app gets this state only
+  // from a payment the backend recorded; choosing ONLINE never creates it, and no screen can set it.
+  const verified = parcels.get(p7);
+  if (verified) {
+    verified.feePaidBy = "ONLINE";
+    verified.feePaidAt = at(-48);
   }
 
   tasks.sort((a, b) => b.assignedAt.localeCompare(a.assignedAt));

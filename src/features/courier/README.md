@@ -73,11 +73,11 @@ transfer". The parcel page also shows the parcel's own journey status, separatel
 
 | API offers | Button | Form | Request |
 |---|---|---|---|
-| `PICKED_UP` | Mark picked up (form: "Mark as picked up") | optional note | `POST …/status` `{ status }` |
+| `PICKED_UP` | Mark picked up (form: "Mark as picked up") | optional note; the fee box when `deliveryFee.collectOn` is `PICKED_UP` | `POST …/status` `{ status }` (+ `feeCollected: true`) |
 | `AT_BRANCH` (pickup) | Hand over at branch | **Received by** (2-100, trimmed), note | `{ status: "AT_BRANCH", receivedBy }` |
 | `AT_BRANCH` (failed delivery) | Return to branch | **Received by**, note | `{ status: "AT_BRANCH", receivedBy }` |
 | `OUT_FOR_DELIVERY` | Out for delivery (form: "Mark out for delivery") | optional note | `{ status }` |
-| `DELIVERED` | Mark as delivered | **Received by** (recipient name), note; cash reminder | `{ status, recipientName }` |
+| `DELIVERED` | Mark as delivered | **Received by** (recipient name), photo, note; cash reminder; the fee box when `deliveryFee.collectOn` is `DELIVERED`; the cash on delivery box when `codAmount` is set (frontend only) | `{ status, recipientName, proofPhotoId }` (+ `feeCollected: true`) |
 | `FAILED` | Mark as failed | **Reason**, note (required for Other) | `{ status, failureReason }` |
 | `canMarkUnableToCollect` | Unable to Collect | **Reason** (the backend's problems), note (required for Other) | `POST …/unable-to-collect` `{ problem, note }` |
 
@@ -91,6 +91,29 @@ meanwhile (409 `ASSIGNMENT_CHANGED` — "Your dispatcher changed this task" —,
 `INVALID_STATUS_TRANSITION`, `ASSIGNMENT_CLOSED`) the dialog closes, a message explains, and the data is loaded again;
 nothing was saved. Field errors stay in the dialog; 404 goes back to today's parcels; network and server errors can be
 retried. A dialog can't be closed or sent twice while it is saving, and the other buttons wait.
+
+### Delivery fee (`lib/delivery-fee.ts`, `components/delivery-fee.tsx`)
+
+Every parcel shows SwiftDrop's delivery fee and how it is paid (`deliveryFee`), apart from the cash on delivery:
+
+| `deliveryFee.status` | Shown | Reminder on a live step |
+|---|---|---|
+| `AWAITING_CASH_COLLECTION` | "Cash at pickup – the sender pays" / "Cash at drop-off – the recipient pays" | AT_PICKUP: on the pickup to do; AT_DROP_OFF: on a delivery still going to the recipient (with COD: both lines and the total when both are rupees) |
+| `CASH_COLLECTED` | green **Delivery fee collected**, and when | none (the COD reminder stays, as before) |
+| `AWAITING_ONLINE_VERIFICATION` | "Online", "No delivery fee collection required" | none (COD reminder unchanged) |
+| `ONLINE_VERIFIED` | "Online", "No delivery fee collection required", green **Already Paid** | none (COD reminder unchanged) |
+| `NOT_RECORDED` | "Payment method not recorded" | none |
+
+The green badges come only from a payment the backend recorded; choosing ONLINE never shows as paid. When the
+backend's `deliveryFee.collectOn` is the dialog's status, the Mark picked up / Mark as delivered dialog shows a required
+"I collected the Rs. … delivery fee from the sender/recipient" box: confirm stays disabled until it is ticked, and the
+request sends `feeCollected: true` (never an amount: the backend records the parcel's own fee). A backend
+`feeCollected` field error shows under the box; `409 FEE_ALREADY_COLLECTED` closes the dialog and reloads the parcel.
+Finished, closed and history entries show the fee and its status read-only. A sender who doesn't pay is "Unable to
+Collect"; a recipient who doesn't pay is "Mark as failed": the fee stays unpaid.
+The Mark as delivered dialog also needs a separate "I collected the Rs. … cash on delivery from the recipient" box
+whenever the parcel has cash on delivery (with the fee box too when both are collected, and the total in the notice).
+The COD box is a frontend confirmation only: nothing is sent, and the backend records no COD payment.
 
 ### Proof of delivery (DELIVERED only)
 
@@ -162,8 +185,14 @@ To go back to the real API, delete the line (or set it to anything other than `t
   - A pickup task with three parcels: one to pick up, one picked up (hand it over), one already handed over today
     (completed while its siblings stay active).
   - A pickup task not started: pick up, or Unable to Collect.
-  - A delivery task with four parcels: one to take out (cash to collect), one out for delivery, one failed (return it to
-    the branch), one delivered today.
+  - A delivery task with six parcels: one to take out (cash to collect), three out for delivery, one failed (return it
+    to the branch), one delivered today.
+  - Delivery fees paid every way: at pickup (with and without cash on delivery), at drop-off (with and without cash on
+    delivery), online ("No delivery fee collection required"), and one parcel booked before payment methods ("not recorded").
+    Cash fees of parcels already picked up (AT_PICKUP) or delivered (AT_DROP_OFF) show as collected. Confirming a
+    pickup or delivery whose fee is due needs the fee box, as the backend does, and records the collection in memory.
+    One sample (out for delivery, ONLINE) shows a **verified** online payment, only so the "Already Paid" badge can be
+    seen: the real app gets that state only from a payment the backend recorded.
   - A delivery whose parcel isn't at the branch yet (only Unable to Collect).
   - Pickups and deliveries only: no branch transfers, today or in History.
   - A pickup completed today (handed over, not collected), and a cancelled pickup that never shows as work.
