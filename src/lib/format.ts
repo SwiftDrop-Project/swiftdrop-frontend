@@ -46,9 +46,21 @@ const timeFormat = new Intl.DateTimeFormat("en-US", {
   timeZone: TIME_ZONE,
 });
 
+const monthYearFormat = new Intl.DateTimeFormat("en-GB", {
+  month: "short",
+  year: "numeric",
+  timeZone: TIME_ZONE,
+});
+
 function parse(iso: string): Date | null {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** ISO timestamp → "Oct 2026" (Sri Lankan time) */
+export function formatMonthYear(iso: string): string {
+  const date = parse(iso);
+  return date ? monthYearFormat.format(date) : iso;
 }
 
 /** ISO timestamp → "1 Nov 2026" (Sri Lankan time) */

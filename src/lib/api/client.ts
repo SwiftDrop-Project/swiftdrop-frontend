@@ -41,8 +41,11 @@ const GENERIC_MESSAGE = "Something went wrong on our side. Try again in a moment
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
-  /** Added to the URL; undefined values are left out. */
-  query?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Added to the URL; undefined values are left out. An array repeats the key once per value
+   * (`{ status: ["DELIVERED", "FAILED"] }` → `?status=DELIVERED&status=FAILED`).
+   */
+  query?: Record<string, string | number | boolean | readonly (string | number)[] | undefined>;
   signal?: AbortSignal;
 }
 
@@ -66,7 +69,12 @@ export function backendOrigin(): string {
 export function apiUrl(path: string, query?: RequestOptions["query"]): string {
   const url = new URL(apiBase() + path);
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined) url.searchParams.set(key, String(value));
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(key, String(item));
+    } else {
+      url.searchParams.set(key, String(value));
+    }
   }
   return url.toString();
 }

@@ -3,6 +3,7 @@
 import { CreditCard, MapPin, Package, Store, User } from "lucide-react";
 import * as React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CodeInput } from "@/components/ui/code-input";
 import { FieldError, FormField } from "@/components/ui/form-field";
 import { ImagePicker } from "@/components/ui/image-picker";
@@ -290,6 +291,41 @@ export function Forms() {
                 Fragile (set by the merchant)
               </label>
             </div>
+          </Example>
+        </ExampleGrid>
+      </Section>
+
+      <Section
+        id="radio-group"
+        title="RadioGroup"
+        description="Picks exactly one option from a list. Checked: orange-600 border and inner dot."
+      >
+        <ExampleGrid>
+          <Example label="Payment method" stack>
+            <RadioGroup defaultValue="cod">
+              <div className="flex items-center gap-3">
+                <RadioGroupItem value="cod" id="rg-cod" />
+                <label htmlFor="rg-cod" className="text-body text-grey-900 cursor-pointer">
+                  Cash on delivery
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <RadioGroupItem value="card" id="rg-card" />
+                <label htmlFor="rg-card" className="text-body text-grey-900 cursor-pointer">
+                  Mock card
+                </label>
+              </div>
+            </RadioGroup>
+          </Example>
+          <Example label="Disabled" stack>
+            <RadioGroup defaultValue="opt1" disabled>
+              <div className="flex items-center gap-3">
+                <RadioGroupItem value="opt1" id="rg-d1" />
+                <label htmlFor="rg-d1" className="text-body text-grey-400">
+                  Fixed option (checked)
+                </label>
+              </div>
+            </RadioGroup>
           </Example>
         </ExampleGrid>
       </Section>
