@@ -5,6 +5,7 @@ import type {
   CourierDeliveryDetail,
   CourierTargetStatus,
   CourierToday,
+  DeliveryFee,
   FailureReason,
   ProofUpload,
   TaskProblem,
@@ -22,6 +23,8 @@ import {
 import {
   canMarkUnableToCollect,
   closes,
+  feeCollectOn,
+  feePaymentStatus,
   handOverBranch,
   nextStatuses,
   outcomeFor,
@@ -77,6 +80,7 @@ const MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   TASK_STEP_NOT_ALLOWED: "This step isn't possible for this parcel now. Refresh to see your task.",
   ASSIGNMENT_CLOSED: "This task is already completed or was cancelled.",
   INVALID_STATUS_TRANSITION: "This parcel can't move to that status now.",
+  FEE_ALREADY_COLLECTED: "The delivery fee for this parcel has already been paid.",
   SERVICE_UNAVAILABLE: "This isn't available yet. Please try again later.",
 };
 
@@ -136,6 +140,8 @@ function view(parcel: PreviewParcel, { task, item, completed, closed }: Step): C
     to: place(parcel.recipient),
     weightKg: parcel.weightKg,
     codAmount: parcel.codAmount,
+    // As the backend: the fee as booked, the method chosen and the status of its recorded payment (if any).
+    deliveryFee: feeView(parcel, task, item, closed),
     instructions: parcel.instructions,
     assignedAt: task.assignedAt,
     updatedAt: parcel.updatedAt,
@@ -161,6 +167,19 @@ function view(parcel: PreviewParcel, { task, item, completed, closed }: Step): C
       problem: item.problem,
       receivedBy: item.receivedBy,
     },
+  };
+}
+
+/** DeliveryFeeResponse: the fee, its payment status and where it is collected (FeePaymentStatus, FeeCollection). */
+function feeView(parcel: PreviewParcel, task: PreviewTask, item: PreviewItem, closed: boolean): DeliveryFee {
+  const status = feePaymentStatus(parcel.paymentMethod, parcel.feePaidBy);
+  return {
+    amount: parcel.feeAmount,
+    currency: parcel.currency,
+    paymentMethod: parcel.paymentMethod,
+    status,
+    collectedAt: parcel.feePaidAt,
+    collectOn: feeCollectOn(status, parcel.paymentMethod, task.type, item.outcome, closed),
   };
 }
 
@@ -344,6 +363,10 @@ function changeStatus(parcelId: string, body: Record<string, unknown>): CourierD
     invalid("receivedBy", "Enter the name of the person at the branch who received the parcel.");
   }
   if (failureReason === "OTHER" && (!note || note.length < 3)) invalid("note", "Describe what went wrong.");
+  // The delivery fee is only confirmed with a successful pickup or delivery.
+  if (body.feeCollected !== undefined && body.feeCollected !== null && status !== "PICKED_UP" && status !== "DELIVERED") {
+    invalid("feeCollected", "Only when you pick up or deliver the parcel.");
+  }
 
   // 2. The parcel is yours (404). 3. The task is open, the step is allowed, the parcel can move (409).
   const found = stepFor(parcelId);
@@ -355,6 +378,25 @@ function changeStatus(parcelId: string, body: Record<string, unknown>): CourierD
   }
   if (!parcelCanMoveTo(parcel.status, target) || !atTheRightBranch(target, found.task.originBranch, parcel.currentBranch)) {
     fail(409, "INVALID_STATUS_TRANSITION");
+  }
+
+  // 4. The delivery fee (FeeCollection, as the backend): required where it is collected, refused anywhere else.
+  const fee = feeView(parcel, found.task, found.item, found.closed);
+  const dueHere = fee.collectOn === target;
+  const confirmed = body.feeCollected === true;
+  if (dueHere && !confirmed) {
+    invalid("feeCollected", `Confirm that you collected the delivery fee of ${fee.currency} ${fee.amount.toFixed(2)} in cash.`);
+  }
+  if (confirmed && !dueHere) {
+    if (fee.status === "CASH_COLLECTED" || fee.status === "ONLINE_VERIFIED") fail(409, "FEE_ALREADY_COLLECTED");
+    invalid(
+      "feeCollected",
+      fee.status === "AWAITING_ONLINE_VERIFICATION"
+        ? "This delivery fee is paid online: there is no cash to collect."
+        : fee.status === "NOT_RECORDED"
+          ? "No payment method is recorded for this parcel: there is no fee to collect."
+          : "The delivery fee isn't collected at this step.",
+    );
   }
 
   // DELIVERED attaches the proof photo: it must be this parcel's and not attached yet (as the backend checks).
@@ -377,6 +419,11 @@ function changeStatus(parcelId: string, body: Record<string, unknown>): CourierD
     photo.attached = true;
   }
   parcel.history.push({ status: target, branch, failureReason: target === "FAILED" ? (failureReason ?? null) : null, occurredAt: at });
+  // The fee's payment, with the status change and the outcome (in memory only: nothing is sent anywhere).
+  if (dueHere) {
+    parcel.feePaidBy = "COURIER_CASH";
+    parcel.feePaidAt = at;
+  }
   record(found, outcomeFor(found.task.type, target), target === "AT_BRANCH" ? { receivedBy } : {}, at);
 
   return detailView(parcel, step(found.task, found.item));

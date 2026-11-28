@@ -90,6 +90,7 @@ function pickDelivery(detail: CourierDelivery): CourierDelivery {
     to: detail.to,
     weightKg: detail.weightKg,
     codAmount: detail.codAmount,
+    deliveryFee: detail.deliveryFee,
     instructions: detail.instructions,
     assignedAt: detail.assignedAt,
     updatedAt: detail.updatedAt,

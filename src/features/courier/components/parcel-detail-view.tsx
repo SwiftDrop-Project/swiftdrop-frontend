@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Banknote, CircleAlert, CircleCheck, CircleDashed, CircleDot, MapPin } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, CircleDot, MapPin } from "lucide-react";
 import * as React from "react";
 import { DetailPage } from "@/components/layout/detail-page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { formatDateTime, formatRs, formatTrackingNumber } from "@/lib/format";
 import { courierApi } from "../api";
 import { useCourierLoad } from "../hooks/use-courier-load";
 import { useDistrictName } from "../hooks/use-district-name";
+import { cashToCollect, feeCollectionNote, formatFee, paymentMethodText } from "../lib/delivery-fee";
 import { ASSIGNMENT_TYPE_LABEL, courierRoutes, failureReasonLabel, formatWeight, taskProblemLabel } from "../lib/labels";
 import type { ActionFailure } from "../lib/parcel-actions";
 import { parcelPhase } from "../lib/parcel-status";
@@ -21,6 +22,7 @@ import type { CourierDeliveryDetail } from "../types";
 import { ContactDetails } from "./contact-details";
 import { CopyTrackingNumber } from "./copy-tracking-number";
 import { CourierLoadError } from "./courier-load-error";
+import { CashToCollectNotice, FeePaidBadge } from "./delivery-fee";
 import { ParcelActionButtons } from "./parcel-action-buttons";
 import { ParcelActionDialog, type ParcelActionTarget } from "./parcel-action-dialog";
 import { ProofOfDeliveryCard } from "./proof-of-delivery";
@@ -237,7 +239,9 @@ function ParcelReady({
   // Shown once each: the step's status in the header, the assigned route in "Your route", the cash reminder in the
   // next step while it applies, the parcel's own status in "Parcel", the whole task's status in "Assignment".
   const route = assignedRoute(delivery, districtName);
-  const cashReminder = actionable && delivery.codAmount !== null && task.type === "DELIVERY";
+  // Never on a history entry or a finished step (actionable is false there): those are read-only.
+  const collect = cashToCollect(delivery, actionable);
+  const fee = delivery.deliveryFee;
 
   return (
     <DetailPage
@@ -301,12 +305,7 @@ function ParcelReady({
                 ) : null}
               </div>
             </div>
-            {cashReminder && delivery.codAmount !== null ? (
-              <p className="flex items-center gap-2 rounded-md border border-grey-200 bg-grey-50 px-3 py-2 text-label text-grey-900 tabular-nums">
-                <Banknote className="size-5 shrink-0 text-grey-700" aria-hidden="true" />
-                Collect {formatRs(delivery.codAmount)} in cash
-              </p>
-            ) : null}
+            {collect ? <CashToCollectNotice collect={collect} /> : null}
             {actionable ? (
               <ParcelActionButtons
                 delivery={delivery}
@@ -349,11 +348,35 @@ function ParcelReady({
               <dd>{PARCEL_STATUS_LABEL[delivery.status]}</dd>
               <dt className="text-grey-600">Weight</dt>
               <dd className="tabular-nums">{formatWeight(delivery.weightKg)}</dd>
-              {/* Not repeated while the next step already asks to collect it. */}
-              {delivery.codAmount !== null && !cashReminder ? (
+              {/* Amounts are not repeated while the next step already asks to collect them. */}
+              {delivery.codAmount !== null && collect?.cod == null ? (
                 <>
                   <dt className="text-grey-600">Cash on delivery</dt>
                   <dd className="tabular-nums">{formatRs(delivery.codAmount)}</dd>
+                </>
+              ) : null}
+              {fee && collect?.fee == null ? (
+                <>
+                  <dt className="text-grey-600">Delivery fee</dt>
+                  <dd className="tabular-nums">{formatFee(fee)}</dd>
+                </>
+              ) : null}
+              {fee ? (
+                <>
+                  <dt className="text-grey-600">Payment</dt>
+                  <dd className="flex min-w-0 flex-col items-start gap-1 break-words">
+                    <span>{paymentMethodText(fee)}</span>
+                    {feeCollectionNote(fee) ? (
+                      <span className="text-body-sm text-grey-600">{feeCollectionNote(fee)}</span>
+                    ) : null}
+                    {/* Only from the payment the backend recorded; read-only on every entry. */}
+                    <FeePaidBadge fee={fee} />
+                    {fee.collectedAt ? (
+                      <span className="text-body-sm text-grey-600 tabular-nums">
+                        {fee.status === "ONLINE_VERIFIED" ? "Verified" : "Collected"} {formatDateTime(fee.collectedAt)}
+                      </span>
+                    ) : null}
+                  </dd>
                 </>
               ) : null}
               {delivery.instructions ? (
@@ -370,9 +393,6 @@ function ParcelReady({
           <CardHeader
             title="Assignment"
             titleId="parcel-task-heading"
-            description={
-              actionable ? "The task your dispatcher gave you. Other parcels in it are worked on their own." : undefined
-            }
           />
           <CardContent>
             {/*

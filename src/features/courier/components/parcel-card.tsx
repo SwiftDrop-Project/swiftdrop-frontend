@@ -1,16 +1,9 @@
 import Link from "next/link";
-import {
-  Banknote,
-  ChevronRight,
-  CircleAlert,
-  CircleCheck,
-  CircleDashed,
-  CircleDot,
-  MapPin,
-} from "lucide-react";
+import { ChevronRight, CircleAlert, CircleCheck, CircleDashed, CircleDot, MapPin, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { formatRs, formatTime, formatTrackingNumber } from "@/lib/format";
+import { formatTime, formatTrackingNumber } from "@/lib/format";
+import { cashToCollect, feeCollectionNote, feePaidLabel, formatFee, paymentMethodText } from "../lib/delivery-fee";
 import { ASSIGNMENT_TYPE_LABEL, courierRoutes, formatWeight } from "../lib/labels";
 import type { ParcelAction } from "../lib/parcel-actions";
 import { parcelPhase } from "../lib/parcel-status";
@@ -25,13 +18,15 @@ import {
 import type { CourierDelivery } from "../types";
 import { ContactActions, fullAddress } from "./contact-details";
 import { CopyTrackingNumber } from "./copy-tracking-number";
+import { CashToCollectNotice, FeePaidBadge } from "./delivery-fee";
 import { ParcelActionButtons } from "./parcel-action-buttons";
 import { ParcelStatusBadge, TaskTypeIcon } from "./task-badges";
 
 /**
  * One parcel on today's dashboard (never a whole task): its type and courier status, the tracking number, where it
- * comes from and goes to, who to meet (only while the API sends the contact), cash to collect, what to do next, and
- * the actions the API allows for this parcel. Render it inside a <ul>.
+ * comes from and goes to, the delivery fee and how it is paid, who to meet (only while the API sends the contact), cash
+ * to collect at this stop (live steps only), what to do next, and the actions the API allows for this parcel. Render
+ * it inside a <ul>.
  */
 export function ParcelCard({
   delivery,
@@ -57,6 +52,9 @@ export function ParcelCard({
   const route = assignedRoute(delivery, districtName);
   const when =
     phase === "completed" && delivery.completedAt ? `Completed at ${formatTime(delivery.completedAt)}` : null;
+  const fee = delivery.deliveryFee;
+  // Only on a live step: a finished or closed parcel never asks for cash.
+  const collect = cashToCollect(delivery, phase === "active");
 
   return (
     // Two rows shared with the other cards in the grid row (CSS subgrid): the body, then the action section. Each row
@@ -97,6 +95,25 @@ export function ParcelCard({
                 <dd className="break-words text-grey-900">{route.to}</dd>
               </div>
             </div>
+            {fee ? (
+              <div className="flex items-start gap-2">
+                <Receipt className="mt-0.5 size-4 shrink-0 text-grey-500" aria-hidden="true" />
+                <div className="min-w-0">
+                  <dt className="text-caption text-grey-600">Delivery fee</dt>
+                  <dd className="break-words text-grey-900 tabular-nums">
+                    {formatFee(fee)} · {paymentMethodText(fee)}
+                  </dd>
+                  {feeCollectionNote(fee) ? (
+                    <dd className="break-words text-grey-600">{feeCollectionNote(fee)}</dd>
+                  ) : null}
+                  {feePaidLabel(fee) ? (
+                    <dd className="mt-1">
+                      <FeePaidBadge fee={fee} />
+                    </dd>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </dl>
 
           {contact ? (
@@ -114,12 +131,7 @@ export function ParcelCard({
             </div>
           ) : null}
 
-          {phase === "active" && delivery.codAmount !== null && delivery.task.type === "DELIVERY" ? (
-            <p className="flex items-center gap-2 rounded-md border border-grey-200 bg-grey-50 px-3 py-2 text-label text-grey-900 tabular-nums">
-              <Banknote className="size-5 shrink-0 text-grey-700" aria-hidden="true" />
-              Collect {formatRs(delivery.codAmount)} in cash
-            </p>
-          ) : null}
+          {collect ? <CashToCollectNotice collect={collect} /> : null}
 
           {/*
             No instructions box and no routine next-step line on the card: the status badge, the route and the buttons
