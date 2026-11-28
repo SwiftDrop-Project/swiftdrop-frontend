@@ -48,3 +48,19 @@ export interface CardPaymentRequest {
   cvc: string;
   nameOnCard: string;
 }
+
+/** POST /payments/card-check: the mock card is approved (nothing charged or stored). */
+export interface CardCheckResult {
+  cardBrand: string;
+  cardLast4: string;
+}
+
+/**
+ * A card approved in the Create delivery payment gateway, kept in the page's memory until the delivery is booked and
+ * its fee paid with it. Never stored anywhere.
+ */
+export interface ApprovedCard {
+  card: CardPaymentRequest;
+  cardBrand: string;
+  cardLast4: string;
+}
