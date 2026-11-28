@@ -17,10 +17,11 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { Stepper } from "@/components/ui/stepper";
-import { TextButton } from "@/components/ui/text-link";
+import { TextButton, TextLink } from "@/components/ui/text-link";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { useCurrentUser } from "@/features/identity";
+import { OnlinePaymentGateway, paymentsApi, type ApprovedCard } from "@/features/payments";
 import { useFeeEstimate, type FeeEstimateRequest } from "@/features/pricing";
 import { useDistricts } from "@/hooks/use-districts";
 import { isApiError } from "@/lib/api";
@@ -40,6 +41,9 @@ const UNKNOWN_ERROR = "Something went wrong on our side. Try again in a moment."
 const PAYMENT_METHOD_REQUIRED = "Choose how the delivery fee will be paid.";
 
 type Step = "details" | "review" | "done";
+
+/** How the online payment went once the delivery was created (null for a cash payment method). */
+type OnlinePaymentResult = { status: "paid"; cardLast4: string } | { status: "failed"; message: string };
 type ContactKey = "pickup" | "recipient";
 
 const EMPTY_CONTACT = { name: "", phone: "", addressLine: "", city: "", district: "" };
@@ -116,6 +120,9 @@ export function CreateDelivery() {
   const [notice, setNotice] = React.useState<string | null>(null);
   // Kept here, not in the form: it is chosen on the review step, after the details form is valid.
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod | null>(null);
+  // The card approved in the payment gateway (Online payment), kept only in memory until the fee is paid with it.
+  const [onlineCard, setOnlineCard] = React.useState<ApprovedCard | null>(null);
+  const [onlinePayment, setOnlinePayment] = React.useState<OnlinePaymentResult | null>(null);
 
   const {
     register,
@@ -150,12 +157,26 @@ export function CreateDelivery() {
   });
 
   const createDelivery = handleSubmit(async (values) => {
-    // The review step sends nothing without a payment method; this keeps the request type honest.
+    // The review step sends nothing without a payment method (and, for Online, an approved card).
     if (paymentMethod === null) return;
+    if (paymentMethod === "ONLINE" && onlineCard === null) return;
     setNotice(null);
     try {
-      // Only the choice is sent: taking an online payment is the payments work.
-      setCreated(await deliveryApi.create({ ...values, paymentMethod }));
+      const delivery = await deliveryApi.create({ ...values, paymentMethod });
+      // Online: pay the new delivery's fee straight away with the card approved in the gateway. The card was
+      // already approved, so this only fails on a network problem: the delivery stays booked, payable later.
+      if (paymentMethod === "ONLINE" && onlineCard !== null) {
+        try {
+          const paid = await paymentsApi.payParcelByCard(delivery.id, onlineCard.card);
+          setOnlinePayment({ status: "paid", cardLast4: paid.cardLast4 ?? onlineCard.cardLast4 });
+        } catch (error) {
+          setOnlinePayment({ status: "failed", message: isApiError(error) ? error.message : UNKNOWN_ERROR });
+        }
+        setOnlineCard(null);
+      } else {
+        setOnlinePayment(null);
+      }
+      setCreated(delivery);
       setStep("done");
       window.scrollTo({ top: 0 });
     } catch (error) {
@@ -177,12 +198,14 @@ export function CreateDelivery() {
     setCreated(null);
     setNotice(null);
     setPaymentMethod(null);
+    setOnlineCard(null);
+    setOnlinePayment(null);
     setStep("details");
     window.scrollTo({ top: 0 });
   };
 
   if (step === "done" && created) {
-    return <DeliveryCreated delivery={created} onCreateAnother={startAnother} />;
+    return <DeliveryCreated delivery={created} onlinePayment={onlinePayment} onCreateAnother={startAnother} />;
   }
 
   const districtPlaceholder =
@@ -258,6 +281,8 @@ export function CreateDelivery() {
           submitting={isSubmitting}
           paymentMethod={paymentMethod}
           onPaymentMethodChange={setPaymentMethod}
+          onlineCard={onlineCard}
+          onOnlineCardApproved={setOnlineCard}
           onCreate={createDelivery}
           onEdit={() => setStep("details")}
         />
@@ -272,6 +297,9 @@ interface ReviewStepProps {
   submitting: boolean;
   paymentMethod: PaymentMethod | null;
   onPaymentMethodChange: (value: PaymentMethod) => void;
+  /** The card approved in the payment gateway; Online payment can't be chosen without one. */
+  onlineCard: ApprovedCard | null;
+  onOnlineCardApproved: (card: ApprovedCard) => void;
   onCreate: React.FormEventHandler<HTMLFormElement>;
   onEdit: () => void;
 }
@@ -280,7 +308,8 @@ interface ReviewStepProps {
  * What will be booked and how the fee will be paid, with the fee estimate (POST /pricing/estimate) beside it on wide
  * screens (sticky while scrolling) and above the buttons on smaller ones, so it is always seen before "Create
  * delivery". A payment method is required. A parcel that needs a manual quote can't be booked here, so the button
- * is off.
+ * is off. Choosing Online payment opens the payment gateway first: it counts as chosen only once a card is approved
+ * there, and "Create delivery" then books the parcel and pays its fee with that card.
  */
 function ReviewStep({
   values,
@@ -288,12 +317,16 @@ function ReviewStep({
   submitting,
   paymentMethod,
   onPaymentMethodChange,
+  onlineCard,
+  onOnlineCardApproved,
   onCreate,
   onEdit,
 }: ReviewStepProps) {
   const { state: estimate, retry } = useFeeEstimate(estimateRequest(values));
   const needsQuote = estimate.status === "ready" && estimate.estimate.status === "MANUAL_QUOTE";
+  const estimatedFee = estimate.status === "ready" ? estimate.estimate.total : null;
   const [paymentError, setPaymentError] = React.useState<string | null>(null);
+  const [gatewayOpen, setGatewayOpen] = React.useState(false);
   const firstPaymentOption = React.useRef<HTMLInputElement>(null);
   const cod = values.codAmount.trim();
   const feeCard = (
@@ -316,12 +349,30 @@ function ReviewStep({
       firstPaymentOption.current?.focus();
       return;
     }
+    if (paymentMethod === "ONLINE" && onlineCard === null) {
+      event.preventDefault();
+      setGatewayOpen(true);
+      return;
+    }
     onCreate(event);
   };
 
+  // Online payment goes through the payment gateway first: it is selected only once the card is approved.
   const choosePaymentMethod = (value: PaymentMethod) => {
     setPaymentError(null);
+    if (value === "ONLINE" && onlineCard === null) {
+      setGatewayOpen(true);
+      return;
+    }
     onPaymentMethodChange(value);
+  };
+
+  const cardApproved = (card: ApprovedCard) => {
+    onOnlineCardApproved(card);
+    onPaymentMethodChange("ONLINE");
+    setPaymentError(null);
+    setGatewayOpen(false);
+    toast({ tone: "success", title: `Card ···· ${card.cardLast4} approved`, description: "Now create the delivery." });
   };
 
   return (
@@ -334,19 +385,28 @@ function ReviewStep({
           value={paymentMethod}
           onChange={choosePaymentMethod}
           error={paymentError ?? undefined}
+          onlineCard={onlineCard}
+          onChangeCard={() => setGatewayOpen(true)}
         />
 
         <div className="xl:hidden">{feeCard}</div>
 
         <FormActions>
           <Button type="submit" loading={submitting} disabled={needsQuote}>
-            Create delivery
+            {paymentMethod === "ONLINE" && onlineCard ? "Create delivery and pay" : "Create delivery"}
           </Button>
           <Button type="button" variant="secondary" disabled={submitting} onClick={onEdit}>
             Edit details
           </Button>
         </FormActions>
       </form>
+
+      <OnlinePaymentGateway
+        open={gatewayOpen}
+        amount={estimatedFee}
+        onClose={() => setGatewayOpen(false)}
+        onApproved={cardApproved}
+      />
     </PageColumns>
   );
 }
@@ -528,8 +588,19 @@ function ReviewDetails({
   );
 }
 
-/** The last step: the tracking number to keep, with a copy button, and the fee the server set. */
-function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; onCreateAnother: () => void }) {
+/**
+ * The last step: the tracking number to keep, with a copy button, the fee the server set and, for an online payment,
+ * whether the card payment went through (if not, the delivery is booked and payable on the Payments page).
+ */
+function DeliveryCreated({
+  delivery,
+  onlinePayment,
+  onCreateAnother,
+}: {
+  delivery: Delivery;
+  onlinePayment: OnlinePaymentResult | null;
+  onCreateAnother: () => void;
+}) {
   const copyTrackingNumber = async () => {
     try {
       await navigator.clipboard.writeText(delivery.trackingNumber);
@@ -547,6 +618,13 @@ function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; on
         Keep the tracking number to follow the parcel.
       </InlineNotice>
 
+      {onlinePayment?.status === "failed" ? (
+        <InlineNotice tone="error" title="The delivery is booked, but the payment didn't go through">
+          {onlinePayment.message} Pay the delivery fee on the{" "}
+          <TextLink href="/customer/payments">Payments page</TextLink>.
+        </InlineNotice>
+      ) : null}
+
       <Card>
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col gap-1">
@@ -562,7 +640,10 @@ function DeliveryCreated({ delivery, onCreateAnother }: { delivery: Delivery; on
           {delivery.paymentMethod ? (
             <div className="flex flex-col gap-1">
               <span className="text-label text-grey-600">Payment</span>
-              <span className="text-body text-grey-900">{PAYMENT_METHOD_LABEL[delivery.paymentMethod]}</span>
+              <span className="text-body text-grey-900">
+                {PAYMENT_METHOD_LABEL[delivery.paymentMethod]}
+                {onlinePayment?.status === "paid" ? ` · Paid by card ···· ${onlinePayment.cardLast4}` : null}
+              </span>
             </div>
           ) : null}
           <div>

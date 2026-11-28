@@ -35,3 +35,11 @@ payments/
 ├── schemas.ts    zod schema for the card form
 └── index.ts      Public exports: the only file other code may import
 ```
+
+## Used by other features
+
+- `OnlinePaymentGateway` (Create delivery, `@/features/delivery`): the payment gateway shown when the customer picks
+  Online payment. It approves the mock card with `POST /payments/card-check` (nothing charged or stored; the decline
+  card stops here), and returns the card, kept only in the page's memory. Create delivery then pays the new delivery
+  with `paymentsApi.payParcelByCard` (`POST /payments/parcels/{parcelId}/card`).
+- `CardDialog` is the shared card form behind both `PayByCardDialog` and the gateway.
