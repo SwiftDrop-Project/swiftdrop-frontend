@@ -34,6 +34,9 @@ export type ApiErrorCode =
   | "ASSIGNMENT_CLOSED"
   | "ASSIGNMENT_NOT_FINISHED"
   | "ASSIGNMENT_CHANGED"
+  // Courier delivery fee collection (API.md "Courier").
+  | "FEE_ALREADY_COLLECTED"
+  | "FEE_COLLECTION_NOT_ALLOWED"
   | "UNSUPPORTED_MEDIA_TYPE"
   | "INTERNAL_ERROR"
   | "SERVICE_UNAVAILABLE"

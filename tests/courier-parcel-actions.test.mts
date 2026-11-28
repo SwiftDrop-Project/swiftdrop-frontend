@@ -93,6 +93,7 @@ function pickup(overrides: Partial<Delivery> = {}, task: Partial<Task> = {}): De
     to: { city: "Kandy", district: "KANDY" },
     weightKg: 1.2,
     codAmount: null,
+    deliveryFee: null,
     instructions: null,
     assignedAt: "2026-11-05T02:30:00Z",
     // Java Instants can carry fractions of a second.
@@ -129,6 +130,7 @@ function delivery(overrides: Partial<Delivery> = {}, task: Partial<Task> = {}): 
     to: { city: "Kandy", district: "KANDY" },
     weightKg: 1.2,
     codAmount: 2450,
+    deliveryFee: null,
     instructions: "Call before you arrive.",
     assignedAt: "2026-11-05T02:30:00Z",
     updatedAt: "2026-11-05T05:10:00Z",
@@ -370,7 +372,11 @@ test("a photo the backend refuses at DELIVERED (proofPhotoId) must be uploaded a
 test("the delivered dialog requires the photo and offers Take photo and Choose file", () => {
   const dialog = readSource("features/courier/components/parcel-action-dialog.tsx");
   assert.match(dialog, /<ImagePicker/);
-  assert.match(dialog, /submitDisabled=\{!isValid \|\| !photoReady\}/, "confirm waits for a valid name and photo");
+  assert.match(
+    dialog,
+    /submitDisabled=\{!isValid \|\| !photoReady \|\| !fee\.ready \|\| !cod\.ready\}/,
+    "confirm waits for a valid name, a photo and every cash box that applies (delivery fee, cash on delivery)",
+  );
   assert.match(dialog, /submitDelivered\(/);
   const picker = readSource("components/ui/image-picker.tsx");
   assert.match(picker, /capture="environment"/, "Take photo opens the camera on phones");

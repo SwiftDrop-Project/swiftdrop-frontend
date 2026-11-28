@@ -206,7 +206,7 @@ test("a parcel not at the task's origin branch can't be taken out, only marked U
 
 test("pickup: PICKED_UP keeps it active; AT_BRANCH needs receivedBy and completes it; the task completes after its last parcel", async () => {
   reset();
-  let after = await status(1, { status: "PICKED_UP" });
+  let after = await status(1, { status: "PICKED_UP", feeCollected: true });
   assert.equal(after.completed, false, "picked up is not completed");
   assert.deepEqual(after.nextStatuses, ["AT_BRANCH"]);
 
@@ -232,7 +232,7 @@ test("delivery: out for delivery, delivered with recipientName; FAILED stays act
   await rejectsWith(status(6, { status: "DELIVERED" }), "VALIDATION_FAILED", "recipientName");
   await rejectsWith(status(6, { status: "DELIVERED", recipientName: "Ayesha" }), "VALIDATION_FAILED", "proofPhotoId");
   const photo = await upload(6);
-  after = await status(6, { status: "DELIVERED", recipientName: "Ayesha", proofPhotoId: photo.proofPhotoId });
+  after = await status(6, { status: "DELIVERED", recipientName: "Ayesha", proofPhotoId: photo.proofPhotoId, feeCollected: true });
   assert.equal(after.completed, true);
   assert.deepEqual(after.proof, { recipientName: "Ayesha", hasPhoto: true });
   assert.ok(preview.previewProofImageUrl(P(6)), "the picked photo is shown from memory");
@@ -268,7 +268,7 @@ test("Unable to Collect: one action for pickups and deliveries; the backend pick
 
 test("the button pressed twice, a skipped step, a cancelled task: the backend's 409s", async () => {
   reset();
-  await status(1, { status: "PICKED_UP" });
+  await status(1, { status: "PICKED_UP", feeCollected: true });
   await rejectsWith(status(1, { status: "PICKED_UP" }), "TASK_STEP_NOT_ALLOWED");
   await rejectsWith(status(4, { status: "AT_BRANCH", receivedBy: "S. Silva" }), "TASK_STEP_NOT_ALLOWED");
   await rejectsWith(status(14, { status: "PICKED_UP" }), "ASSIGNMENT_CLOSED");
@@ -302,7 +302,7 @@ test("proof in preview: only for a parcel out for delivery, a valid image, its o
 
   // Another parcel's photo can't be attached; DELIVERED without a photo is refused.
   await status(6, { status: "OUT_FOR_DELIVERY" });
-  await rejectsWith(status(6, { status: "DELIVERED", recipientName: "Ayesha", proofPhotoId: sevens.proofPhotoId }),
+  await rejectsWith(status(6, { status: "DELIVERED", recipientName: "Ayesha", proofPhotoId: sevens.proofPhotoId, feeCollected: true }),
     "VALIDATION_FAILED", "proofPhotoId");
   assert.equal((await parcel(6)).status, "OUT_FOR_DELIVERY");
   await rejectsWith(status(6, { status: "FAILED", failureReason: "WRONG_ADDRESS", proofPhotoId: sevens.proofPhotoId }),

@@ -94,6 +94,7 @@ function pickup(overrides: Partial<Delivery> = {}, task: Partial<Task> = {}): De
     to: { city: "Kandy", district: "KANDY" },
     weightKg: 1.2,
     codAmount: null,
+    deliveryFee: null,
     instructions: null,
     assignedAt: "2026-11-05T02:30:00Z",
     // Java Instants can carry fractions of a second.
@@ -130,6 +131,7 @@ function delivery(overrides: Partial<Delivery> = {}, task: Partial<Task> = {}): 
     to: { city: "Kandy", district: "KANDY" },
     weightKg: 1.2,
     codAmount: 2450,
+    deliveryFee: null,
     instructions: "Call before you arrive.",
     assignedAt: "2026-11-05T02:30:00Z",
     updatedAt: "2026-11-05T05:10:00Z",
@@ -604,8 +606,9 @@ test("parcel detail page: each fact once (route card, no From/To in Parcel, no d
   assert.match(detail, /<ParcelStatusBadge delivery=\{delivery\} \/>\s*<CopyTrackingNumber trackingNumber=\{delivery\.trackingNumber\} \/>/);
   assert.match(detail, /historical \? "Parcel status now" : "Parcel status"/);
   assert.match(detail, /Task status<\/dt>/);
-  // Cash on delivery once: the next-step reminder while it applies, otherwise in Parcel.
-  assert.match(detail, /delivery\.codAmount !== null && !cashReminder/);
+  // Cash on delivery and the delivery fee once each: the next-step reminder while it applies, otherwise in Parcel.
+  assert.match(detail, /delivery\.codAmount !== null && collect\?\.cod == null/);
+  assert.match(detail, /fee && collect\?\.fee == null/);
   // The contact shows one full address line.
   const contact = readSource("features/courier/components/contact-details.tsx");
   assert.match(contact, /\{fullAddress\(contact, districtName\)\}/);

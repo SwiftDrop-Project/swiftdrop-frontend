@@ -1,5 +1,5 @@
 import type { DistrictCode, ParcelStatus } from "@/types";
-import type { AssignmentType, CourierTargetStatus, ItemOutcome } from "../types";
+import type { AssignmentType, CourierTargetStatus, FeePaymentMethod, FeePaymentStatus, ItemOutcome } from "../types";
 
 /*
  * PREVIEW ONLY. A copy of the backend's step rules, so the sample parcels answer like the real API:
@@ -7,6 +7,7 @@ import type { AssignmentType, CourierTargetStatus, ItemOutcome } from "../types"
  * - dispatch.ItemOutcome (next, closes)
  * - courier.internal.application.CourierTask (stepStatuses, nextStatuses, atTheRightBranch, canMarkUnableToCollect,
  *   unableToCollectOutcome, outcomeFor, handOverBranch)
+ * - delivery.FeePaymentStatus (of) and courier.internal.application.FeeCollection (collectOn)
  * The real screens never use this file: they show what the backend sends. If the backend rules change, change these.
  * Only pickups and deliveries are copied: couriers aren't given branch transfers, so a TRANSFER has no steps here.
  */
@@ -133,4 +134,32 @@ export function handOverBranch(
   destinationBranch: DistrictCode | null,
 ): DistrictCode | null {
   return type === "DELIVERY" ? originBranch : destinationBranch;
+}
+
+/** Who recorded a fee payment (delivery.FeePaymentSource). */
+export type FeePaymentSource = "COURIER_CASH" | "ONLINE";
+
+/** FeePaymentStatus.of: the status from the payment method and the recorded payment (null: none). */
+export function feePaymentStatus(method: FeePaymentMethod | null, paidBy: FeePaymentSource | null): FeePaymentStatus {
+  if (paidBy !== null) return paidBy === "ONLINE" ? "ONLINE_VERIFIED" : "CASH_COLLECTED";
+  if (method === null) return "NOT_RECORDED";
+  return method === "ONLINE" ? "AWAITING_ONLINE_VERIFICATION" : "AWAITING_CASH_COLLECTION";
+}
+
+/**
+ * FeeCollection.collectOn: the status change of this step that must confirm the cash collection (PICKED_UP for an
+ * AT_PICKUP fee in a pickup, DELIVERED for an AT_DROP_OFF fee in a delivery), or null.
+ */
+export function feeCollectOn(
+  status: FeePaymentStatus,
+  method: FeePaymentMethod | null,
+  type: AssignmentType,
+  outcome: ItemOutcome,
+  closed: boolean,
+): "PICKED_UP" | "DELIVERED" | null {
+  if (status !== "AWAITING_CASH_COLLECTION") return null;
+  const target = method === "AT_PICKUP" ? "PICKED_UP" : method === "AT_DROP_OFF" ? "DELIVERED" : null;
+  const taskType = method === "AT_PICKUP" ? "PICKUP" : "DELIVERY";
+  if (target === null || type !== taskType) return null;
+  return stepStatuses(type, outcome, closed).includes(target) ? target : null;
 }

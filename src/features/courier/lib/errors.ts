@@ -9,6 +9,8 @@ import { isApiError } from "@/lib/api";
  * - stale:      409 TASK_STEP_NOT_ALLOWED (a skipped step, a double tap, a completed parcel) or
  *               INVALID_STATUS_TRANSITION (the parcel moved, or isn't at the branch yet) → reload and look again
  * - changed:    409 ASSIGNMENT_CHANGED: the dispatcher changed the task at the same moment → reload and look again
+ * - stale also: 409 FEE_ALREADY_COLLECTED (the delivery fee was already paid, e.g. a second confirmation) or
+ *               FEE_COLLECTION_NOT_ALLOWED → reload: the parcel shows its payment as it is now
  * - other:      anything else (network, 401, 403, 429, 500, 503, an answer that doesn't match the contract)
  * Nothing was saved in any of these cases: the backend writes the parcel and the task together or not at all.
  */
@@ -73,6 +75,8 @@ export function describeCourierError(error: unknown, { loadingById = false } = {
       return result("closed", error.message);
     case "TASK_STEP_NOT_ALLOWED":
     case "INVALID_STATUS_TRANSITION":
+    case "FEE_ALREADY_COLLECTED":
+    case "FEE_COLLECTION_NOT_ALLOWED":
       return result("stale", error.message);
     case "ASSIGNMENT_CHANGED":
       return result("changed", error.message);
